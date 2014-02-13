@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE TAF SYSTEM "tango.dtd" >
+<TAF Version="0x02000002">
+	<Comments />
+
+	<!--Main program-->
+	<Program>
+		<ActionRef Ref="Header_" />
+		<ActionRef Ref="Elenco________">
+			<ActionRef Ref="FilterAssign_" />
+			<ActionRef Ref="QueryBuilder" />
+			<ActionRef Ref="Intestazione" />
+			<ActionRef Ref="ContaRecords" />
+			<ActionRef Ref="Lista" />
+		</ActionRef>
+		<ActionRef Ref="Form_di_Editing______">
+			<ActionRef Ref="If">
+				<ActionRef Ref="Search" />
+			</ActionRef>
+			<ActionRef Ref="Editing___" />
+		</ActionRef>
+		<ActionRef Ref="Insert______">
+			<ActionRef Ref="ControlloCampiMancanti" />
+			<ActionRef Ref="If1">
+				<ActionRef Ref="Insert" />
+				<ActionRef Ref="Reload1" />
+			</ActionRef>
+		</ActionRef>
+		<ActionRef Ref="Update_______">
+			<ActionRef Ref="Update" />
+			<ActionRef Ref="Reload2" />
+		</ActionRef>
+		<ActionRef Ref="Delete________">
+			<ActionRef Ref="Delete" />
+			<ActionRef Ref="Reload" />
+			<ActionRef Ref="Return1" />
+		</ActionRef>
+		<ActionRef Ref="Footer_" />
+		<ActionRef Ref="Return4" />
+	</Program>
+
+	<!--Program actions-->
+	<Actions>
+		<ResultAction ID="Header_" Sig="null">
+			<ResultsOutput Ref="Header_.Results" />
+		</ResultAction>
+		<IfAction ID="Elenco________" Sig="if  " Expanded="True">
+			<Expression><![CDATA[('<@ARG a>'='')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG a>]]></ExpLeft>
+				<ExpRight />
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+		</IfAction>
+		<ResultAction ID="FilterAssign_" Sig="null">
+			<ResultsOutput Ref="FilterAssign_.Results" />
+		</ResultAction>
+		<ResultAction ID="QueryBuilder" Sig="null" PushResults="True">
+			<ResultsOutput Ref="QueryBuilder.Results" />
+		</ResultAction>
+		<ResultAction ID="Intestazione" Sig="null">
+			<ResultsOutput Ref="Intestazione.Results" />
+		</ResultAction>
+		<DirectDBMSAction UseDevelopmentDataSource="TRUE" DSID="jmDbaseName" DeploymentDSID="" ID="ContaRecords" Sig="cust">
+			<Custom><![CDATA[<@VAR sQueryCount encoding=none>]]></Custom>
+			<StartRow>1</StartRow>
+			<MaxRows>1</MaxRows>
+			<ResultSet Name="ResultSet" Type="Array" />
+			<ResultsOutput Ref="ContaRecords.Results" />
+			<ErrorOutput Ref="ContaRecords.Error" />
+		</DirectDBMSAction>
+		<DirectDBMSAction UseDevelopmentDataSource="TRUE" DSID="jmDbaseName" DeploymentDSID="" ID="Lista" Sig="cust">
+			<Custom><![CDATA[<@VAR sQuery encoding=none>]]></Custom>
+			<StartRow>@@iStart</StartRow>
+			<MaxRows><![CDATA[<@VAR iPageRows>]]></MaxRows>
+			<ResultSet Name="ResultSet" Type="Array" />
+			<ResultsOutput Ref="Lista.Results" />
+			<ErrorOutput Ref="Lista.Error" />
+		</DirectDBMSAction>
+		<ElseIfAction ID="Form_di_Editing______" Sig="elif" Expanded="True">
+			<Expression><![CDATA[('<@ARG a>'='new') or ('<@ARG a>'='edit')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG a>]]></ExpLeft>
+				<ExpRight>new</ExpRight>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG a>]]></ExpLeft>
+				<ExpRight>edit</ExpRight>
+				<Conjunction>or  </Conjunction>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+		</ElseIfAction>
+		<IfAction ID="If" Sig="if  " Expanded="True">
+			<Expression><![CDATA[('<@ARG code>'>'0') and ('<@ARG a>'='edit')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG code>]]></ExpLeft>
+				<ExpRight>0</ExpRight>
+				<Operator>gthn</Operator>
+			</ExpressionInfo>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG a>]]></ExpLeft>
+				<ExpRight>edit</ExpRight>
+				<Conjunction>and </Conjunction>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+		</IfAction>
+		<SearchAction UseDevelopmentDataSource="TRUE" DSID="jmDbaseName" DeploymentDSID="" ID="Search" Sig="srch">
+			<Tables>
+				<TableName>jmTableName</TableName>
+			</Tables>
+			<DataDictionary>
+				<Column DataType="long" ColumnType="0">
+					<TableName>jmTableName</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</Column>
+			</DataDictionary>
+			<SearchColumns>
+				<ColumnReference>
+					<TableName>jmTableName</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</ColumnReference>
+			</SearchColumns>
+			<OrderColumns>
+				<OrderColumn>
+					<Ascending>True</Ascending>
+					<TableOwner />
+					<TableName />
+					<ColumnName>1</ColumnName>
+				</OrderColumn>
+			</OrderColumns>
+			<Criteria>
+				<CriteriaItem>
+					<TableName>jmTableName</TableName>
+					<ColumnName>jmFieldCode</ColumnName>
+					<Operator>iseq</Operator>
+					<Value><![CDATA[<@ARG code>]]></Value>
+					<QuoteValue>false</QuoteValue>
+					<IncludeIfEmpty>false</IncludeIfEmpty>
+				</CriteriaItem>
+			</Criteria>
+			<StartRow>1</StartRow>
+			<MaxRows>1</MaxRows>
+			<ResultSet Name="ResultSet" Type="Array" />
+			<ResultsOutput Ref="Search.Results" />
+		</SearchAction>
+		<ResultAction ID="Editing___" Sig="null">
+			<ResultsOutput Ref="Editing___.Results" />
+		</ResultAction>
+		<ElseIfAction ID="Insert______" Sig="elif" Expanded="True">
+			<Expression><![CDATA[('<@ARG a>'='ins')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG a>]]></ExpLeft>
+				<ExpRight>ins</ExpRight>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+		</ElseIfAction>
+		<ResultAction ID="ControlloCampiMancanti" Sig="null">
+			<ResultsOutput Ref="ControlloCampiMancanti.Results" />
+		</ResultAction>
+		<IfAction ID="If1" Sig="if  " Expanded="True">
+			<Expression><![CDATA[('@@fOk'='1')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft>@@fOk</ExpLeft>
+				<ExpRight>1</ExpRight>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+		</IfAction>
+		<InsertAction UseDevelopmentDataSource="TRUE" DSID="jmDbaseName" DeploymentDSID="jmDbaseName" ID="Insert" Sig="insr" AutoCommit="True">
+			<Tables>
+				<TableName>jmDbaseName</TableName>
+			</Tables>
+			<DataDictionary>
+				<Column DataType="long" ColumnType="0">
+					<TableName>agenzie</TableName>
+					<ColumnName>IDCODE</ColumnName>
+				</Column>
+			</DataDictionary>
+			<ValueList>
+				<ValueItem>
+					<Name>IDCODE</Name>
+					<Value />
+					<QuoteValue>false</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+			</ValueList>
+		</InsertAction>
+		<ResultAction ID="Reload1" Sig="null">
+			<ResultsOutput Ref="Reload1.Results" />
+		</ResultAction>
+		<ElseIfAction ID="Update_______" Sig="elif" Expanded="True">
+			<Expression><![CDATA[('<@ARG a>'='upd') and (LEN('<@ARG code>'))]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG a>]]></ExpLeft>
+				<ExpRight>upd</ExpRight>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG code>]]></ExpLeft>
+				<ExpRight />
+				<Conjunction>and </Conjunction>
+				<Operator>nemp</Operator>
+			</ExpressionInfo>
+		</ElseIfAction>
+		<UpdateAction UseDevelopmentDataSource="TRUE" DSID="jmDbaseName" DeploymentDSID="" ID="Update" Sig="updt" AutoCommit="True">
+			<Tables>
+				<TableName>jmTableName</TableName>
+			</Tables>
+			<DataDictionary>
+				<Column DataType="long" ColumnType="0">
+					<TableName>jmTableName</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</Column>
+			</DataDictionary>
+			<Criteria>
+				<CriteriaItem>
+					<TableName>jmTableName</TableName>
+					<ColumnName>CODICE</ColumnName>
+					<Operator>iseq</Operator>
+					<Value><![CDATA[<@ARG code>]]></Value>
+					<QuoteValue>false</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+				</CriteriaItem>
+			</Criteria>
+			<ValueList>
+				<ValueItem>
+					<Name>CODICE</Name>
+					<Value><![CDATA[<@ARG code>]]></Value>
+					<QuoteValue>false</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+			</ValueList>
+		</UpdateAction>
+		<ResultAction ID="Reload2" Sig="null">
+			<ResultsOutput Ref="Reload2.Results" />
+		</ResultAction>
+		<ElseIfAction ID="Delete________" Sig="elif" Expanded="True">
+			<Expression><![CDATA[('<@ARG a>'='del') and (LEN('<@ARG code>'))]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG a>]]></ExpLeft>
+				<ExpRight>del</ExpRight>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG code>]]></ExpLeft>
+				<ExpRight />
+				<Conjunction>and </Conjunction>
+				<Operator>nemp</Operator>
+			</ExpressionInfo>
+		</ElseIfAction>
+		<DeleteAction UseDevelopmentDataSource="TRUE" DSID="jmDbaseName" DeploymentDSID="" ID="Delete" Sig="dele" AutoCommit="True">
+			<Tables>
+				<TableName>jmTableName</TableName>
+			</Tables>
+			<DataDictionary>
+				<Column DataType="long" ColumnType="0">
+					<TableName>jmTableName</TableName>
+					<ColumnName>jmFieldCode</ColumnName>
+				</Column>
+			</DataDictionary>
+			<Criteria>
+				<CriteriaItem>
+					<TableName>jmTableName</TableName>
+					<ColumnName>jmFieldCode</ColumnName>
+					<Operator>iseq</Operator>
+					<Value><![CDATA[<@ARG code>]]></Value>
+					<QuoteValue>false</QuoteValue>
+					<IncludeIfEmpty>false</IncludeIfEmpty>
+				</CriteriaItem>
+			</Criteria>
+		</DeleteAction>
+		<ResultAction ID="Reload" Sig="null">
+			<ResultsOutput Ref="Reload.Results" />
+		</ResultAction>
+		<ReturnAction ID="Return1" Sig="stop" />
+		<ResultAction ID="Footer_" Sig="null">
+			<ResultsOutput Ref="Footer_.Results" />
+		</ResultAction>
+		<ReturnAction ID="Return4" Sig="stop" />
+	</Actions>
+
+	<!--Data sources-->
+	<DataSources>
+		<DataSource ID="jmDbaseName">
+			<DSType>ODBC</DSType>
+			<DSN>jmDbaseName</DSN>
+			<DBMS />
+			<Host>jmDbaseName</Host>
+			<Database />
+			<UserInfo Encrypted="True">
+				<UserName />
+				<Password />
+			</UserInfo>
+		</DataSource>
+	</DataSources>
+
+	<!--Output blocks-->
+	<Outputs>
+		<Output ID="Header_.Results" Type="HTML"><![CDATA[<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"> <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="it-IT"><head><meta http-equiv="content-type" content="text/html; charset=iso-8859-1" /><meta http-equiv="Pragma" content="no-cache" /> <meta http-equiv="expires" content="Sun, 12 May 1968 12:00:00 GMT" /><meta http-equiv="content-Language" content="it-IT" /><title>CMS Ferra srl</title><link href="cms.css" rel="stylesheet" type="text/css" /></head><@assign iPageRows 25><@! Numero di righe per pagina ><@ASSIGN iCs 4><@! Numero colonne in lista><@! style applicativo -----------><style type="text/css">.PageTitle {background-color:#000080; color:white; font-weight:bold; padding:2px;}.SubTitle {height:20px; font-family:Tahoma,helvetica; background-color:#F0F0F0; color:black; padding:4px; font-size:11px; }.zone_a {position:relative; float:left; padding:2px; padding-left:2px; padding-right:2px; background:#eaeaea; color:black;}.zone_s {position:relative; float:left; padding:2px; padding-left:2px; padding-right:2px;}.zone_t {position:relative; float:left; padding:2px; padding-left:8px; padding-right:8px; border:1px solid gray; background:#ff7000; color:white;}.Filter {background-color:#F0F0F0; color:black; padding:2px;}.imgSort {margin:2px;}td.sortOut  {padding-left:2px; background:#eaeaea; border-bottom:2px solid #c0c0c0; border-left:1px solid white;}td.sortSel  {padding-left:2px; background:#eaeaea; border-bottom:2px solid #c0c0c0; border-left:1px solid white;}td.sortOver {padding-left:2px; background:white; border-bottom:2px solid orange; cursor:pointer; border-left:1px solid white;}td.sortNo {padding-left:2px; background:#eaeaea; border-bottom:2px solid eaeaea; border-left:1px solid white;}table.lst {width:100%; border-collapse:collapse;}td.lst {padding:2px; border-left:1px solid #aaaaaa;}tr.lstOut0  {background:#efefef; color:black;}tr.lstOut1  {background:#f8f8f8; color:black;}tr.lstOver0 {background:#e0e0f0; cursor:pointer; color:black;}tr.lstOver1 {background:#e0e0f0; cursor:pointer; color:black;}tr.lstDel  {background:red; color:black;}/* style per lista items */.stsRecord {position:relative; padding:1px; height:24px;}.sel_top {position:absolute; right:1px; top:1px; font-family:Tahoma,helvetica; background:white; font-size:9px;}.sel_bottom {position:relative; font-family:Tahoma,helvetica; background:white; font-size:9px; text-align:center; width:100%; height:24px }.nsipt {margin-left:-1px; margin-top:-1px; padding:0px; height:13px; width:30px;}.nsi {float:left; margin-left:2px;}.nsOut {float:left; padding:2px; border:1px solid gray; margin-left:2px; cursor:pointer;}.nsOutOver {float:left; padding:2px; border:1px solid #c0c0c0; margin-left:2px; cursor:pointer; color:#FF7000;}.ntOut {float:left; width:16px; padding:2px; border:1px solid gray; margin-left:2px; text-align:center; cursor:pointer;}.ntOutOver {float:left; width:16px; padding:2px; border:1px solid #c0c0c0; margin-left:2px; text-align:center; cursor:pointer; color:#ff7000}.nsOver {float:left; padding:2px; border:1px solid gray; margin-left:2px; cursor:pointer; font-size:10px;}.ntOver {float:left; width:16px; padding:2px; border:1px solid gray; margin-left:2px; text-align:center; cursor:pointer; font-size:10px;}.ntFocus {float:left; background:#FF7000; color:white; width:18px; padding:2px; border:1px solid gray; margin-left:2px; text-align:center; font-weight:bold; letter-spacing:-1px; overflow:hidden;}</style><@ASSIGN iStart <@ARG _s>><@IF "@@iStart<1"><@ASSIGN iStart 1></@IF><@ASSIGN iStart <@CALC "(floor((@@iStart-1)/@@iPageRows))*@@iPageRows+1">><script type="text/javascript">var szLinkBase="<@APPFILENAME>?<@USERREFERENCEARGUMENT>&NC=<@RANDOM LOW='1' HIGH='10000'>";function Go(lnk) {var url=szLinkBase;  if (lnk) url+=lnk; document.location.href=url;}function Gos(lnk) { var url=szLinkBase+"&_s=@@iStart";  if (lnk) url+=lnk; document.location.href=url;}</script><body><div class="PageTitle">Gestione jmArchiveName</div>]]></Output>
+		<Output ID="FilterAssign_.Results" Type="HTML"><![CDATA[<@! Filtri e sort ><@IF "<@ARG SF>>''"><@ASSIGN user$jmWordFilter <@ARG WORD>></@IF><@IFEMPTY "@@user$jmUserSort"><@ASSIGN user$jmUserSort "jmFirstSort ASC"></@IF><@IF "<@ARG sort>>'!'"><@assign user$jmUserSort <@ARG sort>></@IF>]]></Output>
+		<Output ID="QueryBuilder.Results" Type="HTML"><![CDATA[<@EXCLUDE><@ASSIGN sQuery "SELECT @#QUERY_LIST#@"><@ASSIGN sQuery "<@VAR sQuery> FROM jmTableName "><@ASSIGN Where ""><@ASSIGN e "WHERE ("><@! Parola  ><@IF "@@user$jmWordFilter>''"><@ASSIGN Where "<@VAR Where encoding=none>@@e (CODICE LIKE '%<@VAR user$jmWordFilter encoding=SQL>%' OR Rag_Sociale LIKE '%<@VAR user$jmWordFilter encoding=SQL>%' OR Tel LIKE '%<@VAR user$jmWordFilter encoding=SQL>%' OR Fax LIKE '%<@VAR user$jmWordFilter encoding=SQL>%' OR Email LIKE '%<@VAR user$jmWordFilter encoding=SQL>%')"><@ASSIGN e " AND"></@IF><@! Lingua  ><@IF "@@user$MBA_Lang>''"><@ASSIGN Where "<@VAR Where encoding=none>@@e (LINGUA='<@VAR user$MBA_Lang>')"><@ASSIGN e " AND"></@IF><@IF "@@Where>''"><@ASSIGN Where "<@VAR Where encoding=none>)"></@if><@ASSIGN sQuery "<@VAR sQuery><@VAR Where encoding=none>"><@ASSIGN sQueryCount "SELECT COUNT(*) FROM jmTableName <@VAR Where encoding=none>"><@ASSIGN sQuery "<@VAR sQuery> ORDER BY <@VAR user$jmUserSort>">@@sQuery<br /></@EXCLUDE>]]></Output>
+		<Output ID="Intestazione.Results" Type="HTML"><![CDATA[<div class="Filter"><form name="f" method="post" action="<@APPFILENAME>?<@USERREFERENCEARGUMENT>&NC=<@RANDOM LOW='1' HIGH='10000'>"><img src="images/nuovo.gif" class="imgButton" width="76" height="21" onClick="Go('&a=new')" /><input type="hidden" name="sf" value="1"><input type="text" name="WORD" value="@@user$jmWordFilter" style="width:80px;" /><input type="submit" value="Cerca"></form></div>]]></Output>
+		<Output ID="ContaRecords.Results" Type="HTML"><![CDATA[<@ASSIGN iTotalRows <@COL 1>>]]></Output>
+		<Output ID="ContaRecords.Error" Type="HTML"><![CDATA[<@VAR sQueryCount econding=none><BR>Total rows: @@Totalrows<BR><BR><@ERRORS><B>Class: </B><@ERROR PART="class"><BR><B>Application File: </B><@ERROR PART="appfilepath"><@ERROR PART="appfilename"><BR><B>Action: </B><@ERROR PART="postion"><BR><B>Main Error Number: </B><@ERROR PART="number1"><BR><B>Secondary Error Number: </B><@ERROR PART="number2"><BR><B>Main Error Message: </B><@ERROR PART="message1"><BR><B>Secondary Error Message: </B><@ERROR PART="message2"><BR><HR></@ERRORS>]]></Output>
+		<Output ID="Lista.Results" Type="HTML"><![CDATA[<script type="text/javascript" language="javascript" src="cms.js"></script><@ASSIGN arTit <@ARRAY VALUE="Id,CODICE,1%,DESC,x">><@ASSIGN sn <@TOKENIZE VALUE="<@VAR user$jmUserSort>" CHARS=" ">><div class="stsRecord"><@ASSIGN iLastRecord <@CALC "@@iStart+@@iPageRows-1">><@IF "@@iLastRecord>@@iTotalRows"><@ASSIGN iLastRecord @@iTotalRows></@IF><@IF "@@iTotalRows=0">Nessun record presente<@ELSEIF "@@TotalRows=1">1 Record presente<@ELSEIF "@@iTotalRows > 1">Records presenti <b>@@iTotalRows</b> <small>(dal <@STARTROW> al @@iLastRecord)</small></@IF><script type="text/javascript">Selector(<@VAR iStart>,<@VAR iPageRows>,<@VAR iTotalRows>,"sel_top");</script></div><@IF "@@iTotalRows>0"><@! Gestione barra ordinamento --------------------------><table class="lst"><tr><@ROWS array=arTit><@IF "<@COL 4>>''"><td id="sort<@CURROW>" class="sortOut" width="<@COL 3>"onMouseOut="this.className='sortOut';" onMouseOver="this.className='sortOver';"<@IF "@@sn[1,1]='<@COL 2>'">onClick="Go('&sort=<@COL 2>+<@IF '@@sn[1,2]=DESC'>ASC<@ELSE>DESC</@IF>');"<@ELSE>onClick="Go(szLinkBase+'&sort=<@COL 2>+<@COL 4>');"</@IF>><@ELSE><td class="sortNo" <@IF "<@COL 3>>''">width="<@COL 3>"</@IF>></@IF><@IF "@@sn[1,1]='<@COL 2>'"><b></@IF><@COL 1><@IF "@@sn[1,1]='<@COL 2>'"><img class="imgSort" src="images/arrow<@IF '@@sn[1,2]=DESC'>Dn.gif<@ELSE>Up.gif</@IF>" /></@IF></td></@ROWS><td width="24" class="sortNo"></td></tr><@!	Output elenco -----------------------------------------><tr><td style="border-top:1px solid #555555"></td></tr><@ROWS><@IF "<@CURROW>><@VAR iPageRows>"><@BREAK></@IF><@! Controllo Pervasive ---- ><@ASSIGN szLink "&a=Edit&code=<@COLUMN 'jmTableName.jmFieldCode'>"><@ASSIGN i <@CALC "<@CURROW>%2">><tr id="tr<@CURROW>" class="lstOut<@VAR i>" onClick="Gos('@@szLink')" onMouseOut="this.className='lstOut<@VAR i>';" onMouseOver="this.className='lstOver<@VAR i>';"><td class="lst">jmRowsList</td><td class="lst"><img src="images/bin.gif" width=17" height="16" title="Cancella" onClick="DelItem(event,<@COL 1>,'<@COL 2 encoding=URL>')" /></td></tr></@ROWS></table><script type="text/javascript">Selector(<@VAR iStart>,<@VAR iPageRows>,<@VAR iTotalRows>,"sel_bottom");</script></@IF>]]></Output>
+		<Output ID="Lista.Error" Type="HTML"><![CDATA[<@VAR sQuery econding=none><BR>Total rows: @@Totalrows<BR><BR><@ERRORS><B>Class: </B><@ERROR PART="class"><BR><B>Application File: </B><@ERROR PART="appfilepath"><@ERROR PART="appfilename"><BR><B>Action: </B><@ERROR PART="postion"><BR><B>Main Error Number: </B><@ERROR PART="number1"><BR><B>Secondary Error Number: </B><@ERROR PART="number2"><BR><B>Main Error Message: </B><@ERROR PART="message1"><BR><B>Secondary Error Message: </B><@ERROR PART="message2"><BR><HR></@ERRORS>]]></Output>
+		<Output ID="Search.Results" Type="HTML"><![CDATA[<@ASSIGN arResult @@ResultSet>]]></Output>
+		<Output ID="Editing___.Results" Type="HTML"><![CDATA[<div class="SubTitle"><@IF "<@ARG a>='new'"><div class="zone_a"><a href="javascript:Gos()">Lista principale</a></div><div class="zone_s">></div><div class="zone_t">Nuovo inserimento</div><@ELSE><div class="zone_a"><a href="javascript:Gos()">Lista principale</a></div><div class="zone_s">></div><div class="zone_t">in modifica @@arResult[1,1]</div></@IF></div><@IF "<@ARG a>='new'"><form method="POST" name="f" action="<@APPFILENAME>?a=ins&<@UserReferenceArgument>&NC=<@RANDOM LOW='1' HIGH='10000'>&_s=<@ARG _s>"><@ELSE><form method="POST" name="f" action="<@APPFILENAME>?a=upd&<@UserReferenceArgument>&NC=<@RANDOM LOW='1' HIGH='10000'>&_s=<@ARG _s>"><input type="hidden" name="code" value="<@ARG code>" /></@IF><table width="100%" class="ed_table"><tr><td width="8%"></td><td width="*"></td></tr><tr><td></td><td>jmEditFields</td></tr></table><table width="100%"><tr><td width="50%"><@IF "<@ARG a>='new'"><input type="submit" value="Inserisci" /><@ELSE><input type="submit" value="Applica le modifiche" /></@IF></td><td align="right"><input type="reset" VALUE="Cancella i campi" /></td></tr></table></form>]]></Output>
+		<Output ID="ControlloCampiMancanti.Results" Type="HTML"><![CDATA[<@ASSIGN fOk 1><@IF "jmFieldsControl"><@ASSIGN fOk 0><div class="SubTitle"><div class="zone_a"><a href="javascript:Gos()">Lista principale</a></div><div class="zone_s">></div><div class="zone_a"><a href="javascript:history.back()">Nuovo inserimento</a></div><div class="zone_s">></div><div class="zone_t">Controllo campi</div></div><table style="background:#f0f0f0; padding:3px; border:2px dashed #ff7000; margin:10px; font-family:Tahoma; font-size:14px;"><tr><td align="center" valign="top"><img src="images/Cart01.gif" /></td><td valign="top">Per procedere con l'inserimento sono nececessari le seguenti informazioni:<br /><b><ul>jmFieldsList</ul></b></td></tr><tr><td colspan="2" align="right"><input type="button" value=" Torna indietro " onClick="history.back()" /></td></tr></table></@IF>]]></Output>
+		<Output ID="Reload1.Results" Type="HTML"><![CDATA[<script type="text/javascript">document.location.href="<@APPFILENAME>?<@UserReferenceArgument>&_s=<@ARG s>";</script>]]></Output>
+		<Output ID="Reload2.Results" Type="HTML"><![CDATA[<script type="text/javascript">document.location.href="<@APPFILENAME>?<@UserReferenceArgument>&_s=<@ARG s>&a=edit&code=<@ARG code>";</script>]]></Output>
+		<Output ID="Reload.Results" Type="HTML"><![CDATA[<script type="text/javascript">document.location.href="<@APPFILENAME>?<@UserReferenceArgument>&_s=<@ARG s>";</script>]]></Output>
+		<Output ID="Footer_.Results" Type="HTML"><![CDATA[<div class="footer">&copy; Ferr&#224; srl <@CURRENTDATE FORMAT="%Y"></div></body></html>]]></Output>
+	</Outputs>
+</TAF>

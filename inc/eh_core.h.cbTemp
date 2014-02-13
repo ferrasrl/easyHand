@@ -1,0 +1,4225 @@
+//-------------------------------------------
+// eh_core.h
+// Easyhand core header
+//
+// Ferrà Art Technology 1996
+// Ferrà srl 2006-2008
+//
+// ==> KERNEL SECTION
+//   --> MATH SECTION
+// ==> NUMBER SECTION
+// ==> MEMORY SECTION
+// ==> STRING SECTION
+// ==> TASK SECTION
+// ==> AUDIO SECTION
+// ==> ULT SECTION (Translator)
+// ==> FILE SECTION
+//
+// ==> SERIAL COM SECTION (RS232) (optional RS_COM MACRO)
+//
+// only not console (!EH_CONSOLE)
+//
+// ==> IN SECTION (human interface for input)
+// ==> FONT SECTION
+// ==> GDI SECTION
+// ==> WIN SECTION
+// ==> OBJ SECTION
+// ==> TEXT INPUT SECTION
+//
+// ==> PRINTER SECTION (EH_PRINT)
+//
+//          by Ferr‡ Art & Technology 1996
+//          by Ferr‡ srl 2007
+//          by Ferr‡ srl 2008
+//-------------------------------------------
+
+#if (!defined(EH_COM)&&!defined(EH_COMPLETED)&&!defined(EH_PRINT)&&!defined(EH_CONSOLE)&&!defined(EH_MOBILE))
+#error Easyhand error. richiesto almeno un EH_<macro>
+#endif
+
+// Modalità GDI di window
+#if (!defined(EH_CONSOLE)&&!defined(EH_MOBILE))
+#define EH_WIN_GDI
+#endif
+
+// =================================================================================
+//                                                                                 =
+// ==> KERNEL SECTION                                                              =
+//                                                                                 =
+// =================================================================================
+
+//
+//	Inizializzo in base al sistema operativo
+//
+
+//
+// Windows 32bit
+//
+#if defined(_WIN32)
+
+#ifndef _CRT_SECURE_NO_WARNINGS
+ #define _CRT_SECURE_NO_WARNINGS
+ #define _CRT_SECURE_NO_DEPRECATE
+#endif
+
+#ifdef _WIN_0501		// Allow use of features specific to Windows XP or later.
+#define _WIN32_WINNT 0x0501	// Change this to the appropriate value to target other versions of Windows.
+#endif
+	#include <winsock2.h>
+
+	#include <windows.h>
+	#include <windowsx.h>
+	#include <commctrl.h>
+	#include <tchar.h>
+	#include <stdio.h>
+#ifndef EH_MOBILE
+	#include <direct.h>
+#endif
+
+#ifdef EH_CONSOLE
+	#include <conio.h>
+	#include <Wincon.h>
+	#define _EH_DEBUGPOINT_ printf("#>%s:%d" CRLF,__FILE__,__LINE__);
+#endif
+
+
+// UNIVERSAL
+	#ifndef __STDARG_H
+	#include <stdarg.h>
+	#endif
+
+	#ifdef _CRT_SECURE_NO_DEPRECATE
+	#define strlwr _strlwr
+	#define strupr _strupr
+	#define chdir _chdir
+	#define fcloseall _fcloseall
+	#endif
+
+	#ifdef _UNICODE
+	#define TEXTSIZE(x) (x*2)
+	#define _TagExchange TagExchangeUnicode
+
+	#else
+	#define TEXTSIZE(x) x
+	#define _TagExchange TagExchange
+
+	#endif
+
+#endif
+
+//                                       =
+// APPLE OS/X                            =
+//                                       =
+#ifdef __APPLE__
+	#include <Carbon/Carbon.h>
+	#include <stdio.h>
+	typedef unsigned int		BOOL;
+	typedef signed short int	WORD;
+	typedef signed int			LONG;
+	typedef char				CHAR;
+	typedef unsigned char		BYTE;
+	typedef char				TCHAR, *PTCHAR;
+	typedef unsigned long		DWORD;
+	typedef unsigned int 		UINT;
+	typedef signed int			INT;
+	typedef UniChar				WCHAR;
+
+	typedef WindowRef			HWND;
+	typedef int					HDC; // Da vedere
+	#define TEXT(a) (a)
+	typedef struct {int x; int y;} POINT;
+	typedef struct {int left; int top; int right; int botton;} RECT;
+#endif
+
+//                                       =
+// LINUX                                 =
+//                                       =
+#ifdef __LINUX__
+	typedef unsigned int		BOOL;
+	typedef signed short int	WORD;
+	typedef signed int			LONG;
+	typedef char				CHAR;
+	typedef unsigned char		BYTE;
+	typedef char				TCHAR, *PTCHAR;
+	typedef unsigned long		DWORD;
+	typedef unsigned int 		UINT;
+	typedef signed int			INT;
+	typedef unsigned int 		WCHAR;
+
+	typedef LONG				HWND;
+	typedef int					HDC; // Da vedere
+	#define TEXT(a) (a)
+	typedef struct {int x; int y;} POINT;
+	typedef struct {int left; int top; int right; int botton;} RECT;
+
+#endif
+
+ typedef signed int   	    SINT;
+ typedef signed int   	    INT32;
+ typedef signed short int	INT16;
+ typedef signed __int64		INT64;
+ typedef unsigned __int64	UINT64;
+ typedef unsigned char ** EH_AR;
+ typedef char ** EH_ARF;
+
+//
+//	KERNEL's macro
+//
+
+// Main
+#define ON 	-1
+#define OFF 0
+#define SEMIOFF 2 // Per eredit‡ con il passato
+#define STOP      127
+#define TXTSTOP -1
+#define CR 13
+#define ESC 27
+#define CRLF "\r\n"
+#define LCRLF L"\r\n"
+#define ZeroFill(p) memset(&p,0,sizeof(p))
+
+// Boolean
+#define SET 0
+#define AND 1
+#define OR  2
+#define XOR 3
+
+// Directions
+#define UP    10
+#define DOWN  11
+#define SX    12
+#define DX    13
+/*
+// Messages
+#define APRI   20
+#define CHIUDI 21
+#define WS_COUNT  22
+#define LOAD   30
+#define CAMBIO 31
+#define ADBHDB 32
+#define ADBIDX 33
+#define ADBDSP 34
+#define ADBREC 35
+#define ADBFUNZ 40
+
+#define WS_OPEN    APRI
+#define WS_CLOSE   CHIUDI
+#define WS_LOAD    LOAD
+#define WS_CHANGE  CAMBIO
+#define WS_HDB     ADBHDB
+#define WS_IDX     ADBIDX
+#define WS_EXTDSP  ADBDSP
+#define WS_EXTFUNZ ADBFUNZ
+#define WS_EXTREC  ADBREC
+*/
+typedef enum {
+
+	WS_INF=    	  0, 	// Richiede informazioni sulla lista
+	WS_BUF=    	  1, 	// Richiede il buffer (lista campi)
+	WS_OFF=    	  2, 	// Setta l'offset
+	WS_SEL=    	  3, 	// Setta la selezione del campo
+	WS_PTREC=  	  4,		// Ritorna il puntatore al record del campo selezionato
+	WS_ISEL=   	103, 	// Come sopra usati in obj_listset
+	WS_IPTREC= 	104, 	// Come sopra usato in obj_listget
+	WS_FIND=   	  5,		// Ricerca una chiave
+	WS_FINDKEY=	 15,		// Ricerca una tasto premuto
+	WS_REFON=  	  6,		// Setta il refresh a ON
+	WS_REFOFF=    7,		// Setta il refresh a OFF
+	WS_DISPLAY=   8,		// Chiamata con il tipo scroll a display
+	WS_DBSEEK=    9,		// Spostamento in + e -
+	WS_DBPERC=   10,		// Spostamento in percentuale
+	WS_FIRST=      11,		// Chiede il primo record alla funzione Ext
+	WS_LAST=       13,		// Comando di fare (qualcosa)    (New 98)
+	WS_FILTER=     12,		// Controlla che sia un record valido
+	WS_SETFILTER=  14,		// Setta il numero di filtro scelto
+	WS_SETFLAG=	   16,		// Ricerca una tasto premuto
+	WS_REALGET=    18,   // Legge il puntatore REALE (solo ADB)
+	WS_REALSET=    19,   // Setta il puntatore REALE (solo ADB)
+
+	WS_OPEN=	   20,
+	WS_CLOSE=	   21,
+	WS_LOAD=	   30,
+	WS_CHANGE=	   31,
+	WS_HDB=		   32,
+	WS_IDX=		   33,
+	WS_EXTDSP=	   34,
+	WS_EXTREC=	   35,
+	WS_EXTFUNZ=    40,
+	WS_GET=		   41,		// GET - Legge (2010)
+	WS_ICONE=      52,   // Richiesta di icone collegata
+
+	WS_DRAG=      100,	// Comando di DRAG  (new 98) Prendo oggetto
+	WS_DROP=      101,		// Comando di DROP  (new 98) Rilascio oggetto
+	WS_DROPFOCUS= 102,		// Comando di DROP  (new 98) Focus su oggetto con click premuto
+	WS_DROPBLUR=  103,		// Comando di DROPBLUR  (2008) perdita del BLUR
+
+	WS_EVENT=	  199,		// Evento (new 2008)
+	WS_KEYPRESS=  200,		// Ricerca una tasto premuto
+	WS_ADD=       201,		// Aggiungi Elemento
+	WS_DEL=       202,		// Cancella Elemento
+	WS_UPDATE=    203,		// Update Elemento
+	WS_INSERT=    204,		// Inserisci un Elemento
+	WS_SEND=	  205,		// Invia (2010)
+	WS_COUNT=     210,		// Ritorna il numero di elementi (New 98)
+	WS_LINK=      211,		// Ricerca un collegamento       (New 98)
+	WS_DO=        212,		// Comando di fare (qualcosa)    (New 98)
+	WS_PROCESS=   215,		// Comando di fare (qualcosa)    (New 98)
+
+	WS_DOLIST=    216,	// Crea la lista di puntatori    (New 99)
+	WS_ADBFILTER= 217,	// Chiede di usare l'adbfilter   (New 99)
+	WS_FINDLAST=  218,	// Cerca l'ultimo                (New 99)
+	WS_CLONE=     219,	// Chiede una clonazione         (New 99)
+	WS_LINEVIEW=  220,	// Cambiamento di grandezza in visione (New99) Display dinamico
+	WS_LINEEDIT=  221,	// Cambiamento di grandezza in visione (New99) Display dinamico
+	WS_SETTITLE=  222,    // Abilitazione/Disabilitazione dei titoli fields scroll (New99)
+	WS_SETHRDW=   223,    // Redraw orizzontale in caso di variazione <--> scroll  (New99)
+	WS_START=     300,    // Inizializza il driver      (new2000)
+	WS_CHECK=     301,    // Controllo (new2002)
+	WS_LOCK=	  302,    // Controlla il blocco del driver
+	WS_RELOAD=    303,    // Chiedi un reload dei dati (new 2003)
+	WS_READY=     304,    // New 2009 (verifica se l'oggetto è pronto)
+
+	WS_PRINT=     400,    // Richiesta di stampa (new 2005)
+
+	WS_CREATE=	  410,	// Richiesta di creazione (Inviata Una tantum all'apertura dell oggetto) viceversa WS_KILL in chiusura
+	WS_DESTROY=   411,	// Comunico la fine uso driver   (New 99) WS_KILL
+	WS_MOVE=	  413,    // L'oggetto Ë in posizione differente
+	WS_SIZE=	  415,    // L'oggetto ha dimensioni differenti
+	WS_SET_TEXT,		//  Cambio di un testo su un oggetto (2010)
+	WS_SET_FONT,		//  Cambio del font (2010)
+
+// New 2008 usato negli scroll testuali
+
+	WS_CODENAME=         501,  // Nome del campo che si usa come codice di ricerca (Es. CODICE)
+	WS_SET_ROWFOCUS=     502,  // Valore del codice attualmente in uso
+	WS_GET_ROWFOCUS=     503,  // Chiede se la riga è selezionata
+	WS_SET_ROWSELECTED=  504,  // Valore del codice attualmente in uso
+	WS_GET_ROWSELECTED=  505,   // Chiede se la riga è selezionata
+	WS_GET_SELECTED			   // Ritorna una struttura S_RET con i valore selezionato
+
+} EN_WSMESSAGE; // <-- What Standard Message
+
+// Stampa con posizionamento New 2000
+typedef enum {
+	DPL_LEFT,
+	DPL_CENTER,
+	DPL_RIGHT,
+	DPL_JUSTIFY	// solo TextInRect
+} EN_DPL;
+
+
+
+#define EH_COLOR DWORD
+#define EH_COLOR_BLACK ColorPal[0]
+#define EH_COLOR_RED ColorPal[11]
+#define EH_COLOR_WHITE ColorPal[15]
+#define EH_COLOR_BLUE RGB(0,0,255)
+#define EH_COLOR_GREEN RGB(0,255,0)
+#define EH_COLOR_YELLOW RGB(255,255,0)
+#define EH_COLOR_ORANGE RGB(255,0x60,0)
+#define EH_COLOR_TRASPARENT -1
+
+#define EhWordAlign(num) ((num+1)>>1)<<1; // WordAlign
+#define EhDWordAlign(num) ((num+3)>>2)<<2; // DoubleWordAlign
+// WS_KILL 999 Eliminato
+
+//
+// Definizioni Standard di tipi di dati/campo
+//
+
+	typedef enum {
+		_UNKNOW=-1,
+		_ALFA=0,
+		_NUMBER, // Numero con decimali
+		_DATE, // DATA: YYYYMMDD
+		_TEXT, // TEXT DINAMICO
+		_PASSWORD=5, // Password 
+		_INTEGER=10, // Intero (numero senza decimali.. può essere 16/32/64 bit)
+	} EH_DATATYPE;
+
+//
+// x compatibilità: Da vedere
+//
+#define	ALFA _ALFA
+#define	NUME _NUMBER
+#define	DATA _DATE
+#define NOTE _TEXT
+#define	NUMS 4
+#define	APSW _PASSWORD
+#define	NUMZ 6
+#define	ALFU 7 
+#define BIND 100  // Data Binding (new 2008)
+
+//#include "/easyhand/ehtool/main/dmiutil.h"
+
+#define FTIME_MAX 10
+
+//
+// 2011
+//
+typedef struct {
+	BOOL bAllocated;
+	EH_DATATYPE enDaTy;
+	union {
+		LONG	lValue;
+		DWORD	dwValue;
+	};
+	union {
+		void *	pVoid;
+		BYTE *  pszString;
+		WCHAR * pwcString;
+	};
+} S_UNIRET; // Universal return
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+S_UNIRET * retCreate(EH_DATATYPE enDaTy,LONG lValue,void *pVoid);
+void IRetDestroy(S_UNIRET **);
+#define retDestroy(a) IRetDestroy(&a);
+
+
+	//
+	// MEMO ELEMENT
+	//
+	#define MEMOUSER_SIZE 16
+
+	typedef struct {
+			SINT    iTipo; 	  // RAM_????
+			void    *lpvMemo; // Puntatore far alla memoria
+			SIZE_T   dwSize;   // Dimensioni
+#ifdef _WIN32
+			HGLOBAL hGlobal;  // Handle Global
+#endif
+			CHAR	User[MEMOUSER_SIZE];
+			} MEMO_ELEMENT;
+
+	//
+	// Debug della memoria
+	//
+	#ifdef EH_MEMO_DEBUG
+	typedef struct {
+		void *pMemo;
+		CHAR *pszProgram;
+		SINT iLine;
+		SIZE_T dwSize;
+	} S_ALLOC_CONTROL;
+	void MemoDebugShow(void);
+	void MemoDebugSet(BOOL bSet);
+
+	#endif
+
+//
+//  DMI Direct Memory Indexed
+//
+
+typedef struct  {
+	 BOOL  Reset;
+	 SINT  Hdl;
+	 WORD  Size;
+	 LONG  Max;
+	 LONG  Num;
+ } _DMI;
+
+#define DRVMEMOINFO _DMI
+#define DMIRESET {-1,-1,0,0,0}
+
+void DMIReset(_DMI *pdmi);
+void DMIOpen(_DMI *DRVinfo,SINT MemoType,LONG Max,SINT Size,CHAR *Nome);
+void DMIAppendDyn(_DMI *DRVinfo,void *Dato); // Only 32bit
+void DMIInsertDyn(_DMI *DRVinfo,LONG Pos,void *Dato);
+void DMIDelete(_DMI *DRVinfo,LONG Pos,void *Dato);
+void DMIInsert(_DMI *DRVinfo,LONG Pos,void *Dato);
+void DMIClose(_DMI *DRVinfo,CHAR *Nome);
+
+// New 2010
+void *	DMILock(_DMI *pDmi,BOOL *pbUnLock);
+void	DMIUnlock(_DMI *pDmi);
+void	DMIMixing(_DMI *pdmi);
+
+// New 2006
+CHAR *	DMIDebug(CHAR *,LONG);
+
+// New 2003
+void DMIReadEx(_DMI *DRVinfo,LONG Pos,void *Dato,CHAR *lpWho);
+void DMIWriteEx(_DMI *DRVinfo,LONG Pos,void *Dato,CHAR *lpWho);
+
+#ifdef _DEBUG
+#define DMIAppend(a,b) DMIAppendEx(a,b,DMIDebug(__FILE__,__LINE__))
+#define DMIRead(a,b,c) DMIReadEx(a,b,c,DMIDebug(__FILE__,__LINE__))
+#define DMIWrite(a,b,c) DMIWriteEx(a,b,c,DMIDebug(__FILE__,__LINE__))
+#else
+#define DMIAppend(a,b) DMIAppendEx(a,b,NULL)
+#define DMIRead(a,b,c) DMIReadEx(a,b,c,NULL)
+#define DMIWrite(a,b,c) DMIWriteEx(a,b,c,NULL)
+#endif
+
+void DMIAppendEx(_DMI *DRVinfo,void *Dato,CHAR *lpWho);
+void DMISort(_DMI *DRVinfo, int (*compare )(const void *elem1, const void *elem2 ));
+
+// New 9/2007
+BOOL DMIBinaryFind(_DMI *pDmi,void *pElement,SINT iSize,SINT *pIndex,BOOL bCaseUnsensitive);
+
+typedef struct  {
+	 SINT Id;
+	 CHAR IdName[15];
+ } IDARRAY;
+
+
+//
+//  FONT
+//
+
+typedef struct			// Usato per compatibilit‡ con i vecchi font
+{
+	CHAR *pOldName;
+	CHAR *pFontFace;
+	CHAR *listHeight;
+	BOOL iStyles;
+	BYTE **arNfiToAlt;
+	SINT iMaxNfi;
+} EH_FONT_OLD;
+
+typedef struct {
+	SINT	iType;			// 0= Vecchio tipo con nfi fissi
+	CHAR *	lpFontFace;	// Nome reale nel sistema operativo
+	SINT	iHeight;			// Altezza di trasformazione in base all'nfi style
+	SINT	iStyles;			// Altezza di trasformazione in base all'nfi style
+	INT		iCharExtra;	// Spazio extra tra i caratteri
+
+	#ifdef _WIN32		// windows 32
+	HFONT hFont;
+	#endif
+
+	WORD wCount;
+} EH_FONT;
+
+typedef enum {
+	STYLE_NORMAL=0x0,
+	STYLE_BOLD=0x10,
+	STYLE_ITALIC=0x20,
+	STYLE_UNDERLINE=0x40
+} EH_TSTYLE;
+//
+//	MOUSE EVENT
+//
+#ifndef EH_CONSOLE
+
+typedef enum {
+		EE_NONE=0,
+		EE_LBUTTONDOWN,
+		EE_LBUTTONUP,
+		EE_RBUTTONDOWN,
+		EE_RBUTTONUP,
+		EE_LBUTTONDBLCLK,
+		EE_RBUTTONDBLCLK,
+		EE_MOUSEWHEELUP,
+		EE_MOUSEWHEELDOWN,
+		EE_MOUSEOVER=16,
+		EE_MOUSEOUT,
+		EE_CHAR=32,
+		EE_OBJ=64,
+		EE_FOCUS=0x1000,
+		EE_BLUR
+} EN_EHEVENT;
+
+// Easyhand Event
+typedef enum
+{
+	DD_NONE=0,
+	DD_DRAGREADY, // 1=Drag fissato (ma ancora da partire),
+	DD_DRAGDROP,  // 2-Drag & Drop partito,
+	DD_READY	  // 3=Drag & Drop Ready Fissato il punto
+} EN_DRAGDROP;
+
+typedef struct {
+	EN_DRAGDROP iDragStatus;	// 0= No, 1=Drag fissato (ma ancora da partire), 2-Drag & Drop partito, 3=Punto di Drop Fissato DD_
+	BOOL	bDragNotify;	// T/F se è stato notificato all'oggetto di Drag che è stato selezionato (notifico dopo un po)
+	POINT	sDragPointAbsolute; // Punto assoluto di Drag
+
+	//SINT iDragType;			// Punto di Drag
+	void *	pDragPtr;
+	POINT	sDragPoint;
+	INT		iDragParam;
+
+	//SINT iDropType;			// Punto di Drop
+	void *	pDropPtr;
+	POINT	sDropPoint;
+	INT		iDropParam;
+
+} EH_DRAGDROP;
+
+typedef struct {
+	//BOOL fActive;
+	EN_EHEVENT	iEvent;		// EH_LBUTTON??
+
+	SINT	iWin;		// Finestra di appartenenza (numero di easyhand)
+	BOOL	bObj;		// Evento associato ad un oggetto
+	HWND	hWnd;		// windows di appartenenza dell'evento
+	POINT	sPoint;	// Coordinata dell'evento (per il mouse)
+	//BYTE	szChar[2];	// Tasto premuto
+	INT16	iTasto;
+	SINT	iObject;	// Oggetto selezionato
+	CHAR	szObjName[20];
+	DWORD	dwParam;	// di Parametro aggiunto
+ } EH_EVENT;
+
+#define MAX_DEFAULT_EVENT 50
+#ifndef EH_MOBILE
+void * EhEvent(SINT cmd,SINT info,void *ptr);
+#endif
+
+#endif
+
+
+// ------------------------------------------------------------------------
+//
+//	SYS structure
+//
+// ------------------------------------------------------------------------
+
+#ifndef EH_CONSOLE
+
+	#define NOMEICONE_SIZE 9
+	#define LUNNOMEOBJ 10 // Massima lunghezza nome oggetto
+
+	typedef struct  {
+		CHAR	szName[NOMEICONE_SIZE]; //                Nome della icone
+		WORD	wHdl;      //  Handle memory
+		SIZE	sDim;		// Dimensioni dell'icone
+		DWORD	dwSize;
+		DWORD	dwOffset;	//  Offset di spiazzamento
+
+		SINT	iBitColor;	// Bit-Colore dell'icone
+
+		DWORD	dwRowSize;		// Dimensioni della riga del bitmap
+		DWORD	dwMaskRowSize;	// dimensioni della riga della mask
+		BOOL	bLic;		// 0/1 se appartiene ad una LIC
+		SINT	iGroup;		// Gruppo di appartenenza (-1=Sistema protetto)
+
+		BOOL	bAlpha;			// Il bitmap ha l'alpha channel
+		void	*hBitmapIcon;	// !=NULL puntatore ad oggetto bitmap del sistema operativo
+		void	*hBitmapMask;	// !=NULL puntatore ad oggetto bitmap di maskera
+		void	*pbBits;
+		} EH_ICON;
+
+	// Definizione macro per oggetti
+	typedef enum {
+
+		O_ZONA=1,
+		O_KEY=2,
+		O_KEYDIM=20,
+		O_MKUP=21,
+		O_MKDOWN=22,
+		O_MKLEFT=23,
+		O_MKRIGHT=24,
+		O_KEYDRV=25,
+		//O_TEXT          3
+		O_RADIO=4,
+		O_MARK=5,
+		O_SCROLL=6,
+		O_SCRDB=18,
+		O_ICONEA=7,
+		O_ICONEB=8,
+		O_IMARKA=9,
+		O_IMARKB=10,
+		O_IRADIA=11,
+		O_IRADIB=12,
+		O_LIST=14,
+		O_LISTP=101, // List Plus  NovitÖ 99
+
+		O_PMENU=15,
+		O_BARY=16,
+		O_BARX=17,
+
+		// Oggetti disponibili solo in Windows
+		OW_PMENU=50,
+		OW_SCR=51,
+		OW_LIST=52,
+		OW_LISTP=53,
+		OW_COMBO=54,
+		OW_SCRDB=56,
+		O_ZONAP=60, // Zona parametrica
+		OW_MENU		// Menu 2010 (Fatto con EH_MENUITEM
+
+	} EH_OBJTYPE;
+
+	struct OBJ {
+			EH_OBJTYPE tipo;
+			CHAR nome[LUNNOMEOBJ+1]; // TIPO OGGETTO,NOME ASSEGNATO
+			SINT status;			  //
+			SINT bEnable;			  // T/F se l'oggetto Ë attivo
+			SINT px,py,col1,col2; //                        POSIZIONE E COLORI
+			CHAR text[40];   //                     TESTO DA SCRIVERE SULLO SCHERMO
+			CHAR grp[2];     //                     GRUPPO DI APPARTENENZA (x O_RADIO)
+			void * (*funcExtern)(struct OBJ *, SINT cmd, LONG info,CHAR *str); //  funzione esterna di controllo
+			CHAR **ptr; // Puntatore ad una lista di parametri aggiuntivi
+			SINT idxFont; // Indice del font in memoria da usare
+			SINT CharY;
+			SINT iStyle;
+			HWND hWnd;
+			HMENU hMenu;
+
+			SINT	iHmz;		// Tooltip associato all'oggetto
+			SINT	iMgz;		// Mouse cursor associato all'oggetto
+			BOOL	bFreeze;	// T/F se devo congelare l'oggetto (se congelato, non verranno effettuate chimate esterne)
+			SINT	yTitle; // Dimensione del titolo (OW_SCR,OW_SCRDB)
+			BOOL	fVertBar; // Se esiste la barra verticale negli scroll
+			BOOL	fHRedraw; // Redraw completo in caso di variazione orizzontale
+			BOOL	fMouseGhost; // Disabilita l'intercettazione del mouse
+			SINT	idxWin; // New 2007
+			BOOL	bVisible; // new 2007 T/F se visibile
+			void *	pOther;	// Puntatore ad altro (new) 11/2007
+			void *	pOtherEx;	// Dati aggiuntivi in fase di ricerca Estesi (2008) usato Es. OdbcScroll()
+			RECT	sClientRect;	// New 2008 Rettangolo dell'area client dell'oggetto
+			SIZE	sClientSize;	// Dimensioni area Cliente
+			POINT	sClientCursor;	// Punto in cui si trova il cursore del mouse
+			BOOL	bTabCode;		// T/F se è ho una array con tab code (new 2010)
+		};
+
+#define EH_OBJ struct OBJ
+
+		typedef struct  {
+			SINT numobj;  // Numero di oggetti contenuti
+			EH_OBJ *arObj;
+			SINT WinOwnerPt; // Puntatore alla finestra proprietaria
+		} EH_OBJINFO;
+
+
+#endif
+
+//
+//	Versione Windows
+//
+
+#if (defined(_WIN32)) || defined(_WIN32_WCE)
+
+typedef struct {
+	BOOL	bVisible;
+	HWND	hWnd;	// Finestra
+	SINT	x,y;	// Posizione
+	SINT	cx,cy;	// Dimensioni
+	DWORD	dwColor;
+	DWORD	dwSpeed;
+
+	BOOL    bBlink;
+	DWORD	dwCounter;
+} EH_TCURSOR;
+
+typedef struct {
+	SINT		idTimer;
+	CHAR *		pszEvent;
+	void		(*funcNotify)(void *); // 2/2008 - Funzione da usare in alternativa a Exit() in PRG_end()
+	TIMERPROC	lpfnMyTimerProc;
+	UINT_PTR	uipTimer;
+	BOOL		bInterval;
+} S_TIMER;
+
+struct SYSTEM {
+
+		SINT	iSystemStatus; //	0=Non operativo, 1=Operativo, 2=In chiusura
+		BOOL	bSocketReady; // Se le librerie di socket sono pronte
+		CHAR	szAppName[512]; // Nome del programma in esecuzione (compreso di persorso)
+
+		//                                                      Gestione memoria
+		MEMO_ELEMENT *memolist;
+		SINT    memomaxi;
+		SINT	memocont;
+		SINT    MEMO_diskult;
+		LONG    MEMO_inizio;
+		LONG    MEMO_rimasta;
+
+		//                                                      Sezione video
+		SINT    videomodo; // Tipo di risoluzione
+		SINT    video_x;         // Dimensioni orizzontali massime monitor
+		SINT    video_y;   // Dimensioni verticali massime monitor
+		WORD	colori;                // Numero massimo colori disponibili
+
+		INT     iWinKeySpecial;// Situazione shift e control
+
+		HICON   LocalIcone;
+		HINSTANCE EhWinInstance;
+		BOOL    EhPaint;
+		TCHAR   tzWinClassBase[80];
+		BOOL    fTitleLock;// Blocca il cambio di focus sulla title bar
+
+		INT		WinWriteFocus;        // Finestra correntemente in usi per le istruzioni di stampa (WinScena)
+		INT		WinInputFocus;        // Finestra correntemente in uso per le input da utente
+		HWND	hWndInput;		 // Handle Win corrente che pu‡ ricevere gli input
+														 // (mi server per far prima ad intercettare i messaggi)
+		HDC		DirectDC;
+		BOOL	DirectDCActive;
+		WORD    wMenuHeightMin; // Altezza minima dell'item del menu in apertura (0=Default)
+		WORD    wMenuLeftMin;   // Spazio a sinistra delle voci nell'item (0=Default)
+
+		// Colori di base per il disegno generale
+		EH_COLOR	ColorBackGround;
+		EH_COLOR	ColorButtonText;
+		EH_COLOR	Color3DHighLight; // La luce chiara del 3D (def.Bianco)
+		EH_COLOR	Color3DLight;     // Il colore dell'oggetto (def.Grigio chiaro)
+		EH_COLOR	Color3DShadow;    // L'ombra media (def.grigio scuro)
+		EH_COLOR	ColorWindowText;  // Colore delle testo nelle finestre (def. Nero)
+		EH_COLOR	ColorWindowBack;  // Colore dello sfondo delle finestre (def. bianco)
+
+		EH_COLOR	ColorSelectText;  // Colore delle testo selezionato (def. Bianco)
+		EH_COLOR	ColorSelectBack;  // Colore dello sfondo selezionato (def. Blu)
+		EH_COLOR	ColorButtonGradientTop;
+		EH_COLOR	ColorButtonGradientBottom;
+		EH_COLOR	colEhWinBackground; // new 2010
+		DWORD		arColorBGR[16];		// Pallet Easyhand in BGR (per icone)
+
+		DWORD	xWidthScroll;	  // Dimensioni della barra di scroll orizzontale
+
+		BOOL    fSoundEfx;        // Attivazione Suoni ad effetto su oggetti
+
+		//SINT    DeskTop_x;
+		//SINT    DeskTop_y;
+		RECT	rcDesktop;	// 2010
+		SIZE	sizeDesktop; //2010
+
+		BOOL    WDblClick;      // (Reserved)
+		BOOL    fMouseCapture;  // TRUE/FALSE (Riservato)
+// 		BOOL	OemTranslate;   // TRUE/FALSE se effettuare la traduzione dei caratteri speciali
+ 		BOOL	bOemString;   // TRUE/FALSE se effettuare la traduzione dei caratteri speciali
+		BOOL    EhWinType;      // TRUE Finestre tipo EasyHand    FALSE Finestre tipo Windows
+        BOOL    fLightRight;	// TRUE/FALSE se la luce viene da destra
+
+        BOOL	iColorMode;   // 0=Easyhand 16 1=TRUE Color
+
+		POINT   WinBorder;     // Bordo della Finestra (x/y)
+		SINT    yWinTitle;     // Altezza del titolo
+		SINT    yWinTop;       // Altezza Titolo + Bordo
+		SINT    yWinMenu;      // Altezza Menu
+
+		SINT    iLanguage;     // Lingua in uso
+		SINT	iSourceLang;   // Lingua in cui Ë scritto il sorgente
+		SINT	fTranslate;     // Esegui traduzione (TRUE/FALSE)
+		SINT	fTranslateDisp; // Esegui la traduzione dei display (TRUE/FALSE)
+		BOOL	bErrorContentType;	// T/F se voglio l'intestazione Content in caso di errore
+		DWORD   dwIptDefaultStyle; // Default style degli input
+
+#ifndef _WIN32_WCE
+		_DMI DmiIDArray;
+		IDARRAY   *IDArray;
+		LONG g_lCPUExtensionsAvailable; // Status CPU
+#endif
+
+		BOOL	bGetKeyInEnd; // T/F se devo chiedere un tasto nel PRG_end
+		BOOL	bGetKeyInEndError; // T/F se devo chiedere un tasto in caso di errore
+		void	(*subExitAlternative)(SINT iError); // 2/2008 - Funzione da usare in alternativa a Exit() in PRG_end()
+
+#ifdef _WIN32
+		BOOL	(*funcPreTranslate)(MSG *pMsg); // 1/2009 controllo pretranslate della coda dei messaggi
+#endif
+
+		BOOL	fInternalError; // TRUE/FALSE se si Ë in internalError
+		FILE	*chLog; // New fine 2004
+		BOOL	bLogShow; // T/F se inviare del log anche al stderr
+		BOOL	bConReady; // T/F se la console degli errori è attiva
+		BOOL	fOleReady; // T/F se la Tecnologia OLE Ë stata inizializzata
+		SINT	uACP;
+
+#ifndef _WIN32_WCE
+
+		// Font
+		SINT	iFonts;					// Font caricati in memoria
+		EH_FONT *arFonts;				// array dei font gestiti
+
+		CHAR	*pFontStandardName;		// Nome del font standard
+		SINT	iFontStandardIndex;	// Handle del font standard
+		SINT	iFontStandardHeight;	// Altezza del font standard
+
+		SINT	iFontInputDefault;
+		SINT	iFontInputHeight;
+
+#endif
+
+#ifndef EH_CONSOLE
+
+		_DMI dmiTimer;	// 2010
+
+		EH_TCURSOR	sTxtCursor;
+		/*
+		// Carret
+		SINT    txc_vedi;  // Se il carret Ë visibile
+		SINT    txc_x,txc_y;// Coordinate textcursor
+		SINT    txc_dim_x; // Dimensione textcursor orizzontale
+		SINT    txc_dim_y; // Dimensione textcursor verticale
+		LONG    txc_color; // Colore del textcursor
+		SINT    txc_speed;
+		HWND    txc_hWnd;
+		BOOL    txc_status;
+		SINT    txc_count;
+		SINT    txc_win;
+*/
+
+// Mouse
+		CHAR	*pMouseCursorBase; // Nome Icone del cursore Base
+		BOOL	bMouseCursorEnable; // T/F ON SE C'E' OFF = NO
+		CHAR	szMouseCursorName[80]; // Icone corrente del mouse
+		POINT	sMouseCursorHotPoint;
+		SINT    mouse_type; // Se cä >0 cä numero dei tasti
+		SINT    ms_x,ms_y,ms_b;
+		SINT    ms_miny,ms_maxy;
+		SINT    ms_minx,ms_maxx;
+
+//		SINT    hdl_icone;     // Handle delle icone
+//		SINT    ICO_num; // Numero di ICONE
+//		SINT    ICO_max; // Numero massimo di Icone
+		SINT	iIconMaxStart;	// Spazio per icone in avvio
+		_DMI	dmiIcon;
+		EH_ICON	*arIcon; // Puntatore all'array delle icone
+
+//
+//		Gestore eventi
+//
+		SINT	iEventStart;	// Mouse Cue Event Start
+		SINT	iEventStop;	// Mouse Cue Event Stop
+		SINT	iEventMax;	// Numero massimo di eventi in coda
+		SINT	iEventLength;	// Mouse Cue Event Number
+		EH_EVENT *arEvent;
+
+		EH_EVENT sLastEvent; // Per compatibilità
+		EH_DRAGDROP sDragDrop;
+
+
+//
+//		Gestore oggetti
+//
+		BOOL	bObjectAniMouse;	// T/F se si vogliono durante la gestione degli oggetti le animazioni con la manina
+		EH_OBJ	*pObjFocus; //	Puntatore all'oggetto in focus
+
+		_DMI	dmiObject;
+		EH_OBJINFO *arObject;
+		SINT  iObjFocus2;//=-1;
+		//SINT  OBJ_sel;//=-1; // Numero oggetto selezionato
+		SINT  OBJ_time;//=-1; // Livello di passaggio per oggetto selezionato
+
+		SINT  OBJ_rep1;//=300; // In futuro parametrizzabile da file
+		SINT  OBJ_rep2;//=20;
+
+	// Font per il men—
+		SINT  pmenu_hdl,pmenu_nfi;
+		CHAR pmenu_altC; // Altezza chiusura
+		CHAR pmenu_altO; // Altezza apertura
+//#endif
+		
+		UINT_PTR uipTimer;
+
+#endif
+
+#if !defined(__cplusplus) && ( defined(EH_PRINT) || defined(EH_COMPLETED))
+		SINT    lpt_cor; // Stampante di default
+		PRINTDLG pd;			// Struttura per la finestra di dialogo della stampante
+		PAGESETUPDLG ps;		// Struttura per la finestra di dialogo della scelta del tipo di pagina
+#endif
+
+ };
+#endif
+
+//
+//	Versione Apple
+//
+#ifdef __APPLE__
+	struct SYSTEM {
+
+			SINT	iSystemStatus; //	0=Non operativo, 1=Operativo, 2=In chiusura
+
+			//                                                      Gestione memoria
+			struct  RAM *memolist;
+			SINT    memomaxi;
+			SINT	memocont;
+			SINT    MEMO_diskult;
+			LONG    MEMO_inizio;
+			LONG    MEMO_rimasta;
+
+			//                                                      Sezione video
+			SINT    videomodo; // Tipo di risoluzione
+			SINT    video_x;         // Dimensioni orizzontali massime monitor
+			SINT    video_y;   // Dimensioni verticali massime monitor
+			WORD	colori;                // Numero massimo colori disponibili
+			SINT    hdl_icone;     // Handle delle icone
+			struct  ICONE *icone; // Puntatore far alle icone
+			SINT    ICO_num; // Numero di ICONE
+			SINT    ICO_max; // Numero massimo di Icone
+
+	#ifndef _WIN32_WCE
+			SINT    txc_vedi;  // Se il cursore Ë visibile
+			SINT    txc_x,txc_y;// Coordinate textcursor
+			SINT    txc_dim_x; // Dimensione textcursor orizzontale
+			SINT    txc_dim_y; // Dimensione textcursor verticale
+			LONG    txc_color; // Colore del textcursor
+			SINT    txc_speed;
+			HWND    txc_hWnd;
+
+			BOOL    txc_status;
+			SINT    txc_count;
+			SINT    txc_win;
+
+			SINT    mouse; // ON SE C'E' OFF = NO
+			SINT    mouse_type; // Se cä >0 cä numero dei tasti
+			SINT    ms_x,ms_y,ms_b;
+			SINT    ms_miny,ms_maxy;
+			SINT    ms_minx,ms_maxx;
+	// Font
+			SINT	iFonts;					// Font caricati in memoria
+			EH_FONT *arFonts;				// array dei font gestiti
+
+			CHAR	*pFontStandardName;		// Nome del font standard
+			SINT	iFontStandardIndex;	// Handle del font standard
+			SINT	iFontStandardHeight;	// Altezza del font standard
+
+			SINT	iFontInputDefault;
+			SINT	iFontInputHeight;
+
+	#endif
+//			INT     WinKeySize;
+//			SINT    WinKeyHdl;
+//			INT16   *WinKeyBuffer;
+//			INT     WinKeyStart;
+//			INT     WinKeyEnd;
+			INT     iWinKeySpecial;// Situazione shift e control
+
+/*
+			HICON   LocalIcone;
+			HINSTANCE EhWinInstance;
+			*/
+			BOOL    EhPaint;
+			TCHAR   tzWinClassBase[80];
+			BOOL    fTitleLock;// Blocca il cambio di focus sulla title bar
+
+			INT		WinWriteFocus;        // Finestra a fuoco
+			INT		WinInputFocus;        // Finestra a fuoco
+			HWND	hWndInput;		 // Handle Win corrente che pu‡ ricevere gli input
+															 // (mi server per far prima ad intercettare i messaggi)
+			HDC		DirectDC;
+			BOOL	DirectDCActive;
+			WORD    wMenuHeightMin; // Altezza minima dell'item del menu in apertura (0=Default)
+			WORD    wMenuLeftMin;   // Spazio a sinistra delle voci nell'item (0=Default)
+
+			// Colori di base per il disegno generale
+			LONG    ColorBackGround;
+			LONG    ColorButtonText;
+			LONG    Color3DHighLight; // La luce chiara del 3D (def.Bianco)
+			LONG    Color3DLight;     // Il colore dell'oggetto (def.Grigio chiaro)
+			LONG    Color3DShadow;    // L'ombra media (def.grigio scuro)
+			LONG    ColorWindowText;  // Colore delle testo nelle finestre (def. Nero)
+			LONG    ColorWindowBack;  // Colore dello sfondo delle finestre (def. bianco)
+
+			LONG    ColorSelectText;  // Colore delle testo selezionato (def. Bianco)
+			LONG    ColorSelectBack;  // Colore dello sfondo selezionato (def. Blu)
+
+			LONG	ColorButtonGradientTop;
+			LONG	ColorButtonGradientBottom;
+
+			BOOL    fSoundEfx;        // Attivazione Suoni ad effetto su oggetti
+
+			CHAR	*MouseCursorBase; // Nome Icone del cursore Base
+			SINT    DeskTop_x;
+			SINT    DeskTop_y;
+
+			BOOL    WDblClick;      // (Reserved)
+			BOOL    fMouseCapture;  // TRUE/FALSE (Riservato)
+// 			BOOL	OemTranslate;   // TRUE/FALSE se effettuare la traduzione dei caratteri speciali
+ 			BOOL	bOemString;   // TRUE/FALSE se effettuare la traduzione dei caratteri speciali
+			BOOL    EhWinType;      // TRUE Finestre tipo EasyHand    FALSE Finestre tipo Windows
+			BOOL    fLightRight;	// TRUE/FALSE se la luce viene da destra
+	/*
+			BOOL    fFontBold;      // TRUE/FALSE funzioni Display in Bold
+			BOOL    fFontItalic;    // TRUE/FALSE funzioni Display in Italic
+			BOOL    fFontUnderline; // TRUE/FALSE funzioni display con sottolineatura
+			SINT    iFontRotation;  // Rotazione del font in decimi di grado (90∞ = 900)
+	*/
+			//TCHAR*	lpLastFont;     // Ultimo font selezionato TrueType
+			BOOL	DCColorMode;   // FALSE = Compatibilita' con il vecchio, TRUE = TRUE Color
+
+			POINT   WinBorder;     // Bordo della Finestra (x/y)
+			SINT    yWinTitle;     // Altezza del titolo
+			SINT    yWinTop;       // Altezza Titolo + Bordo
+			SINT    yWinMenu;      // Altezza Menu
+
+			SINT    iLanguage;     // Lingua in uso
+			SINT	iSourceLang;   // Lingua in cui Ë scritto il sorgente
+			SINT	fTranslate;     // Esegui traduzione (TRUE/FALSE)
+			SINT	fTranslateDisp; // Esegui la traduzione dei display (TRUE/FALSE)
+			DWORD   dwIptDefaultStyle; // Default style degli input
+
+	#ifndef _WIN32_WCE
+			_DMI DmiIDArray;
+			IDARRAY   *IDArray;
+			LONG g_lCPUExtensionsAvailable; // Status CPU
+	#endif
+			BOOL	bGetKeyInEnd; // T/F se devo chiedere un tasto nel PRG_end
+			void	(*subExitAlternative)(SINT iError); // 2/2008 - Funzione da usare in alternativa a Exit() in PRG_end()
+			BOOL	fInternalError; // TRUE/FALSE se si Ë in internalError
+			FILE	*chLog; // New fine 2004
+			BOOL	fOleReady; // T/F se la Tecnologia OLE Ë stata inizializzata
+			SINT	uACP;
+
+	#ifndef EH_CONSOLE
+			SINT	iEventStart;	// Mouse Cue Event Start
+			SINT	iEventStop;	// Mouse Cue Event Stop
+			SINT	iEventMax;	// Numero massimo di eventi in coda
+			SINT	iEventLength;	// Mouse Cue Event Number
+			EH_EVENT *arEvent;
+	#endif
+
+	#if !defined(__cplusplus) && ( defined(EH_PRINT) || defined(EH_COMPLETED))
+			SINT    lpt_cor; // Stampante di default
+			PRINTDLG pd;			// Struttura per la finestra di dialogo della stampante
+			PAGESETUPDLG ps;		// Struttura per la finestra di dialogo della scelta del tipo di pagina
+	#endif
+	 };
+#endif
+
+
+//
+//	Versione DOS
+//
+
+#ifdef __DOS__
+
+ #define SIZESTACK 22000U
+ #define EH_DRVINTN 0x89
+
+ typedef signed   char  BOOL;
+ typedef unsigned char  BYTE;
+ typedef signed   int  	SINT;
+ typedef signed   int   INT;
+ typedef signed   int   INT16;
+ typedef unsigned int   UINT;
+ typedef long       	  LONG;
+ typedef unsigned int   WORD;
+ typedef unsigned long  DWORD;
+ typedef char           CHAR;
+ #define TRUE  -1
+ #define FALSE  0
+
+ struct DRV_COM {
+	void interrupt (*DRV_call)(void);
+	SINT      command;
+	void *in;
+	void *out;
+	SINT  risposta;
+	SINT  Driver; //   ON Il driver ä in funzione
+	SINT  xms;      // ON c'ä un driver XMS
+	SINT  zooming;
+	SINT  zm_x1;
+	SINT  zm_y1;
+	SINT  zm_x2;
+	SINT  zm_y2;
+	SINT  m_type;
+
+	};
+
+ struct SYSTEM {
+
+		//                                                      Sezione video
+		SINT      videomodo; // Tipo di risoluzione
+		SINT      video_x;         // Dimensioni orizzontali massime monitor
+		SINT      video_y;   // Dimensioni verticali massime monitor
+		WORD      colori;                // Numero massimo colori disponibili
+		SINT      hdl_icone;     // Handle delle icone
+		struct    ICONE *icone; // Puntatore far alle icone
+		SINT      ICO_num; // Numero di ICONE
+		SINT      ICO_max; // Numero massimo di Icone
+
+		SINT      txc_vedi;    // Se il cursore ä visibile
+		SINT      txc_x,txc_y; // Coordinate textcursor
+		SINT      txc_dim_x;   // Dimensione textcursor orizzontale
+		SINT      txc_dim_y;   // Dimensione textcursor verticale
+		LONG      txc_color;   // Colore del textcursor
+		SINT      txc_speed;
+
+		SINT      mouse; // ON SE C'E' OFF = NO
+		SINT      mouse_type; // Se cä >0 cä numero dei tasti
+		SINT      ms_x,ms_y,ms_b;
+		SINT      ms_miny,ms_maxy;
+		SINT      ms_minx,ms_maxx;
+		SINT 	  DOS4GWin;// Flag di uso con DOS4G sotto windows (*)
+
+		SINT      prs1_x,prs1_y;
+		SINT      rel1_x,rel1_y;
+		SINT      prs2_x,prs2_y;
+		SINT      rel2_x,rel2_y;
+
+		WORD      clp_x1,clp_x2,clp_y1,clp_y2;
+		SINT      lpt_cor; // Stampante di default
+
+		//                                                      Gestione memoria
+		struct  RAM *memolist;
+		SINT     memomaxi,memocont;
+		SINT     MEMO_diskult;
+		LONG    MEMO_inizio;
+		LONG    MEMO_rimasta;
+
+		//                              Puntatore a funzioni principali
+		void interrupt (*EH_call)(void);
+		SINT command;
+
+		SINT hdl;
+		SINT dato;
+		LONG datol1;
+		LONG datol2;
+		void *usr;
+		FILE *ch;
+		WORD sgm,ofs;
+
+		SINT risposta;
+		};
+#endif
+
+//
+//	KERNEL functions
+//
+	TCHAR	*EHPath(TCHAR *Str);
+
+	TCHAR *	ehAppPath(TCHAR *pszProgram,TCHAR *pszBuffer,SIZE_T sztBuffer); // Percorso dell'applicazione
+	TCHAR *	ehAppDataPath(TCHAR *pszProgram,TCHAR *pszBuffer,SIZE_T sztBuffer); // Percorso dei dati dell'applicazione 
+	TCHAR *	ehUserPath(TCHAR *pszProgram,TCHAR *pszBuffer,SIZE_T sztBuffer);// Percorso dei dati dell'utente
+	TCHAR *	ehWorkingPath(TCHAR *pszProgram,TCHAR *pszBuffer,SIZE_T sztBuffer); // Percorso di lavoro dell'applicazione
+
+	CHAR	*GetSystemProductKey(void); // new 2008
+	CHAR	*GetCurrentUserName(void); // new 2008
+	void	OsEventLoop(SINT iNum);
+
+	SINT	PRG_start(void (*FunzForStart)(SINT),void (*Funz2)(void));
+	void	PRG_end(CHAR *Mess,...);
+#define		PRG_endPoint() PRG_end("EndPnt# %s,%s():%d",__FILE__,__FUNCTION__,__LINE__);
+#define		PRG_endFunc() PRG_end("%s():%d",__FUNCTION__,__LINE__);
+	void	PRG_run(CHAR *file);
+	void  alert(CHAR *pszMess,...);
+
+	void	ehSocketInit(void); // new 2010 - Avvio dei socket
+
+	void	ehReport(BOOL bShow,CHAR *Mess); 
+
+#ifdef _WIN32
+	void WindowsMessageDispatch(void);
+    LRESULT CALLBACK EHStdWndProc(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
+#endif
+	CHAR *AppGetVersion(void); // New 2009
+
+
+	void 	pausa(LONG ps);
+	void	PauseActive(LONG ps);
+
+	// Obsolete
+	// void	ledblink(SINT cmd,void *ptr);
+	// void	orologio(SINT cmd,void *ptr);
+
+	//
+	// Gestione del Log
+	//
+	void EhLogOpen(TCHAR *lpFileLog,void (*funz)(CHAR *ptr));
+	void EhLogWrite(CHAR *Mess,...); // new fine 2004
+	BOOL EhLogWriteEx(CHAR *lpFileLog,CHAR *Mess,...); // new 2008
+	void EhLogSetProcess(DWORD id); // new 2009
+
+	void EhConWrite(CHAR *Mess,...);
+
+	//
+	// New 2005
+	//
+	BOOL	ClipboardPut(CHAR *lpMess,...);
+	SINT	ini_find(CHAR *cerca,CHAR *serv);
+	void	ini_replace(CHAR *lpOldString,CHAR *lpNewValue);
+
+#if !defined(EH_CONSOLE)
+	void	main(void);
+	void	mainarg(SINT,CHAR **);
+	#endif
+
+	void	OsError(BOOL fBreak,DWORD dwError,CHAR *Mess,...);
+	CHAR	*OsErrorToString(SINT iError);
+
+	#define JOBBER {PtJobber=__FILE__"|"__FUNCTION__;}
+	void EasyHand(void);
+
+	//
+	// Exit Manager 2007
+	//
+	void EM_AddFunc(void (*Func)(BOOL fExitOnError));
+	void EM_DelFunc(void (*Func)(BOOL fExitOnError));
+	void EM_FuncCall(BOOL fExitOnError);
+
+	//
+	// Finestre di avviso o richiesta
+	// Vanno cambiate con altro, chiamare win
+	//
+
+	 SINT EhMessageBox(CHAR *lpTitle,CHAR *lpMessage,SINT iType); // new 2007
+
+	 void win_info(CHAR *lpMessage);
+	 void win_err(CHAR *lpMessage);
+	 void win_errgrave(CHAR *lpMessage);
+	 SINT win_ask(CHAR *lpMessage);
+	 SINT win_askarg(SINT iType,CHAR *lpTitle,CHAR *Mess,...);
+	 void win_time(CHAR *lpMessage,SINT time);
+	 WORD win_time2(CHAR *lpMessage,SINT time);
+	 void win_infoarg(CHAR *Mess,...);
+
+	#ifdef EH_CONSOLE
+	 HWND WindowNow(void);
+	#endif
+
+	 //
+	 // Math Section (2010)
+	 //
+	BOOL IsPointInPolygon(SINT iPoints, POINT *arPoint, SINT  x, SINT y);
+
+//
+// <== KERNEL SECTION (END) ========================================================
+//
+
+// =================================================================================
+//
+// ==> NUMBER SECTION
+//
+// =================================================================================
+	SINT	xtoi(CHAR *str);
+	CHAR	*nummask(CHAR *num,SINT numcif,SINT dec,SINT sep,SINT segno);
+	TCHAR	*Snummask(double Numer,SINT numcif,SINT dec,SINT sep,SINT segno);
+	LONG	DToL(double Numero);
+	double	Ddecfix(double Numero,SINT dec);
+	double	DNoS(double dato);
+
+//
+// <== NUMBER SECTION (END) ========================================================
+//
+
+// =================================================================================
+//
+// ==> STRING SECTION
+//
+// =================================================================================
+#define strLen(a) (DWORD) strlen(a)
+#define wcsLen(a) (DWORD) wcslen(a)
+
+	#define AddBs(path) {if (path[strlen(path)-1]!='\\') strcat(path,"\\");}
+	#define AddBsW(path) {if (path[wcslen(path)-1]!=L'\\') wcscat(path,L"\\");}
+	#define AddSlash(path) {if (path[strlen(path)-1]!='/') strcat(path,"/");}
+	#define AddSlashW(path) {if (path[wcslen(path)-1]!=L'/') wcscat(path,L"/");}
+
+	// simil ansi
+	void	strIns(BYTE *p,BYTE *Cosa);
+	INT		strCmp(BYTE *pszA,BYTE *pszB); // 2010
+	CHAR *	strCpy(CHAR *pszDest,CHAR *pszSource,SIZE_T tSize); // 2010
+
+	CHAR	* rstrstr(CHAR *String,CHAR *Find);
+	WCHAR	* rwcsstr(WCHAR *pString,WCHAR *pFind);
+	CHAR	* rstristr(CHAR *String,TCHAR *Find);
+	CHAR	* stristr(CHAR *String,CHAR *lpFind);
+	WCHAR	* wcsistr(WCHAR *String,WCHAR *pwFind);
+
+	BOOL	strReplace(CHAR *lpSource,CHAR *lpFindStr,CHAR *lpReplaceStr);
+	BOOL	strReplaceW(WCHAR *lpSource,WCHAR *lpFindStr,WCHAR *lpReplaceStri);
+	BOOL	striReplace(CHAR *lpSource,CHAR *lpFindStr,CHAR *lpReplaceStr);
+
+	BOOL	strBegin(CHAR *lpString,CHAR *lpControllo); // new 8/2007
+	BOOL	striBegin(CHAR *lpString,CHAR *lpControllo); // new 8/2007
+	BOOL	strEnd(CHAR *lpString,CHAR *lpControllo); // new 11/2007
+	BOOL	striEnd(CHAR *lpString,CHAR *lpControllo); // new 11/2007
+	CHAR *	strWordCase(CHAR *); //new 9/1007
+	void	strUtfBreak(CHAR *pStringUft,UINT iMaxSize); // new 11/2008
+	BYTE *	strUtfLower(CHAR *pszSource,SIZE_T dwSize); // 10/2010
+
+	BYTE *	strTrimRight(BYTE *lpStr); // Ex NoSpaceCue()
+	WCHAR *	wcsTrimRight(WCHAR *lpStr);
+	CHAR *	strTrimNaRight(CHAR *lpStr); // ChrNullCue
+
+	BYTE *	strTrim(BYTE *lpSource);
+	WCHAR *	wcsTrim(WCHAR *pSource);
+//	TCHAR	*ChrSpaceCut(TCHAR *lpSource);
+	WCHAR*	strTrimw(CHAR *lpSource);
+	CHAR *  strPad(CHAR cChar,SINT iRepeat); // 2010
+
+	void	CharToUnicode(wchar_t *lpDest,CHAR *lpSource);
+	void	UnicodeToChar(CHAR *lpDest,wchar_t *lpSource);
+//	wchar_t *ToUnicodeAlloc(CHAR *lpSource); // New 2006
+
+	CHAR	*strOmit(CHAR *lpSource,CHAR *lpChar); // Limitati a 250byte (no MT)
+	CHAR	*strKeep(CHAR *lpSource,CHAR *lpChar); // Limitati a 250byte (no MT)
+	CHAR	*strOmitAlloc(CHAR *lpSource,CHAR *lpChar);
+	CHAR	*strKeepAlloc(CHAR *lpSource,CHAR *lpChar);
+	SINT	strCount(BYTE *pSource,BYTE *pChar); // new 2009
+	BOOL	strControl(BYTE *pszCharList,BYTE *pszStringCheck); // new 2010
+
+	//
+	// String allocation
+	//
+#ifndef EH_MEMO_DEBUG
+	CHAR	*strDup(CHAR *lpString);
+	WCHAR	*wcsDup(WCHAR *lpString);
+	//CHAR *	strPts(BYTE *pStart,CHAR *pEnd); // new 2008  => strTake
+	void	strAssign(BYTE **ptr,BYTE *pNewValue); // Era SetString - (alloca) una stringa 2007 in un puntatore (se il puntatore Ë pieno lo libera)
+	CHAR  *	strTake(BYTE *pStart,CHAR *pEnd);	// new 11/2008
+	WCHAR *	strTakeW(WCHAR *pStart,WCHAR *pEnd); // new 11/2008
+
+	#define StringAlloc(a) strDup(a)
+	#define StringAllocW(a) wcsDup(a)
+
+	CHAR	*strFromWcs(WCHAR *wcString); // StringAllocToChar
+
+#else
+	CHAR  * _strDupEx(CHAR *lpString,CHAR *pszProgram,SINT iLine);
+	WCHAR *	_wcsDupEx(WCHAR *lpString,CHAR *pszProgram,SINT iLine);
+	CHAR  *	_strPtsEx(BYTE *pStart,CHAR *pEnd,CHAR *pszProgram,SINT iLine); // new 2008
+	void	_strAssignEx(BYTE **ptr,BYTE *pNewValue,CHAR *pszProgram,SINT iLine); // new 2008
+	CHAR *  _strFromWcs(WCHAR *wcString,CHAR *pszProgram,SINT iLine); 
+	CHAR *	_strTakeEx(BYTE *pStart,CHAR *pEnd,CHAR *pszProgram,SINT iLine);
+
+	#define strDup(a) _strDupEx(a,__FILE__,__LINE__)
+	#define strTake(a,b) _strTakeEx(a,b,__FILE__,__LINE__)
+	#define strTakeW(a,b) _strTakeWEx(a,b,__FILE__,__LINE__)
+	#define strAssign(a,b) _strAssignEx(a,b,__FILE__,__LINE__)
+	#define wcsDup(a) _wcsDupEx(a,__FILE__,__LINE__)
+	#define strFromWcs(a) _strFromWcs(a,__FILE__,__LINE__)
+
+	#define StringAlloc(a) _strDupEx(a,__FILE__,__LINE__)
+	#define StringAllocW(a) _wcsDupEx(a,__FILE__,__LINE__)
+
+#endif
+
+	// Ancora anomali
+	WCHAR	*wcsFromStr(CHAR *lpString); // StringAllocToUnicode
+
+	BOOL	strEmpty(CHAR *ptr);
+	BOOL	wcsEmpty(WCHAR *ptr);
+#define strNext(a) a+strlen(a)
+
+	void	strAdd(CHAR *pContainer,CHAR *pString,CHAR *pSep,BOOL bNoEmpty); // new 2008 Ex ARAdd
+	void	strCat(BYTE **ptr,BYTE *pNewValue); // new 2008 (Cat dinamico)
+#define		strEver(a) (!a?"":a)
+
+	BOOL	strOnlyNumber(CHAR *pString); // Stringa di soli numeri
+	DWORD	strWordCount(CHAR *psz);
+	DWORD	strWordCountW(WCHAR *pwc);
+
+	// Estrae un stringa dando il tag di inizio e fine
+	CHAR *	strExtract(CHAR *pString,CHAR *pTagStart,CHAR *pTagEnd,BOOL bCaseUnsensitive,BOOL bWithTag);
+	WCHAR *	wcsExtract(WCHAR *pwString,WCHAR *pwTagStart,WCHAR *pwTagEnd,BOOL bCaseUnsensitive,BOOL bWithTag);
+	
+	CHAR *	strFileSize(UINT64 tiSize,SINT iDec); // 02/2010 GDF
+	CHAR *	strFileLimiter(CHAR *pszFileName,DWORD iMaxString,CHAR *pszDest); // 04/2010
+	WCHAR *	wcsFileLimiter(WCHAR *pwcFileName,DWORD iMaxString,WCHAR *pwcDest);
+
+	INT		strGetInt(CHAR *psz,SINT iLen);
+
+	BOOL	strWildMatch(CHAR *pszPattern, CHAR *pszString);
+	BOOL	wcsWildMatch(WCHAR *pwcPattern, WCHAR *pwcString);
+
+	BOOL	isNaN(BYTE *pString); // Come Javascript new 2009
+	BOOL	isEmail(CHAR *pEmail); // 2010
+
+
+//
+// <== STRING SECTION (END) ========================================================
+//
+
+// =================================================================================
+//
+// ==> TASK SECTION
+//
+// =================================================================================
+
+	BOOL	ProcessRun(CHAR *lpProgram,
+					   CHAR *lpCommandLine,
+					   CHAR *lpEnvironment, // Separare con /n CICCIO=PIPPO/nA=2/n
+					   BOOL fHide,
+					   SINT *lpiErr);
+#ifdef _WIN32
+	BOOL	ProcessRunEx(CHAR *lpProgram,
+				      CHAR *lpCommandLine,
+				      CHAR *lpEnvironment, // Separare con /n CICCIO=PIPPO/nA=2/n
+				      BOOL fHide,
+				      SINT *lpiErr,
+				      PROCESS_INFORMATION *lpProcessInformation);
+#endif
+
+	CHAR *	ProcessRunAlloc(CHAR *lpProgram,
+					  CHAR *lpCommandLine,
+					  CHAR *lpEnvironment, // Separare con /n CICCIO=PIPPO/nA=2/n
+					  BOOL fHide,
+					  SINT *lpiErr,
+					  BOOL fEnvironmentParent); // T/F Aggiungo l'Enviroment del Task Padre
+	void	ProcessWait(DWORD dwMillSec);
+
+//
+// <== TASK SECTION (END) ========================================================
+//
+
+// =================================================================================
+//
+// ==> MEMORY SECTION
+//
+// =================================================================================
+
+	// Macro
+	#define RAM_HDLFREE -1
+	#define RAM_HEAP    0
+	#define RAM_BASSA   1
+	#define RAM_ALTA    2
+	#define RAM_AUTO    2
+	#define RAM_XMS     3
+	#define RAM_DISK    4
+	#define RAM_GLOBALHEAP RAM_HEAP+128
+
+
+	SINT 	memo_start	(void);
+	SINT    memo_end  	(void);
+
+	//#define farPtr(a,b) ((BYTE *) a)+(b)
+	void *farPtr(void *p,LONG l);
+
+
+	SIZE_T 	memo_usata(void);
+	SINT    memo_chiedi(SINT tipo,SIZE_T sizebyte,CHAR *usr);
+	SINT    memo_libera(SINT hdl,CHAR *chisei);
+	void    memo_diskswap(SINT hdl);
+	void    memo_list(void);
+
+	SINT	memo_scrivi(SINT memo_hdl,
+						LONG dest,
+						WORD sgm,
+						WORD off,
+						LONG numbyte);
+
+	SINT	memo_scrivivar(SINT memo_hdl,
+						   LONG dest,
+						   void *pt,
+						   LONG numbyte);
+
+	SINT	memo_leggi(SINT memo_hdl,
+					   LONG sorg,
+					   WORD sgm,
+					   WORD off,
+					   LONG numbyte);
+
+	SINT	memo_leggivar(SINT memo_hdl,
+						  LONG sorg,
+						  void *pt,
+						  LONG numbyte);
+
+
+	SINT			memo_tipo(SINT hdl);
+	void *			memo_heap(SINT hdl);
+	SINT			memo_copyall(SINT hdl1,SINT hdl2);
+	CHAR *			memo_name(SINT hdl);
+	MEMO_ELEMENT *	memo_info(SINT hdl);
+
+//
+//	Windows
+//
+#ifdef _WIN32
+
+	void	*Wmemo_lock(SINT memo_hdl);
+	void	*Wmemo_lockEx(SINT memo_hdl,CHAR *lpWho);
+    void	Wmemo_unlock(SINT memo_hdl);
+	void	Wmemo_unlockEx(SINT memo_hdl,CHAR *lpWho);
+
+#define	memoLock Wmemo_lock
+#define	memoUnlock Wmemo_unlock
+
+	SINT	memo_clone(SINT Hdl);
+	BOOL	memo_manager(SINT iNewSize);
+
+	#define CPU_MMX (0x00000002L)
+	#define CPUF_SUPPORTS_SSE                       (0x00000010L)
+	#define CPUF_SUPPORTS_SSE2                      (0x00000020L)
+
+#endif
+
+//
+// Apple
+//
+#ifdef __APPLE__
+    void	*Wmemo_lock(SINT memo_hdl);
+	void	*Wmemo_lockEx(SINT memo_hdl,CHAR *lpWho);
+    void	Wmemo_unlock(SINT memo_hdl);
+	void	Wmemo_unlockEx(SINT memo_hdl,CHAR *lpWho);
+	SINT	memo_clone(SINT Hdl);
+	BOOL	memo_manager(SINT iNewSize);
+#endif
+
+	// es far_bsearch() (Ritorna TRUE se non la trova)
+	BOOL ehBinSearch(CHAR *cerca,
+				      CHAR *dbase,
+				      DWORD *pos,
+				      DWORD size,
+				      DWORD offset,
+				      DWORD nkey);
+
+//
+// DOS
+//
+#ifdef __DOS__
+	SINT 	memo_info(SINT hdl,SINT *tipo,WORD *sgm);
+	WORD	memo_seg(SINT hdl);
+	WORD	memo_off(SINT hdl);
+
+	struct RAM {
+			SINT  tipo; 	// RAM_????
+			WORD  sgm;    // Segmento di riferimento memoria
+			WORD  ofs;    // Offset   di riferimento memoria
+			CHAR *ptmemo; // Puntatore far alla memoria
+			FILE  *fp;			// Usato per RAM_disk
+			LONG  size;	  // Dimensioni
+			SINT  xms;		// Handle per XMS
+			CHAR far User[MEMOUSER];
+			};
+
+	    // XMS.H
+
+     SINT  XMS_alloca(SINT,SINT *);
+     SINT  XMS_libera(SINT);
+     SINT  XMS_size(SINT *);
+
+#endif
+
+//
+// Windows
+//
+#ifdef _WIN32
+	#define RAM_GLOBALHEAP RAM_HEAP+128
+
+	#ifdef EH_MEMO_DEBUG
+
+	 void *		_EhAlloc(SIZE_T iMemo,BOOL bZero,CHAR *pszProgram,SINT iLine);
+	 void		_EhFree(void *ptr,CHAR *pszProgram,SINT iLine);
+	  void		memDebugUpdate(void *ptr,CHAR *pszProgram,SINT iLine); // 2010
+
+	 #define	EhAlloc(a) _EhAlloc(a,FALSE,__FILE__,__LINE__)
+	 #define	EhAllocZero(a) _EhAlloc(a,TRUE,__FILE__,__LINE__)
+	 #define	EhFree(a) _EhFree(a,__FILE__,__LINE__)
+
+	#else
+	// EhAlloc Group in modalità release
+		void *	EhAlloc(SIZE_T iMemo);
+		void *	EhAllocZero(SIZE_T iMemo); // Alloca Ë mette a zero
+		void	EhFree(void *ptr);
+	#endif
+
+	void * EhReAlloc(void *ptr,SIZE_T OldMemo,SIZE_T iMemo);
+	#define EhFreeNN(lp) {if (lp) EhFree(lp);}
+	void EhFreePtr(void **ptr);
+	void EhFreePtrs(SINT iNum,...);  // 2010
+
+	#ifdef _WIN32_WCE
+		#define Ehmemcpy(a,b,c)	memcpy(a,b,c)
+	#else
+		void Ehmemcpy(void* dst, const void* src, size_t len);
+	#endif
+
+#endif
+
+//
+// Apple
+//
+#ifdef __APPLE__
+	struct RAM {
+			SINT    iTipo; 	  // RAM_????
+			void    *lpvMemo; // Puntatore far alla memoria
+			DWORD   dwSize;   // Dimensioni
+		//	HGLOBAL hGlobal;  // Handle Global
+			CHAR	User[MEMOUSER_SIZE];
+			};
+	#define RAM_GLOBALHEAP RAM_HEAP+128
+	void * EhAlloc(SIZE_T iMemo);
+	void * EhAllocZero(SIZE_T iMemo); // Alloca Ë mette a zero
+	void * EhReAlloc(void *ptr,SIZE_T OldMemo,SIZE_T iMemo);
+	void EhFree(void *ptr);
+	#define EhFreeNN(lp) {if (lp) EhFree(lp);}
+	void EhFreePtr(void **ptr);
+	void Ehmemcpy(void* dst, const void* src, size_t len);
+#endif
+//
+// <== MEMORY SECTION (END) ==========================================================
+//
+
+// =================================================================================
+//
+// ==> AUDIO SECTION
+//
+// =================================================================================
+
+	void AudioStart(void);
+	void AudioEnd(void);
+
+	//		FLM_AUDI HEADER
+
+	void sonic(WORD part,SINT lop1,SINT inc1,SINT lop2,SINT inc2,SINT wait);
+	void beep1(void);
+	void efx1(void);
+	void efx2(void);
+	void efx3(void);
+	void efxtext(void);
+	void efxmem(SINT num);
+
+	#ifdef _WIN32
+	 void PlayMySound(CHAR *Nome);
+	#endif
+//
+// <== AUDIO SECTION (END) =========================================================
+//
+
+// =================================================================================
+//
+// ==> ULT SECTION (Translator)
+//
+// =================================================================================
+
+#define EH_LANG_ITALIAN  0
+#define EH_LANG_FRENCH   1
+#define EH_LANG_ENGLISH  2
+#define EH_LANG_DEUTCH   4
+#define EH_LANG_SPAIN    5
+
+#define ULT_MAXTYPE 20 // <--- Importante
+
+#define ULT_TYPE_WINT 0
+#define ULT_TYPE_WINI 1
+#define ULT_TYPE_OBJS 2
+#define ULT_TYPE_HMZ  3
+#define ULT_TYPE_OBJ  4
+#define ULT_TYPE_MENU 5
+#define ULT_TYPE_SPF  6
+#define ULT_TYPE_DISP 7
+#define ULT_TYPE_LIST 8
+
+#define ULT_TYPE_HTML 16
+#define ULT_TYPE_JAVA 17
+
+#define ULT_TYPE_WTAG_NO 18 // Ex sistema di diversificazione di encoding, lasciato con la versione 4 in UTF
+
+#define ULT_MAXLANG 50 // Numero Massimo di lingue gestite
+
+// CharType
+typedef enum {
+	ULT_CS_LATIN1=0,
+	ULT_CS_UTF8=1,
+	ULT_CS_ASCII=2,
+	ULT_CS_ANSI=3,
+	ULT_CS_UNICODE=0x20,
+} EN_CHARTYPE;
+
+typedef enum {
+UU_UNKNOW=0,	// Sconosciuto
+UU_SOURCE=1,	// Sorgente
+UU_ADMIN=2,		// Admin
+UU_CPU=3		// CPU - Tradotto da Computer
+} EN_USERTYPE;
+
+#define UU_CTRL 0x10000 // Traduzione che Necessita di controllo, cambiata voce principale
+#define UU_MASK 0x0FFFF // Masketa Utenti
+
+// Encoding in generazione Htl
+#define ULT_ENCODE_ISO 0  // Latin1 (per compatilit‡ con il passato)
+#define ULT_ENCODE_UTF8 1 // Consigliato con UTF-8
+
+typedef struct {
+	SINT idLang;
+	CHAR *lpIsoPrefix;
+	CHAR *lpLangName;			// Uso Interno
+	WCHAR *pwcLangNameNativo;
+	CHAR *lpTransName;
+	CHAR *lpXiff;
+} ULT_LANG_INFO;
+
+typedef struct {
+	SINT iFirst;
+	SINT iNum;
+} ULT_TYPE;
+
+typedef struct {
+	INT16	iType; // Tipo di definizione
+	DWORD	dwID;  // Identificativo univoco della definizione
+	SINT	iTransStatus; // percentuale lingue tradotte 100=Tutto tradotto
+	BOOL	fLost:1;  // Non Ë associato a nessun file (il collegamento Ë stato perso)
+//	BYTE  *lpcText[ULT_MAXLANG]; // Puntatore alla lingua codificata come da CS_Dictionary
+
+	BYTE  *	lpbText; // Puntatore alla traduzione CHAR (inserita per compatibilità con i programmi One Char)
+	WCHAR *	lpwText[ULT_MAXLANG]; // Puntatore alla lingua codificata come da CS_Dictionary
+	DWORD	dwUser[ULT_MAXLANG]; // Utente che ha fatto la traduzione 0=non indicato, 1=Amministratore, 2=Traduttore automatico | new 2009
+
+	// I uso solo sui programmi EasyHand per compatibilit‡ con il passato
+
+} ULTVOICE;
+
+typedef struct {
+	CHAR szFile[300];
+	CHAR szUltFolder[300];
+	DWORD dwLastId;
+	SINT iVersion;
+	SINT iTypeEncDict;			 // 0=con @# e @<, 1=con \1\2\3
+
+	SINT hdlLangReady;			  // Memoria che contiene hdlLangReady
+	ULT_LANG_INFO *arLangGeneral; // Array con le lingue gestibili
+	ULT_LANG_INFO *arLangReady;	  // Array cone le lingue presenti nel dizionario
+	SINT iLangNum;				  // Numero di lingue/Codici presenti nel dizionario
+
+	//SINT iLangList[ULT_MAXLANG]; // Codici Linguaggi presenti
+	CHAR **lpLangSuffix;		// Puntatore a suffissi di lingua
+
+	SINT iLangWant;				// Lingua voluta (Macro della lingua) / Solo uso Esecutivo per caricare solo la lingua desiderata
+
+	SINT iLangReady;			// Numero di lingue realmente presenti nell'ult, tolte quelle di appoggio come codice,files,note ecc..
+	SINT iLangNative;			// Codice Interno della lingua nativa |iLangNative|
+	BOOL fRealCode;				// T/F se il idxLangCode Ë un codice reale: False Ë un "Testo da sorgente", TRUE un Codice
+	SINT idxLangCode;			// indice il "Codice" sorgente (default 0)
+	SINT idxLangNative;			// indice lingua NATIVA da cui deriva il codice Sorgente(es 1)
+
+	SINT idxLangTranslated;		// Indice della lingua da usare (solo esecutivo)
+	SINT iLangTransAlternative;		// Codice Interno della lingua alternativa alla traduzione
+	SINT idxLangTransAlternative;	// indice lingua Alternativa in caso di traduzione inesistente (indice in Item)
+
+	SINT idxFiles;				// indice Files > 0
+	SINT idxNote;				// indice Note > 0
+	//SINT idxAlfaCode;			// indice Codice Alfanumerico > 0
+
+	BOOL fLoadAll;				// Tutto il dizionario caricato in memoria
+	BOOL fModified;				// T/F se Ë stato modificato o Ë stata aggiunta qualche voce
+
+	DRVMEMOINFO dmiDict;		// dmi del dizionario
+	SINT iNewItem; // Nuovi item (Es. usato in Scan)
+
+//	SINT iTypePoint[ULT_MAXTYPE];
+//	SINT iTypeNumber[ULT_MAXTYPE];
+	ULT_TYPE arType[ULT_MAXTYPE];
+
+	ULTVOICE *lpVoiceShare;		// Memoria di appoggio condivisa
+	SINT iSizeVoice;
+
+	BOOL fWebFolder;		// T/F se agganciato ad un WebFolder
+	BOOL fWebAutoScan;		// T/F se deve autoscansire il sito in apertura
+	//CHAR szWebFolder[250];	// Indirizzo del Web Folder
+
+	SINT iCS_Source;		// CharType del "codice" presi dal sorgente (default ANSI LATIN1/CHAR)
+	SINT iCS_Dictionary;	// CharType dei termini tradotti (default UTF-8/CHAR)
+	SINT iEncodeHtml;		// Encoding in Html (default ISO = Es &nbsp)
+	SINT iItemDup;			// Item duplicati in caricamento (stesso Tipo/Parola codice)
+
+	// Logo di creazione files
+	FILE *chLog;
+	CHAR szLogFile[500];
+	BOOL fLogWrite;			// Scrive il log in fase di costruzione files
+	BOOL fLogShowEnd;		// Mostra il log alla fine
+	BOOL fLogError;			// Se non stati riscontrati errori durante la creazione dei files
+
+} ULTINFO;
+
+ULTINFO *ULTInfo(void);
+void ULTDictionaryMake(void);
+BOOL ULTDictionaryLoad(CHAR *File,SINT iLanguage,BOOL fLoadAll);
+BOOL ULTDictionaryLoadEx(CHAR *lpFileName,
+						 SINT iLanguage,
+						 BOOL fLoadAll,
+						 BOOL fOnlyHeader);
+
+SINT ULTDictionarySave(CHAR *lpFileName,BOOL fShowError);
+SINT ULTDictionaryNew(TCHAR *lpFileName);
+
+void ULTFree(void);
+void ULTResourceFree(void);
+SINT ULTItemInsert(SINT iType,WCHAR *pwcWord,DWORD dwID,BOOL *lpfDup);
+void ULTWordFileControl(SINT iIndex,CHAR *lpFile);
+void ULTAddWord(void *lpElement,SINT idxLang,SINT iCharSize,DWORD dwUser); // 1=CHAR 8 Bit originale, 2=Wide Char
+
+ULT_LANG_INFO *UltLangInfo(SINT idLang,CHAR *lpIsoFind);
+
+BYTE *ULTTranslate(SINT iType,BYTE *lpWord);
+//BYTE *ULTTranslateCheck(SINT iType,BYTE *lpWord);  // Vecchio sistema
+
+#define ULTTranslateCheck(a,b) sys.fTranslate?ULTTranslate(a,b):b
+void *ULTTranslateEx(SINT iType,
+					 WCHAR *pwcWordCode, // Ricerca Wide Char
+					 CHAR *lpFile,
+					 BOOL fBuildOn,
+					 SINT *lpRow); // Dove si trova nelle righe
+
+//void *ULTTranslateCheck(SINT iType,BYTE *lpWord);//,SINT iCharSet);
+TCHAR *ULTTranslateSZZAlloc(TCHAR *lpStringZZ); // New 2005 Double Zero String
+
+BOOL ULTWordUpdate(SINT Index,SINT iLang,void *lpWord,SINT iCharSize,DWORD dwUser);
+
+//void ULTWordUpdateW(SINT Index,SINT iLang,WCHAR *lpWord);
+
+void ULTWordDelete(SINT Index,SINT iLang,DWORD dwUser);
+void ULTItemDelete(SINT Index,DWORD dwUser);
+void ULTNewDictionary(TCHAR *lpFileName);
+
+BOOL ULTFolderScan(void);
+void ULTGeneralFileBuilder(CHAR *lpFileUlt,
+						   BOOL fOpenDizionario,
+						   BOOL fRebuildAll,
+					       BOOL fShowFilesTouch);
+
+CHAR *ULTCodeToText(SINT iWhat,SINT iCode);
+SINT ULTTextToCode(SINT iWhat,CHAR *p);
+CHAR *ULTTypeToText(SINT iCode);
+BOOL ULTExtEnable(CHAR *lpExt);
+SINT ULTDwToRow(DWORD dwId); // da ID univoco a id Row
+SINT ULTLangReady(SINT iCode,BYTE *lpIsoPrefix);
+SINT ULTLangAdd(CHAR *lpIsoPrefix);
+SINT ULTLangRemove(CHAR *lpIsoPrefix);
+void ULTSetLang(SINT idToLang,SINT iLangMiss);
+
+BOOL ULTMultiFileBuilder(CHAR *lpFolderBase, // Il folder dove si trovano le cartelle in lingua Es. c:\inetpub\wwwroot\mondialbroker
+						 CHAR *lpIsoLang,	 // Prefisso della lingua interessata
+						 WCHAR *pwcFileList, // Elenco dei file da rielaborare separati da virgola
+						 SINT *lpiFileMissing,
+						 BOOL fShowFilesTouch);	// Numero dei File scomparsi
+
+BOOL ULTIdxIsLang(SINT idx);
+void UltItemSetFlag(void);
+
+#define ULT_CRYPT "Gioele12"
+//
+// <== ULT SECTION (END) ===========================================================
+//
+
+// =================================================================================
+//
+// ==> FILE SECTION
+//
+// =================================================================================
+
+#define IGNORA   -101
+#define RIPROVA  -102
+#define ABORT    -103
+#define DOSERR   -104
+
+#define NOSEEK  -1
+
+#define ONVEDI   2
+#define POP     -2
+
+//
+// Win 32
+//
+#if defined(_WIN32)&&!defined(_WIN32_WCE)
+	#include <io.h>
+	#define MAXDIR  _MAX_DIR
+	#define MAXPATH _MAX_PATH
+
+	#define FA_ARCH   _A_ARCH
+	#define FA_HIDDEN _A_HIDDEN
+	#define FA_RDONLY _A_RDONLY
+	#define FA_SYSTEM _A_SYSTEM
+	#define FA_DIREC  _A_SUBDIR
+
+	typedef struct {
+		 intptr_t Handle;
+		 SINT AttribSel;
+#ifdef UNICODE
+		 struct _wfinddata_t ffile;
+#else
+		 struct _finddata_t ffile;
+#endif
+		 TCHAR  *ff_name;
+		 SINT   ff_attrib;
+		 TCHAR   ff_date[9];
+	} FFBLK;
+#endif
+
+//
+// Per Windows Mobile
+//
+#if defined(_WIN32)&&defined(_WIN32_WCE)
+	#define MAXDIR  200
+	#define MAXPATH _MAX_PATH
+
+	#define FA_ARCH   _A_ARCH
+	#define FA_HIDDEN _A_HIDDEN
+	#define FA_RDONLY _A_RDONLY
+	#define FA_SYSTEM _A_SYSTEM
+	#define FA_DIREC  _A_SUBDIR
+
+	typedef struct {
+		 LONG Handle;
+		 SINT AttribSel;
+//		 struct _finddata_t ffile;
+		 CHAR  *ff_name;
+		 SINT   ff_attrib;
+		 CHAR   ff_date[9];
+	} FFBLK;
+#endif
+
+#ifdef _DOS
+
+	typedef struct {
+		CHAR  *ff_name;
+		SINT   ff_attrib;
+		SINT   AttribSel;
+		CHAR  ff_date[9];
+		struct ffblk ffblk;
+	} FFBLK;
+#endif
+
+//
+// Apple
+//
+#ifdef __APPLE__
+
+#include <AvailabilityMacros.h>
+#include <sys/appleapiopts.h>
+#include <sys/cdefs.h>
+#include <sys/attr.h>
+#include <sys/kernel_types.h>
+
+//	#define MAXDIR  _MAX_DIR
+	#define MAXPATH MAXPATHLEN
+
+	#define FA_ARCH   _A_ARCH
+	#define FA_HIDDEN _A_HIDDEN
+	#define FA_RDONLY _A_RDONLY
+	#define FA_SYSTEM _A_SYSTEM
+	#define FA_DIREC  _A_SUBDIR
+
+	typedef struct {
+		 LONG Handle;
+		 SINT AttribSel;
+		 /*
+#ifdef UNICODE
+		 struct _wfinddata_t ffile;
+#else
+		 struct _finddata_t ffile;
+#endif
+*/
+		 TCHAR  *ff_name;
+		 SINT   ff_attrib;
+		 TCHAR   ff_date[9];
+	} FFBLK;
+#endif
+
+	SINT   f_open(TCHAR *nome,TCHAR *tipo,FILE **ch);
+	SINT   f_close(FILE *ch);
+	SINT   f_put(FILE *ch,LONG location,void *sorg,UINT dim);
+	SINT   f_get(FILE *ch,LONG location,void *dest,UINT dim);
+	SINT   f_gets(FILE *ch,CHAR *buf,UINT dim);
+	SINT   f_exist(TCHAR *file);
+	SINT   f_existw(WCHAR *nome);
+
+	SINT   f_getdir(SINT drive,CHAR *dir);
+	SINT   f_getdrive(void);
+
+	typedef struct {
+		TCHAR Name[255];
+		TCHAR OSName[255];
+		DWORD SerialNumber;
+		DWORD MaxPath;
+		DWORD SystemFlags;
+
+		DWORD dwSectorsPerCluster;  // pointer to sectors per cluster
+		DWORD dwBytesPerSector;  // pointer to bytes per sector
+		DWORD dwNumberOfFreeClusters;// pointer to number of free clusters
+		DWORD dwTotalNumberOfClusters;
+
+#ifdef _WIN32
+		ULARGE_INTEGER uliFreeBytesAvailableToCaller; // receives the number of bytes on disk available to the caller
+		ULARGE_INTEGER uliTotalNumberOfBytes;    // receives the number of bytes on disk
+		ULARGE_INTEGER uliTotalNumberOfFreeBytes; // receives the free bytes on disk
+#endif
+		} VOLINFO;
+
+	typedef struct {
+		
+		DWORD	dwFileAttributes;
+		INT64	tSize;
+		INT64	tTimeCreation;
+		INT64	tTimeAccess;
+		INT64	tTimeWrite;
+
+	} S_FILEDETAILS;
+
+	typedef struct {
+
+		CHAR	szFileName[_MAX_PATH];
+		CHAR	*pszFullPath;
+		S_FILEDETAILS sFd;
+
+	} S_FILEINFO;
+
+	typedef struct {
+
+		WCHAR	wcsFileName[_MAX_PATH];
+		WCHAR	*pwcFullPath;
+		S_FILEDETAILS sFd;
+
+	} S_FILEINFOW;
+
+	typedef enum {
+		FDE_SUBFOLDER=0x0001,		// Analizza anche le sotto cartelle
+		FDE_UNICODE=0x0002,			// In unicode
+		FDE_DMIMODE=0x0004,			// Modalita DMI
+		FDE_FULLPATH=0x0008,		// Richiedo costruizione FullPath
+
+		FDE_ADDFOLDER=0x0010,		// Aggiunge le cartelle trovate alla lista
+		FDE_ADDHIDDEN=0x0020,		// Aggiunge i files nascosti
+		FDE_ADDSYSTEM=0x0040,		// Aggiunge i files di sistema
+		FDE_DELEMPTYFOLDER=0x1000	// Cancella le cartelle che si svuotano (solo in delete)
+	} EN_FD_PARAM;
+
+	typedef struct {
+		EN_FD_PARAM	dwParam;
+		INT64	tDateLimit;
+		BOOL	(*subControl)(void *lpFolder,S_FILEINFOW *psFileInfo);
+
+		// Risultato
+		_DMI	dmiFiles;
+		EH_AR	arFiles;
+
+	} S_FILEDIR;
+
+	BOOL   f_volumeinfo(TCHAR *lpRootPathName,VOLINFO *VolInfo);
+	SINT   f_findFirst(TCHAR *fname,FFBLK *,SINT attrib);
+	SINT   f_findNext(FFBLK *);
+	void   f_findClose(FFBLK *);
+
+	SIZE_T	file_len(TCHAR *file);
+	SINT	file_load(TCHAR *file,SINT tipo);
+
+
+	CHAR *	FileToString(TCHAR *lpFile);
+	CHAR *	FileToStringW(WCHAR *wcpFile);
+
+	CHAR *	filePath(CHAR *file);
+	CHAR *	fileName(CHAR *file);
+	CHAR *	fileExt(CHAR *pFile); // new 2010
+
+	WCHAR *	filePathW(WCHAR *file); // new 2010
+	WCHAR *	fileNameW(WCHAR *file); // new 2010
+	WCHAR *	fileExtW(WCHAR *pFile); // new 2010
+
+	S_FILEDIR * fileDir(	void *pszPath,  
+							CHAR *lpDate,
+							EN_FD_PARAM dwParam,
+							BOOL (*subControl)(void *lpFolder,S_FILEINFOW *psFileInfo));
+	void fileDirDestroy(S_FILEDIR *);
+
+	SINT fileDelete(CHAR *lpPath,CHAR *lpDate); // Modificato 2007 file_delete()
+	SINT fileDeleteEx( void *pPath,
+					   CHAR *lpDate,
+					   EN_FD_PARAM dwParam,
+					   BOOL (*subControl)(TCHAR *lpFolder,S_FILEINFOW *psFileInfo)); // ritrona TRUE se va saltato
+
+	CHAR *	fileTimeToDt(CHAR *psDt,FILETIME *psFileTime);
+	BOOL	fileGetInfo(CHAR *pszFile,S_FILEINFO *psFileInfo);
+	BOOL	fileSetDate(CHAR *pszFileName,INT64 tCreateFile,INT64 tLastAccess,INT64 tLastWrite); // 2011
+	BOOL	ehFileSemaphore(EN_WSMESSAGE enMess,INT iSec,CHAR *psFile); // new 2010
+/*
+#define file_path(a) filePath(a) // per compatibilità
+#define file_name(a) fileName(a)
+*/
+	SINT MsDriveType(SINT iDrive); // Solo su Windows
+
+//	void   os_errset(SINT tipo);
+//	void   os_errcode(SINT *code,SINT *clas,SINT *act,SINT *locus);
+//	SINT   os_error(CHAR *ms1);
+//	SINT   os_drvtype(SINT drive);
+//	void   os_errvedi(CHAR *ms);
+//	SINT   handler(SINT errval,SINT ax,SINT bp,SINT si);
+//	void os_ErrorShow(CHAR *ms,SINT iError);
+
+	FILE *	TempFileOpen(CHAR *lpName); // New 8/2007
+	BYTE *	TempFileCloseGet(FILE *ch,CHAR *lpName); // New 8/2007
+	SINT TempFileName(TCHAR *pFolder, // Cartella dove crearlo
+					  TCHAR *pPrefix,
+					  TCHAR *pFileName, // Nome del file generato
+					  BOOL fCrea); // Crea il file
+	CHAR *FileToString(TCHAR *lpFile); // new 2007
+	BOOL StringToFile(TCHAR *lpFile,CHAR *lpString); // New 2007
+	BOOL StringToFileAppend(TCHAR *lpFile,CHAR *lpString); // new 2007
+
+	BOOL MemoryToFile(TCHAR *lpFile,void *pPtr,SIZE_T tSize); // new 2010
+	BYTE *FileToMemory(TCHAR *lpFile,SIZE_T *ptSize); // new 2010
+
+	BOOL ArgToFile(TCHAR *lpFile,CHAR *Mess,...); // new 2009
+
+	BOOL CreateFoldersFromFile(TCHAR *lpFileName); // New 8/2007
+	void FileView(TCHAR *File);
+
+
+
+//
+// <== FILE SECTION (END) ===========================================================
+//
+
+
+
+// =================================================================================
+//
+// ==> SERIAL COM SECTION
+//
+// =================================================================================
+#if defined(EH_COM) || defined(EH_COMPLETED)
+
+	#define COM1 0
+	#define COM2 1
+	#define COM3 2
+	#define COM4 3
+
+	#ifdef _WIN32
+	#define COM5 4
+	#define COM6 5
+	#define COM7 6
+	#define COM8 7
+	#endif
+
+	#define	COM_OPEN     0
+	#define	COM_CLOSE    1
+	#define	COM_CLOSEALL 2
+	#define	COM_SETBUF   3
+	#define	COM_LOCAL    4
+	#define	COM_REMOTE   5
+	#define	COM_ECHON    6
+	#define	COM_ECHOFF   7
+	#define	COM_SEND     10
+	#define	COM_SENDDIR  11
+	#define	COM_SENDLOC  20
+	#define	COM_RICE     30
+	#define	COM_INPUT    31
+	#define	COM_BUFREADY 32
+	#define	COM_CHECKBUF 33 // Solo Window
+	#define	COM_TIMEOUT  34 // Solo Window
+	#define	COM_STATUS   40
+	#define	COM_CLEAR    50
+
+	struct COM_STS {
+			WORD dataready:1;
+			WORD overrun:1;
+			WORD parity:1;
+			WORD frame:1;
+			WORD ebreak:1;
+			WORD reg_tras:1;
+			WORD reg_scor:1;
+			WORD timeout:1;
+
+			WORD var_cts:1;
+			WORD var_dsr:1;
+			WORD riv_ring:1;
+			WORD var_linea:1;
+			WORD cts:1;
+			WORD dsr:1;
+			WORD ring:1;
+			WORD linea:1;
+		};
+
+	SINT 	com_start(void);
+	void 	com_end(void);
+
+//
+// Versione DOS
+//
+	#ifdef __DOS__
+
+		struct COMINFO
+		{
+		 SINT power; // ON/OFF se la porta ä aperta
+		 SINT irq;   // Irq usato
+		 SINT rcm;
+		 SINT ind;
+		 CHAR *ptbuf; // Puntatore al buffer
+		 SINT hdlbuf;  // Handle del buffer
+		 WORD buflen; // Grandezza del buffer
+		 WORD bufstart; // Puntatore a coda circolare di start e di end
+		 WORD bufend;
+		 WORD maxinp; // Auto CR dopo maxinp caratteri
+		 void interrupt (*oldirq) (void);
+		 SINT cd;//    Carrier Detect 		: ON=Controllo,OFF=No
+		 SINT dsr;//   DataTerminalReady : ON/OFF controllo
+		 SINT cts;//   ClearToSend       : ON/OFF controllo
+		 SINT echo;//  Echo Locale				: ON/OFF
+		};
+		struct COM_STS rs232(SINT cmd,CHAR *buf,SINT port);
+
+	#endif
+
+//
+// Versione Windows
+//
+	#ifdef _WIN32
+		struct COMINFO
+		{
+		 BOOL power; // ON/OFF se la porta ä aperta
+		 SINT rcm;
+		 SINT ind;
+		 SINT irq;
+
+		 CHAR *ptbuf;  // Puntatore al buffer locale
+		 SINT hdlbuf;  // Handle del buffer locale
+		 WORD buflen;  // Grandezza del buffer locale
+		 WORD bufstart; // Puntatore a coda circolare di start e di end
+		 WORD bufend;
+		 WORD iTimeout; // Default 200 (= 2s)
+
+		 WORD maxinp; // Auto CR dopo maxinp caratteri
+		 SINT cd;//    Carrier Detect 		: ON=Controllo,OFF=No
+		 SINT dsr;//   DataTerminalReady : ON/OFF controllo
+		 SINT cts;//   ClearToSend       : ON/OFF controllo
+		 SINT echo;//  Echo Locale				: ON/OFF
+		 HANDLE hCom; // File delle comunicazione
+		 HANDLE hThread;// Thread attivo allo stoccaggio dei dati
+		 HANDLE hObject[3]; // Objects per la sincronizzazione del Thread
+		 OVERLAPPED ovr;// Struttura per I/O overlapped Input
+		 OVERLAPPED ovw;// Struttura per I/O overlapped OutPut
+		 BOOL fEnable;// T/F se la porta Ë abilitata
+		};
+
+		struct COM_STS * CommPort(SINT cmd,CHAR *buf,SINT port_com);
+		SINT IsCommPort(SINT port_com);
+		SINT CommSelect(SINT iComPort); // Selezione di una porta
+	#endif
+
+	void test_com(SINT port);
+	void rs232_err(SINT err,CHAR *buf);
+#endif
+
+//
+// <== SERIAL COM SECTION (END) =======================================================
+//
+
+//
+//	GESTIONE DEL COLORE
+//
+
+	EH_COLOR ColorLum(LONG Color,SINT Perc);
+	EH_COLOR ColorFusion(LONG ColorBase,LONG ColorNew,SINT Perc);
+	EH_COLOR ColorLumRGB(LONG Color,SINT PercR,SINT PercG,SINT PercB);
+	EH_COLOR ColorWebConvert(CHAR *lpColore);
+	EH_COLOR ColorGray(SINT Perc);
+
+#define GrayConvertRGB(r,g,b) (((DWORD) r*27+ (DWORD) g*86+ (DWORD) b*51)/164)
+#define GrayConvert(color) ((GetBValue(color)*27+GetGValue(color)*86+GetRValue(color)*51)/164)
+
+	RECT *rectFill(RECT *rc,SINT x,SINT y,SINT x2,SINT y2);
+	void rectAdjust(RECT *rcRect);
+	void sizeCalc(SIZE *psSize,RECT *psRect);
+
+
+//
+//	SUPPORTO DELLA GRAFICA (NO MODALITA CONSOLE)
+//
+#if !defined(EH_CONSOLE)
+
+	// =================================================================================
+	//
+	// ==> IN SECTION (Tastiera e mouse)
+	//
+	// =================================================================================
+
+	// Macro
+
+	#define IN_SX 1
+	#define IN_DX 2
+	#define IN_SXR 4
+	#define IN_DXR 8
+	#define IN_DBLSX 20
+	#define IN_DBLDX 24
+	#define IN_KEY -1
+	#define IN_OBJ -2
+	#define IN_KEYBREAK -3
+	//#define IN_MW_UP 64
+	//#define IN_MW_DOWN 65
+
+	#define KEY_F1   59
+	#define KEY_F2   60
+	#define KEY_F3   61
+	#define KEY_F4   62
+	#define KEY_F5   63
+	#define KEY_F6   64
+	#define KEY_F7   65
+	#define KEY_F8   66
+	#define KEY_F9   67
+	#define KEY_F10  68
+	#define KEY_F11  69
+	#define KEY_F12  70
+
+	#define _CANC 'S'
+	#define _INS  'R'
+	#define _END  'O'
+	#define _HOME 'G'
+	#define _FDX  'M'
+	#define _FSX  'K'
+	#define _FUP  'H'
+	#define _FDN  'P'
+	#define _PGUP 'I'
+	#define _PGDN 'Q'
+
+	#define	_SHIFTDX    1
+	#define	_SHIFTSX    2
+	#define	_CTRL       4
+	#define	_ALT        8
+	#define	_BLOCSCORR  16
+	#define	_BLOCNUM    32
+	#define	_BLOCMAIUS  64
+	#define	_INSERTON   128
+	#define	_ANYSHIFT   3
+
+	BOOL in_start(void);
+	void in_end(void);
+
+	// Mouse
+	void mouse_on(void); //  Abilita la visualizzazione del cursore
+	void mouse_off(void); // Disabilita ^
+
+	void mouse_set(SINT x,SINT y); // Setta la posizione del cursore
+	void mouse_prs(SINT x); // Rileva ultimo tasto premuto(NON FUNGE *)
+	void mouse_rel(SINT x); // Rileva ultimo tasto rilascato(IDEM ^)
+	void mouse_rangex(SINT x1,SINT x2);
+	void mouse_rangey(SINT y1,SINT y2);
+	void mouse_range(SINT x1,SINT y1,SINT x2,SINT y2); // Definisce RANGE cursore
+	SINT mouse_graph(SINT x,SINT y,CHAR *car); // Disegna il cursore grafico
+	SINT mouse_motion(SINT a); // Legge il movimento assoluto del mouse
+	void mouse_sens(SINT x,SINT y); // Setta la sensibilitÖ
+	void mouse_vel(SINT m); // VelocitÖ di spostamento
+
+#ifndef _WIN32
+	void mouse_click(void);
+#endif
+
+	//
+	//  FTIME
+	//
+	void FTControl(void);
+	struct FTIME {           // Struttura di controllo funzioni temporali
+				void (*funz)(SINT cmd,void *ptr);
+				SINT     cont;
+				SINT timer;
+				};
+	SINT	FTIME_on(void (*funz)(SINT cmd,void *ptr),SINT timer);
+	SINT	FTIME_off(void (*funz)(SINT cmd,void *ptr));
+
+	// Timer 2010
+	void CALLBACK ehEventTimer(HWND hwnd, UINT msg, UINT uipTimer, DWORD dwTime);
+	SINT ehSetTimer(BYTE *pszEvent,void	(*funcNotify)(void *),DWORD dwTimeoutMs,BOOL bInterval);
+	void ehCleanTimer(SINT uipTimer);
+
+//	SINT WaitEvent(HWND hWnd,BOOL bWait); // new 2008
+	SINT EhWaitEvent(HWND hWnd,BOOL bWait,BOOL bGetEvent,EH_EVENT *psEvent,BOOL bOnlyOsEvent);
+
+// Compatibilità con il passato
+
+//#define mouse_inp() WaitEvent(WIN_info[sys.WinInputFocus].hWnd,FALSE,TRUE)
+#define EventGet(a) EhWaitEvent(WIN_info[sys.WinInputFocus].hWnd,FALSE,TRUE,a,FALSE)
+
+//#define mouse_input() WaitEvent(WIN_info[sys.WinInputFocus].hWnd,TRUE,TRUE)
+//#define input_wait() WaitEvent(WIN_info[sys.WinInputFocus].hWnd,TRUE,TRUE)
+#define EventGetWait(a) EhWaitEvent(WIN_info[sys.WinInputFocus].hWnd,TRUE,TRUE,a,FALSE)
+
+//	SINT mouse_inp(void);
+//	SINT mouse_input(void);
+//	SINT input_wait(void);
+	SINT	mouse_ce(SINT x1,SINT y1,SINT x2,SINT y2);
+	SINT	Amouse_ce(SINT x1,SINT y1,SINT x2,SINT y2);
+
+	// Keyboard
+	SINT	key_press(CHAR car);
+	SINT	key_press2(CHAR car);
+	BOOL	key_pressS(SINT BitCheck,SINT mode);
+	SINT	key_SGet(void);
+
+	void	key_clean(void); // new 2008
+	CHAR	key_getchar(void); // new 2008
+	void	key_hit(SINT iTasto); // new 2008
+	void	key_hitEx(HWND hwnd,SINT iTasto); // new 2008
+
+	void	key_putstring(CHAR *pString); // new 2008
+	void	key_putstringEx(HWND hwnd,CHAR *pString); // new 2008
+
+	//BOOL VK_putc(CHAR Byte);
+	//void VK_putstring(CHAR *String);
+
+	//
+	// Mouse Graphaspect Zone
+	//
+	SINT mgz_start(void);
+	void mgz_end(void);
+	SINT mgz_on(SINT x,SINT y,SINT x2,SINT y2,SINT grp,SINT sx,SINT sy,CHAR *ico);
+	SINT Amgz_on(SINT x,SINT y,SINT x2,SINT y2,SINT grp,SINT sx,SINT sy,CHAR *ico);
+	SINT mgz_off(SINT x,SINT y,SINT x2,SINT y2);
+	SINT Amgz_off(SINT x,SINT y,SINT x2,SINT y2);
+	SINT mgz_grpoff(SINT grp);
+	SINT mgz_winoff(void);
+	SINT mgz_del(SINT  num);
+	void mgz_ask(void);
+
+	struct MGZ {
+		SINT x,y,x2,y2;
+		SINT sx,sy;
+		CHAR nome[9];
+		CHAR *pf;
+		SINT dimx,dimy;
+		SINT grp;
+		SINT win;
+	};
+
+	//
+	//	Help Mouse Zone (ToolTip)
+	//
+	struct HMZ {
+		CHAR *help;//[HMZSTR];
+		SINT x,y;
+		SINT x2,y2;
+		SINT win;
+	};
+
+	SINT hmz_start(void);
+	void hmz_end(void);
+	SINT hmz_on(SINT x,SINT y,SINT x2,SINT y2,TCHAR *str);
+	SINT Ahmz_on(SINT x,SINT y,SINT x2,SINT y2,TCHAR *str);
+	SINT hmz_off(CHAR *help);
+	SINT hmz_winoff(void);
+	SINT hmz_del(SINT num);
+	void hmz_ask(SINT cmd,void *ptr);
+	SINT hmz_obj(CHAR *nome,TCHAR *str);
+
+	//
+	// Windows
+	//
+	#ifdef _WIN32
+		// void LKBWinInsert(INT16 Tasto,SINT Num);
+		void OsEventTranslate(SINT iWin,BOOL bObj,HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
+
+		void WinMouse(SINT x,SINT y,WORD b);
+		void WinMouseAction(SINT iWin,HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
+		HWND WCreateTooltip(HWND hwndOwner);
+		void TooltipAdd(SINT id,SINT x,SINT y,SINT x2,SINT y2,CHAR *str);
+		void TooltipDel(SINT id);
+
+		//void hmz_objdel(CHAR *nome);
+		void MouseCursorDefault(void);
+#define MouseCursorWait() mouse_graph(0,0,"W:WAIT")
+
+		void EHSetCapture(HWND hWnd);
+		void EHReleaseCapture(void);
+		SINT EHMouseControl(SINT iMode);
+
+		void I_KeyTraslator_Windows(HWND hwnd,UINT cmd,LPARAM lParam,WPARAM wParam); // Uso Interno
+		//SINT MouseWheelManager(SINT cmd,SINT iValue); // new 2007
+	#endif
+
+	//
+	// <== IN SECTION (END) =======================================================
+	//
+
+	// =================================================================================
+	//
+	// ==> FONT SECTION
+	//
+	// =================================================================================
+	#define FONT_STANDARD sys.pFontStandardName,sys.hFontStandardHandle,sys.iFontStandardHeight,STYLE_NORMAL
+	void	Font_Start(void);
+	void	Font_End(void);
+	void	FontFree(EH_FONT *psFont,BOOL bFreeThis);
+
+	EH_FONT * FontBuilder(	CHAR *	pFontFace, // Font name
+							SINT	iAlt,		// Altezza
+							SINT	iStyles, // Stili
+							BOOL	bNotStore, // 2010 = Chiedo di non memorizzarlo nei fonti in memoria
+							BOOL *	fAllocated, // T/F se il font Ë stato allocato ed Ë da liberare
+							SINT *	idxFont);
+
+	EH_FONT * fontBuilderEx(CHAR *	pszFontFace, // Font name
+							SINT	iHeight,	 // Altezza
+							SINT	iWidth,		 // Larghezza
+							SINT	iWeight,	 // Peso
+							SINT	iStyles,	 // Stili
+							SINT	iCharExtra,
+							SINT	iRotation,
+							SINT	iPitch);
+
+	void	fontGetSize(TCHAR *lpTextOriginal,DWORD dwLen,EH_FONT *psFont,SIZE *psSize); // new 2010
+	void	dcFontGetSize(HDC hdc,INT iCharByte,void *pTextOriginal,DWORD dwLen,EH_FONT *psFont,SIZE *psSize);
+	SINT	font_lenh	(TCHAR *lpTextOriginal,DWORD dwChar,EH_FONT *psFont);//,SINT Nfi,SINT iStyles)
+
+	SINT 	font_dim	(TCHAR *lpText,DWORD dwChar,SINT idxFont);//,SINT nfi,SINT iStyles);
+	SINT 	font_len	(TCHAR *lpText,SINT idxFont);//,SINT nfi,SINT iStyles);
+	SINT 	font_alt	(SINT idxFont);//,SINT nfi,SINT iStyles);
+
+	SINT 	font_lenf	(TCHAR *lpText,CHAR *font,SINT iAlt,SINT iStyles);
+	SINT 	font_altf   (TCHAR *font,SINT iAlt,SINT iStyles);
+	SINT	font_find(CHAR *pFontName,SINT iAlt,SINT iStyles);
+	SINT	font_style(SINT idxFont,SINT iStyles);
+
+	SINT	Wfont_altChar(LOGFONT *LogFont); // Conversione da pitch a pixel
+	SINT	Wfont_alt(LOGFONT *LogFont); // Altezza reale del carattere in pixel
+	SINT	Wfont_dim(TCHAR *Str,UINT Num,LOGFONT *LogFont);
+	SINT	Wfont_len(TCHAR *Str,LOGFONT *LogFont);
+	BOOL	WChooseFont(LOGFONT *LogFont);
+	//
+	// <== FONT SECTION (END) =======================================================
+	//
+
+	// =================================================================================
+	//
+	// ==> GDI SECTION
+	//
+	// =================================================================================
+
+	//#define STYLE_WIDTHFIX 0x50
+
+	#define MAXCLIP 20
+	#define CLIPUSER 10
+	void GDI_start(void);
+	void GDI_end(void);
+	void GDIGetInfo(void); // new 2007
+	void lineAdjust(RECT *rcRect);
+	HBITMAP winBitmapBuilder(DWORD cx,DWORD cy,SINT iColorDepthBit,RGBQUAD *psPalette, BYTE **ppBits); // new 2010
+	HBITMAP winBitmapConvert(HBITMAP hBitmap,SINT iColorDepthBit,RGBQUAD *pPalette); // new 2010
+	void winBitmapAlphaFactor(SINT cx,SINT cy,BYTE *pbImage,BYTE *pbBits); // new 2010
+	POINT * arPoint(SINT iPoints,...); // new 2011
+
+
+#define rectCopy(a,b) memcpy(&a,&b,sizeof(RECT))
+
+//
+// Device Graphic (2008)
+//
+
+	typedef struct {
+		SINT	iType;
+		SIZE	sizArea;
+		RECT	rcArea;
+
+		// Windows technology
+#ifdef _WIN32
+	#ifndef EH_MOBILE
+		BITMAPV5HEADER bi;
+		HDC hdc;
+		HBITMAP hBitmap;
+		HBITMAP hBitmapOld;
+	#else
+		//BITMAPHEADER bi;
+		HDC hdc;
+		HBITMAP hBitmap;
+		HBITMAP hBitmapOld;
+	#endif
+#endif
+		void *pBits;
+
+	} EH_DG;
+
+	EH_DG * dgCreate(SINT iType,DWORD dwWidth,DWORD dwHeight);
+	EH_DG * dgDestroy(EH_DG *psDgs);
+	void dgCopy(EH_DG *psDgs,RECT *pRectDgs,SINT x,SINT y,SINT idxWin);
+	void dgCopyDC(EH_DG *psDgs,RECT *pRectDgs,SINT x,SINT y,HDC hdcDest); //2010
+	struct CLIP {
+		CHAR user[CLIPUSER];
+		SINT x1,y1;
+		SINT x2,y2;
+	};
+
+	struct LKUP { // Struttura per dichiarazione colori
+			CHAR blue;
+			CHAR green;
+			CHAR red;
+			CHAR unused;
+			};
+
+	struct BMP_HD {
+	 CHAR                   bit;    //      Bit per pixel (1/4/8/24)
+	 LONG                   larg;   //      Larghezza in pixel
+	 LONG                   alt;            //  Altezza in pixel
+	 WORD riga;   //    Larghezza in byte
+	 LONG                   size;           //      Grandezza in byte
+	 LONG                   col1;           // Colore del bit 1 per il B/W
+	 LONG                   col0;           // Colore del bit 0 per il B/W (-1= Trasparente)
+	};
+
+	#define DBH sizeof(struct BMP_HD)
+
+
+	//
+	//  DOS
+	//
+	#ifdef __DOS__
+		struct BMPINFO {
+			SINT 	type;
+			LONG 	numbyte;
+			SINT 	reserved1;
+			SINT 	reserved2;
+			LONG 	offset;
+			LONG	size;
+			LONG	dim_x;
+			LONG	dim_y;
+			SINT  planes;
+			SINT  bitcount;
+			LONG  compression;
+			LONG  sizeimage;
+			LONG  xpel;
+			LONG  ypel;
+			LONG  color_us;
+			LONG  color_im;
+		};
+		struct CHR_HEAD {
+			CHAR  id[10];  // Identificazione del file
+			CHAR  ver[8];  // Versione
+			CHAR  font[31]; // Nome del font MAX 30b
+			CHAR  made[81]; // Nome del costruttore del font MAX 30b
+			CHAR  eof;
+			SINT   num_font; // Numero di font contenuti
+		};
+
+		struct CHR_FONT {
+			SINT	chr_y;	// Altezza del carattere
+			LONG    bitmap;
+			LONG	tabloc;
+		};
+
+		struct CHR_CELL {
+			WORD	larg;
+			WORD	pos;
+		};
+
+		struct ICONE {
+			CHAR nome[NOMEICONE]; //                Nome della icone
+			SINT  hdl;      //    Handle memory
+			LONG  size;
+			LONG  offset;  //                Offset di spiazzamento
+			//CHAR lic[9];  //                Libreria di appartenenza
+			BOOL  Lic; // 0/1 se appartiene ad una LIC
+			SINT grp;                //    Gruppo di appartenenza (-1=Sistema protetto)
+			};
+
+		struct LIBLIC {
+			 CHAR icone[NOMEICONE];
+			 LONG size;
+			 LONG offset;
+		};
+
+		struct D_FILE {
+				FILE *ch;
+				LONG ofs_file;
+				SINT pt;
+				SINT hdl;
+				LONG offset;
+				};
+
+		struct D_TXT {
+				SINT bmp;
+				SINT px,py;
+				SINT lx,ly;
+				SINT ofs_x,ofs_y;
+				SINT modo;
+				};
+
+		struct D_GRAF {
+				SINT px,py;
+				SINT px2,py2;
+				LONG colore;
+				SINT modo;
+				};
+
+		struct D_MEMO {
+				SINT hdl,hdl2;
+				LONG dest;
+				WORD sgm,off;
+				LONG numbyte;
+				};
+
+		struct LIC_HEAD
+			 { CHAR id[10];
+				 CHAR eof;
+			   SINT  NumIco;
+			   LONG dati;
+			 };
+
+		struct ICO_HEAD {
+			CHAR id[10]; // Indentificazione del file
+			CHAR eof;
+			CHAR bit; // Bit-Colore dell'icone
+			SINT dimx;// Dimensioni orizzontali
+			SINT dimy;// Dimensioni verticali
+			SINT byte;// Dimensioni in byte orizzontali
+			LONG blk; // Dimensioni in byte dell'icone
+			LONG ofs_mask; // Posizione della maskera
+			LONG ofs_icone;  // Posizione dell'icone
+			SINT fpal;// Flag : ON cä la pallette OFF no
+		 };
+
+		struct VGAMEMO {
+				SINT memo_hdl;  // Handle della memoria collegata
+				SINT px,py;     // Coordinata in pixel dell'area di backup
+				SINT dimx;      // Dimensioni orizzontali
+				SINT dimy;      // Dimensioni verticali
+				SINT lenx;
+				SINT leny;
+				SINT nbx;
+				LONG size;
+				};
+	#endif
+
+	//
+	//  WINDOWS
+	//
+	#ifdef _WIN32
+		#pragma pack(1)
+		 typedef struct {
+			SINT hdlMemo;
+			BITMAP sBitMap;
+			HBITMAP hBitmap;
+			HPALETTE hPalette;
+		 } BITMAP_INFO;
+
+		#pragma pack()
+
+		LRESULT CALLBACK EH_DoPaint(HWND hWnd,WPARAM wParam,LPARAM lParam);
+		void EhDirectDC(HDC hdc);
+		EH_COLOR RealColor(LONG col1);
+		LONG ModeColor(LONG Col);
+
+		//
+		//	BitMap
+		//
+		void BmpDisp(SINT x1,SINT y1,HBITMAP BitMap);//,BOOL fAbsolute);
+		void BmpDispMask(SINT x,SINT y,HBITMAP BitMap,HBITMAP Mask);//,BOOL fAbsolute);
+		void BmpDispEx(SINT PosX,SINT PosY,
+					   SINT Lx,SINT Ly,
+					   SINT LxNew,SINT LyNew,
+					   HBITMAP BitMap,
+					   BOOL Ridim);//,
+					   //BOOL fAbsolute); // Ridimensiona
+
+		HDC UsaDC(SINT cmd,HDC LastDC);
+
+		//
+		// SaveBitMode functions
+		//
+		void DCSB_RectCopy(RECT *pRect,SINT win);
+		#define _SaveBit_RectChange(r) {if (sys.WinWriteFocus>-1) {if (WIN_info[sys.WinWriteFocus].bSaveBitMode) DCSB_RectCopy(&r,sys.WinWriteFocus);}}
+		void DCSB_Copy(SINT x,SINT y,SINT x2,SINT y2,SINT win);
+	    #define I_Show_Bitmap(x,y,x2,y2) {if (sys.WinWriteFocus>-1) {if (WIN_info[sys.WinWriteFocus].bSaveBitMode) {DCSB_Copy(x,y,x2,y2,sys.WinWriteFocus);}}}
+	//	EH_FONT *FontGetInfo(SINT iNum,SINT iNfi);
+		SINT Tbox		(SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera);
+		SINT Tboxp		(SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera);
+		SINT Tline      (SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera);
+		SINT TPolygon   (LONG cPen,LONG cBrush,SINT iPoints,...); // New Fine 2006
+		void TRect(RECT *psRect,EH_COLOR cBorderPen,EH_COLOR cBrushInside);
+		void TRectRound(RECT *psRect,
+						EH_COLOR cBorderPen,
+						EH_COLOR cBrushInside,
+						SINT lRoundWidth,
+						SINT lRoundHeight);
+
+		SINT boxFocus(SINT x1,SINT y1,SINT x2,SINT y2);
+
+		SINT hWndToWin(HWND hWnd);
+//		void Wcursor(HWND hWnd);
+
+		SINT Wdispf(SINT x,SINT y,LONG col1,LONG col2,LOGFONT *LogFont,TCHAR *String);
+		SINT Tdispf(SINT px,SINT py,LONG colcar,LONG colbg,SINT iStyles,TCHAR *font,SINT nfi,TCHAR *str);
+
+
+		//
+		// Direct DC Dirette
+		//
+		SINT dcDispf(	HDC hdc,
+				SINT px,SINT py,
+				EH_COLOR cText,
+				EH_COLOR cBack,
+				SINT iStyles,
+				CHAR *pFontFace,
+				SINT iNfi,
+				CHAR *pString); // new 2007
+		SINT dcDisp(HDC hdc,SINT px,SINT py,
+					LONG colcar,LONG colbg,
+					SINT idxFont,
+					CHAR *str);
+		SINT	dcDisp3D(HDC hdc,SINT px,SINT py,SINT idxFont,TCHAR *str);
+		SINT	dcIconeGray(HDC hdc,SINT px,SINT py,CHAR *nome,LONG lColor,SINT iLumCorrection);
+		DWORD	dcTextout(HDC hdc,SINT x,SINT y,EH_COLOR colText,EH_COLOR colBack,EH_FONT *psFont,SINT iByteChar,void *pString,SINT iLen,EN_DPL enAlign);
+		
+
+		//SINT dcIcone3d(HDC hdc,SINT px,SINT py,LONG col,CHAR *nome);
+//		SINT dcIcone3d(HDC hdc,SINT px,SINT py,LONG col,CHAR *nome,SINT *piWidth,SINT *piHeight);
+
+		void dcBoxp(HDC hDC,RECT *rcBox,DWORD dwColor);//SINT x1,SINT y1,SINT x2,SINT y2,LONG col);
+		void dcLine(HDC hDC,SINT x1,SINT y1,SINT x2,SINT y2,LONG col);
+		void dcBoxBrush(HDC hDC,RECT *psRect,SINT iType,EH_COLOR cBrush,EH_COLOR cBackground); // 2008
+		void dcRectRound(HDC	hDC,
+						RECT *	psRect,
+						EH_COLOR cBorderPen,
+						EH_COLOR cBrushInside,
+						SINT	lRoundWidth,
+						SINT	lRoundHeight,
+						SINT	iPenSize);
+		void dcRect(HDC hDC,
+					RECT *psRect,
+					EH_COLOR cBorderPen,
+					EH_COLOR cBrushInside,
+					SINT iPenSize);
+
+		void dcLineEx(HDC  hDC,SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera,SINT fnPenStyle,SINT nWidth);
+		void dcBmpDisp(	HDC hdc,
+						SINT PosX,SINT PosY,
+						SINT LxNew,SINT LyNew,
+						HBITMAP hBitmap); // Strano .. ma nel 2010
+		void dcBmpDispMask(HDC hdc,
+					   SINT x,SINT y,
+					   SINT lx,SINT ly,
+					   HBITMAP BitMap,
+					   HBITMAP MaskBit);
+
+		void dcBmpDispAlpha(HDC hdc,
+							SINT x,SINT y,
+							SINT lx,SINT ly,
+							HBITMAP hBitMap,
+							BYTE  bSourceConstantAlpha // 0xFF=Opaco, 0x00 invisibile
+							);
+
+
+		//SINT dcIconeEx(HDC hdc,SINT x1,SINT y1,CHAR *nome,SINT *piWidth,SINT *piHeight);
+		typedef struct {
+			SINT		iType;
+			EH_COLOR	colColor;
+			SINT		iLuminance;
+			DOUBLE		dAlpha;
+		} S_ICONE_EFFECT;
+
+		EH_ICON * dcIconeEx(HDC hdc,SINT x1,SINT y1,CHAR *pIconName,S_ICONE_EFFECT *psEffect); // new 2010
+		EH_ICON * dcIcone(HDC hdc,SINT x1,SINT y1,CHAR *pIconName);
+//		EH_ICON * dcIconeTrasp(HDC hdc,SINT x1,SINT y1,CHAR *pIconName,SINT Perc,EH_COLOR cColorBack);
+		EH_ICON * dcIconeAlpha(HDC hdc,SINT x1,SINT y1,CHAR *pIconName,double dPercAlpha,EH_COLOR cColorBack);
+		EH_ICON * dcIcone3d(HDC hdc,SINT px,SINT py,EH_COLOR cColorBack,CHAR *pIconName);
+		//#define dcIcone(a,b,c,d) dcIconeEx(a,b,c,d,NULL)
+		//#define dcIconeTrasp(a,b,c,d,e,f) dcIconeTraspEx(a,b,c,d,e,f,NULL,NULL)
+
+		HBITMAP IconeToHB(CHAR *nome);
+
+		HDC UsaDC(SINT cmd,HDC LastDC);
+		SINT AlineEx(SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera,SINT fnPenStyle,SINT nWidth);
+		SINT lineEx(SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera,SINT fnPenStyle,SINT nWidth);
+
+		HRGN ClipRgnMake(HDC hDC);
+		void ClipRgnKill(HDC hDC,HRGN hrgn);
+
+
+	//
+	// GDI++ (new 2007)
+	//
+		#define gdi_AlphaShift 24
+		#define gdi_RedShift 16
+		#define gdi_GreenShift 8
+		#define gdi_BlueShift 0
+		#define AlphaRGB(a,r,g,b) ( ((b) << gdi_BlueShift) | ((g) << gdi_GreenShift) | ((r) << gdi_RedShift) | ((a) << gdi_AlphaShift) )
+		#define AlphaColor(a,b) ( ((a) << gdi_AlphaShift) | ((b&0xff0000)>>16) | (b&0xff00) | ((b&0xff)<<16))
+		void GDIPlus(SINT iCmd);
+		void dcBoxGradient(	HDC hdc,
+							RECT *rcBox,
+							RECT *rcGradient,
+							DWORD cColorStart,
+							DWORD cColorEnd);
+		void BoxGradient(RECT *rcBox,
+						 RECT *rcGradient,
+						 DWORD cColorStart,
+						 DWORD cColorEnd);
+		void dcBoxFill(	HDC hdc,
+						RECT *rcBox,
+						DWORD cColorPen,
+						DWORD iPenSize,
+						DWORD cColorFill);
+		void BoxFill(	RECT *rcBox,
+						DWORD cColorPen,
+						DWORD iPenSize,
+						DWORD cColorFill);
+		void dcBox(	HDC hdc,
+					RECT *rcBox,
+					DWORD cColorPen,
+					DWORD iPenSize);
+
+		void dcLinePlus(HDC hdc,
+						SINT x,SINT y,SINT x2,SINT y2,
+						DWORD cColorPen,
+						double iPenSize);
+
+		void dcLineGradient(HDC hdc,
+							RECT *rcLine,
+							DWORD cColorStart,
+							DWORD cColorEnd);
+
+		void LineGradient(RECT *rcLine,
+						 DWORD cColorStart,
+						 DWORD cColorEnd);
+		SINT PlusPolygon(DWORD cColorPen,
+						 DWORD cColorBrush,
+						 SINT iPoints,...);
+		SINT dcPolygon(	HDC	hDC,
+						DWORD cColorPen,
+						float dSizePen,
+						DWORD cColorBrush,
+						SINT iPoints,POINT *arPoint);
+
+		void dcRectRoundEx(	HDC	hDC,
+							RECT *	prcBox,
+							EH_COLOR cBorderPen,
+							EH_COLOR cBrushInside,
+							SINT	lRoundWidth,
+							SINT	lRoundHeight,
+							SINT	iPenSize);
+		void dcPie( HDC	hdc,
+					RECT *	prcBox,
+					EH_COLOR cBorderPen,
+					EH_COLOR cBrushInside,
+					double dStartAngle,
+					double dSweepAngle);
+
+//		void dcImageDraw(HDC hdc);
+
+		// Icone
+		#pragma pack (1) // pack(1) obbliga il compilatore ad allinerare al byte
+		 struct LIC_HEAD
+			 { CHAR id[10];
+			   CHAR eof;
+			   INT16 NumIco;
+			   DWORD dati;
+			 };
+
+		typedef struct  {
+			CHAR id[10]; // Indentificazione del file
+			CHAR eof;
+			CHAR bit; // Bit-Colore dell'icone
+			INT16 dimx;// Dimensioni orizzontali
+			INT16 dimy;// Dimensioni verticali
+			INT16 byte;// Dimensioni in byte orizzontali
+			LONG blk; // Dimensioni in byte dell'icone
+			LONG ofs_mask; // Posizione della maskera
+			LONG ofs_icone;  // Posizione dell'icone
+			INT16 fpal;// Flag : ON cä la pallette OFF no
+		 } EH_ICOHEAD; // Ex ICO_HEAD
+
+		typedef struct  {
+			CHAR	id[10]; // Indentificazione del file
+			CHAR	eof;
+			SINT	iType;	// 0
+			SINT	iChannels;
+			SINT	iColorDeep; // Bit-Colore dell'icone
+			BOOL	bAlpha;
+			SIZE	sSize;
+			DWORD	dwRowWidth;	// Dimensione orizzontale in byte della linea
+			DWORD	dwSize;		// Dimensione totale del bitmap
+			DWORD	dwOffsetBitmap; // Offset inizio bitmap
+			DWORD	dwOffsetMask; // Offset inizio maskera (0 se assente)
+		 } EH_ICOHEAD_2; // Versione 2
+
+		struct LIBLIC
+		{
+			 CHAR icone[NOMEICONE_SIZE];
+			 LONG size;
+			 LONG offset;
+		};
+		#pragma pack ()
+
+
+		struct VGAMEMO {
+				SINT memo_flag;
+				SINT x;
+				SINT y;
+				HBITMAP bitmap; // Handle della memoria collegata
+				};
+
+	#endif
+
+	SINT	HwndToWin(HWND hWnd);
+	SINT	setpal(struct LKUP *info,LONG col_start,LONG col_num);
+	CHAR	TC_decoder	(CHAR red,CHAR green,CHAR blue);
+
+	//
+	//		Servizio
+	//
+	void 	xy_rel			(SINT x,SINT y);
+	void	Abar_perc(SINT x,SINT y,SINT lx,LONG riemp,LONG max,CHAR *car,SINT nfi);
+	void 	bar_perc		(SINT x,SINT y,SINT lx,LONG riemp,LONG max);
+	void	bar_percf(SINT x,SINT y,SINT lx,LONG riemp,LONG max,CHAR *car,SINT nfi);
+	void 	clip_set		(SINT x,SINT y,SINT x2,SINT y2,CHAR *user);
+	void 	Aclip_set		(SINT x,SINT y,SINT x2,SINT y2,CHAR *user);
+	void	clip_pop(void);
+
+	// Debug functions
+	void	dispx(CHAR *Mess,...);
+	void	dispxEx(SINT x,SINT y,CHAR *Mess,...);
+	void	bmpDispx(HBITMAP hBitmap);
+
+	SINT	disp(SINT px,SINT py,LONG colcar,LONG colbg,TCHAR *str);
+	SINT  	dispf(SINT px,SINT py,LONG colcar,LONG colbg,SINT iStyles,TCHAR *font,SINT nfi,TCHAR *str);
+	SINT  	dispfm	(SINT px,SINT py,LONG colcar,LONG colbg,SINT iStyles,TCHAR *font,SINT nfi,TCHAR *str);
+	SINT	dispfmS	(SINT x,SINT y,SINT lx,LONG col1,LONG col2,SINT iStyles,TCHAR *Font,SINT nfi,TCHAR *Desc);
+	SINT  	Adispfm	(SINT px,SINT py,LONG colcar,LONG colbg,SINT iStyles,TCHAR *font,SINT nfi,TCHAR *str);
+	SINT	dispf_h	(SINT px,SINT py,LONG colcar,LONG colbg,SINT idxFont,TCHAR *str);
+	SINT	dispfm_h(SINT px,SINT py,LONG colcar,LONG colbg,SINT idxFont,TCHAR *str);
+	SINT	Adispfm_h(SINT px,SINT py,LONG colcar,LONG colbg,SINT idxFont,TCHAR *str);
+	SINT  	Adisp_drv(SINT x,SINT y,LONG col1,LONG col2,SINT lx,SINT ly,SINT ofx,SINT ofy,SINT idxFont,TCHAR *str);
+	SINT	Adisp_drvf(SINT x,SINT y,LONG col1,LONG col2,SINT lx,SINT ly,SINT ofx,SINT ofy,SINT iStyles,BYTE *pFontFace,SINT iAlt,CHAR *pString);
+	SINT	dispfLim(SINT x,SINT y,LONG col1,LONG col2,SINT lx,SINT ly,SINT iStyles,BYTE *pFontFace,SINT iAlt,CHAR *pString);
+	SINT	disp3Dfm_h(SINT px,SINT py,SINT idxFont,TCHAR *str);
+	SINT	disp3Df(SINT px,SINT py,SINT iStyle,TCHAR *lpFont,SINT nfi,TCHAR *str);
+	SINT	dispnum_h(SINT x,SINT y,LONG col1,LONG col2,SINT idxFont,SINT cifre,SINT dec,SINT sep,double numero,BOOL fSign);
+	SINT	dispnum(SINT x,SINT y,LONG col1,LONG col2,SINT iStyle,TCHAR *Font,SINT nfi,SINT cifre,SINT dec,SINT sep,double numero);
+	SINT	dispnums(SINT x,SINT y,LONG col1,LONG col2,SINT iStyle,TCHAR *Font,SINT nfi,SINT cifre,SINT dec,SINT sep,double numero);
+	SINT  	dispfp	(SINT px,SINT py,EN_DPL enDpl,LONG colcar,LONG colbg,SINT iStyles,TCHAR *font,SINT nfi,TCHAR *str);
+
+	// Grafica
+	SINT clip_disp (SINT *ptx,SINT *pty,
+					SINT *ptofx,SINT *ptofy,
+					SINT *lx,SINT *ly,
+					SINT idxFont,TCHAR *str,SINT flag);
+
+	//			Gestione bitmap
+	SINT bmp_info(TCHAR *lpFile,BITMAP *sBitMap);
+	SINT bmp_load(TCHAR *lpFile,BITMAP_INFO *bmp,SINT tipo);
+	SINT bmp_disp (TCHAR *file,SINT px,SINT py,SINT modo);
+	SINT clip_bmp		(SINT *ptx,SINT *pty,SINT *ptofx,SINT *ptofy,
+									 SINT *lx,SINT *ly,
+									 SINT hdl,SINT flag);
+
+	//			Disegno
+	SINT pset	(SINT x1,SINT y1,LONG col,SINT opera);
+	SINT Apset	(SINT x1,SINT y1,LONG col,SINT opera);
+	LONG pget(SINT x1,SINT y1);
+	LONG Apget(SINT x1,SINT y1);
+
+	SINT line		(SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera);
+	SINT Aline	(SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera);
+
+	SINT box		(SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera);
+	SINT boxp		(SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera);
+//	SINT boxBrush	(SINT x1,SINT y1,SINT x2,SINT y2,HBRUSH hbr); // new 2008
+	void boxBrush(SINT x1,SINT y1,SINT x2,SINT y2,SINT iType,EH_COLOR cBrush,EH_COLOR cBackground); // 2008
+
+	SINT Abox		(SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera);
+	SINT Aboxp	(SINT x1,SINT y1,SINT x2,SINT y2,LONG col,SINT opera);
+	void box3d	(SINT x1,SINT y1,SINT x2,SINT y2,SINT tipo);
+
+	SINT clip_box		(SINT *x1,SINT *y1,SINT *x2,SINT *y2,SINT flag);
+	SINT clip_boxp	(SINT *x1,SINT *y1,SINT *x2,SINT *y2,SINT flag);
+/*
+	SINT Avideo_bck (SINT x1,SINT y1,SINT x2,SINT y2,SINT modo,struct VGAMEMO *vga);
+	SINT video_bck	(SINT x1,SINT y1,SINT x2,SINT y2,SINT modo,struct VGAMEMO *vga);
+	SINT video_rst  (struct VGAMEMO *vga);
+	SINT video_vedi (struct VGAMEMO *vga);
+	SINT video_free(struct VGAMEMO *vga);
+*/
+
+	//			Gestione ICONE
+	BOOL ico_cerca(DWORD *puIdx,CHAR *lpIcone);
+	SINT ico_info(SINT *x1,SINT *y1,CHAR *nome);
+	void ico_sfondo(CHAR *icone);
+	SINT ico_load(TCHAR *lpFile,SINT grp,SINT memo);
+	SINT ico_add(CHAR *pszIcoName,SINT iGroup,BYTE *pIconFile); // new 2008
+
+	// New 2008
+	EH_ICON *ico_getinfo(CHAR *pIconName);
+	void *ico_getptr(CHAR *pIconName,BOOL *pbLock,EH_ICON **psIconGet);
+	HBITMAP EhIconToBitmap(	SINT iMode, 
+							CHAR *pIconName,
+							BOOL *pbAlpha,
+							HBITMAP *phBitmapMask,
+							VOID **ppvBits);
+	BOOL ico_bitmapBuider(CHAR *pIconName);
+	// --------
+
+	SINT lic_load(TCHAR *lpFile,SINT grp,SINT memo);
+	SINT lic_import(BYTE *pNome,BYTE *pFile,SINT iGroup,SINT iMemoType);
+	BOOL lic_fromResource(LPCSTR pName,LPCSTR pType,SINT iGrp);
+	BOOL LicLoad(CHAR *pszName,SINT iGrp); // new 2008
+
+	SINT IcoToImage(CHAR *lpIcone,SINT iLx,SINT iLy,struct  ICO_HEAD *lpHead);
+
+	//SINT Dico_disp(SINT x1,SINT y1,CHAR *nome,SINT cmd);
+	SINT ico_disp(SINT x,SINT y,CHAR *pIconName);
+	SINT ico_dispAlpha(SINT x1,SINT y1,CHAR *nome,double dPercAlpha,LONG Color);
+	SINT ico_dispGray(SINT px,SINT py,CHAR *nome,LONG lColor,SINT iLumCorrection);
+	void ico_grpdel(SINT iGrp);
+	SINT ico_disp3D(SINT px,SINT py,EH_COLOR col,CHAR *nome);
+
+	SINT Aico_disp(SINT x1,SINT y1,CHAR *pIconName);
+	SINT ico_del(CHAR *pIconName);
+
+	SINT dcScroll(HDC hdc,SINT x1,SINT y1,SINT x2,SINT y2,SINT tipo,SINT pix,COLORREF col);
+	SINT scroll(SINT x1,SINT y1,SINT x2,SINT y2,SINT tipo,SINT pix,COLORREF col);
+	SINT Ascroll(SINT x1,SINT y1,SINT x2,SINT y2,SINT tipo,SINT pix,COLORREF col);
+	
+	SINT ehBarRangeAdjust(HWND hwnd,SINT iWhere,SINT iOffset,SINT iMaxCam,SINT iNumCam); // 2010
+	SINT ehScrollTranslate(HWND hWnd,SINT iWhere,DWORD wParam,SINT iOffset,SINT iMaxArea,SINT iViewArea); // 2010
+
+	//
+	//	Gestione Carret (ex cursore)
+	//
+//	void cursor_on	  (void);
+//	void cursor_off   (void);
+	void	txtCursor(BOOL bEnable);
+	void	txtCursorAspect(SINT dimx,SINT dimy,LONG col,SINT speed); // 	void cursor_graph(SINT dimx,SINT dimy,LONG col,SINT speed);
+	void	txtCursorPos(SINT x,SINT y); //void cursor_xy(SINT px,SINT py);
+	void	txtCursorPosEx(HWND hwnd,SINT x,SINT y); //void cursor_xy(SINT px,SINT py);
+	void	txtCursorDraw(BOOL bShow); // CursorDisplay(BOOL fShow); // new 2007 (uso interno)
+	//void Acursor_xy(SINT px,SINT py);
+//	void CursorDisplay(BOOL fShow); // new 2007
+	void oscura(SINT x1,SINT y1,SINT x2,SINT y2,CHAR tipo);
+	//
+	// <== GDI SECTION (END) =======================================================
+	//
+
+	// =================================================================================
+	//
+	// ==> WIN & OBJ (Common structure)
+	//
+	// =================================================================================
+
+	// Strutture comuni
+	typedef struct {
+		 CHAR *Name;
+		 SINT iType;
+		 SINT iPx,iPy;
+		 SINT iD1,iD2;
+		 SINT iD3,iD4;
+		 CHAR *lpChar1;
+		 SINT iD5;
+		 CHAR *lpChar2;
+		 RECT Rect;
+		} OBJS;
+
+	typedef struct {
+		SINT Type;
+		CHAR *Name;
+		SINT xTLAction;
+		CHAR *lpxTLParent;
+		SINT yTLAction;
+		CHAR *lpyTLParent;
+		SINT xBRAction;
+		CHAR *lpxBRParent;
+		SINT yBRAction;
+		CHAR *lpyBRParent;
+
+		SINT xTLActionReal;
+		SINT xTLValue;
+		SINT yTLActionReal;
+		SINT yTLValue;
+		SINT xBRActionReal;
+		SINT xBRValue;
+		SINT yBRActionReal;
+		SINT yBRValue;
+		//	CHAR *lpParent; // In relazione ad un oggetto parente
+	} AUTOMOVE;
+
+	typedef struct {
+		AUTOMOVE *Am;
+		SINT ObjPt;
+		SINT IptPt;
+		OBJS *Objs;
+	} AUTOMOVEINFO;
+
+
+
+	// =================================================================================
+	//
+	// ==> WIN SECTION
+	//
+	// =================================================================================
+
+	// Macro
+	#define WS_EHMOVE     WS_CLIPCHILDREN|WS_SYSMENU|WS_MINIMIZEBOX|WS_MAXIMIZEBOX|WS_OVERLAPPEDWINDOW|WS_VISIBLE|WS_SIZEBOX
+	#define WS_EHMOVEHIDE WS_CLIPCHILDREN|WS_SYSMENU|WS_MINIMIZEBOX|WS_MAXIMIZEBOX|WS_OVERLAPPEDWINDOW|WS_SIZEBOX
+	#define AUTOMATIC -2
+	#define EHWP_FULLSIZE	  -1
+	#define EHWP_MOUSECENTER  -2
+	#define EHWP_SCREENCENTER -3
+	#define EHWP_FOCUSCENTER  -4
+	#define EHWP_MENUCENTER  -5
+
+	#define NOACTIVE 128
+	#define NOWIN 0x1000
+
+
+	//                                                                      Apre e chiude finestra
+	SINT    win_start       (void);
+	void    win_end         (void);
+
+	WORD win_open(SINT x,SINT y,
+				  SINT lx,SINT ly,
+				  LONG col1,LONG col2,
+	 			  SINT modo,CHAR *car);
+
+	//
+	//	Windows
+	//
+	#ifdef _WIN32
+		struct WIN {
+			CHAR   *titolo;
+			LONG    col1;    // Colore dello sfondo -1=Standard
+			LONG    col2;    // DOS: Colore del titolo
+			SINT    x,y;     // Posizione della finestra
+			SINT    Lx,Ly;   // Dimensioni reali della finestra
+			SINT    CLx,CLy; // Dimensioni dell'area Client
+			SINT    zooming,efx;
+			SINT    zm_x1,zm_y1,zm_x2,zm_y2;
+			SINT    bck_relx,bck_rely;
+			/*
+			SINT    txc_vedi;
+			SINT    txc_x,txc_y;
+			SINT    txc_dim_x,txc_dim_y;
+			LONG    txc_color;
+			SINT    txc_speed;
+			*/
+			EH_TCURSOR	sTxtCursor;
+			HWND    txc_hWnd;
+			SINT    obj_num;
+			SINT    ipt_num;
+			SINT    tipo;
+
+			SINT    PMhdl;
+			SINT    PMnfi;
+			CHAR    PMaltO;
+			CHAR    PMaltC;
+
+			//CHAR    job[16];
+			CHAR    *job;
+			HWND	hWnd; // Handle della finestra
+			HWND    hWndTT; // Tooltip Windows
+			SINT    ObjPt;// Puntatore alla struttura degli oggetti in azione
+			SINT    IptPt;// Puntatore alla struttura degli input in azione
+			SINT    OldInputFocus;
+			SINT    OldWriteFocus;
+			OBJS    *Objs;// Puntatore alla struttura degli Obj statici in azione
+			AUTOMOVEINFO AMInfo;
+
+			// Limiti di dimensioni Minime e massime
+			SINT    xSizeMin;
+			SINT    xSizeMax;
+			SINT    ySizeMin;
+			SINT    ySizeMax;
+			WORD    wTypeShow; // Mod. 2001: Tipo di visualizzazione (Es. SW_MAXIMIZE)
+			BOOL    PhaseCritical;
+
+			//
+			// SaveBit Mode
+			// Usata per compatibilit‡ con applicazioni generate senza windows o a finestra fissa
+			//
+			BOOL	bSaveBitMode;	// T/F
+			HDC		hdcSaveBit;		// hdcClone
+			HBITMAP	hBitmap;
+			HBITMAP	hOldBitmap;
+
+			//	RECT	DCZone;
+			BOOL    EhWinType;
+			void    * (*SubPaint)(SINT,LONG,void *); //  CHIAMATA ALLA ROUTINE
+			BOOL    fBackGroundExtern; // FALSE/TRUE Gestione del Background della finestra esterno
+									   // Serve si vuole gestire un'immagine di background in una finestra
+			BOOL    ColorMode; // False/True
+			SINT    Relwx,Relwy;
+		//	SINT    clp_x1,clp_x2,clp_y1,clp_y2;
+			SINT	ClipNum;
+			struct  CLIP Clip[MAXCLIP];
+			};
+
+		WORD win_openEx(SINT  x,SINT y,  // Posizione a video (x=EHWP_macro)
+						CHAR  *lpTitle,  // Titolo
+						SINT  ClientLx,SINT ClientLy, // Dimensioni area Client Interessata
+						LONG  col1,  // Colore finestra (Real Color) -1=Default
+						DWORD dwParam, // 1 = Ci sar‡ un menu collegato (Usi Futuri)
+						LONG  WinStyleEx,// Style Esteso
+						LONG  WinType,   // Syyle Normale
+						BOOL  DosEmulation, // Emulazione Dos
+						void *(*SubPaint)(SINT,LONG,void *)); // Sotto procedura dedicata al Paint
+
+		typedef struct {
+		 SINT Relwx;
+		 SINT Relwy;
+		 SINT WinWrite;
+		 HDC  hDC;
+		 BOOL DcActive;
+		 SINT IPT_ult;
+		} WINSCENA;
+
+		void WinDirectDC(HDC hdc,WINSCENA *Scena);
+		void WinWriteSet(SINT Win,WINSCENA *WScena);
+		void WinWriteRestore(WINSCENA *WScena);
+		#define MYSCRY 4
+		#define MYSCRX 4
+
+		void  win_SizeLimits(SINT xMin,SINT yMin,SINT xMax,SINT yMax);
+		HWND  WindowNow(void);
+		void  WinGetClip(struct CLIP *lpClip,SINT win,BOOL Flag);
+
+	#endif
+
+	//
+	//	Apple
+	//
+	#ifdef __APPLE__
+
+	#endif
+
+	//
+	//	DOS
+	//
+	#ifdef __DOS__
+			struct WIN {
+				struct VGAMEMO info;
+				CHAR   *titolo;
+				LONG    col1,col2;
+				SINT    x,y,Lx,Ly;
+				SINT    zooming,efx;
+				SINT    zm_x1,zm_y1,zm_x2,zm_y2;
+				SINT    bck_relx,bck_rely;
+				SINT    txc_vedi;
+				SINT    txc_x,txc_y;
+				SINT    txc_dim_x,txc_dim_y;
+				LONG    txc_color;
+				SINT    txc_speed;
+				SINT    obj_num;
+				SINT    ipt_num;
+				SINT    tipo;
+
+				SINT    PMhdl;
+				SINT    PMnfi;
+				CHAR    PMaltO;
+				CHAR    PMaltC;
+
+				//CHAR    job[16];
+				CHAR   *job;
+
+				};
+
+	#endif
+
+	void win_openAdd(HWND hWnd); // new 2007 (x CE)
+
+	SINT win_close(void);
+
+	void win_draw(SINT num);
+	void win_drawon(SINT num);
+	void win_drawoff(SINT num);
+
+	WORD win_errprot(CHAR info[]);
+	SINT win_mess(CHAR info[],SINT tipo,SINT time);
+	void win_cart(SINT cmd,void *ptr);
+
+
+
+	//
+	// <== WIN SECTION (END) =======================================================
+	//
+
+
+	// =================================================================================
+	//
+	// ==> OBJ SECTION
+	//
+	// =================================================================================
+
+
+	// Macro per la gestione degli oggetti windows
+	#define EH_COMBOBOX 1024
+
+	// new 2007
+	// Bit 1 (TRUE= tasto premuto/FALSE=TASTO ALZATO)
+	// Bit 2 (Mouse focus)
+	// Bit 5 (Il mouse Ë sopra)
+	#define O_KEYSTS_MASK	0x01
+	#define O_KEYSTS_UP		0x00	// Lo status del tasto Ë su
+	#define O_KEYSTS_DOWN	0x01	// Lo status del tasto Ë giu
+	#define O_MOUSE_FOCUS	0x02	// Il mouse focus Ë sul tasto (Ë premuto ma il mouse non Ë sopra)
+	#define O_MOUSE_OVER	0x10    // Il mouse Ë sopra l'oggetto
+	#define O_MOUSE_MASK	0x10    // Il mouse Ë sopra l'oggetto
+
+	//
+	// Oggetti statici
+	//
+	#define OS_TEXT  1000
+	#define OS_ICON  1001
+	#define OS_BOX   1002
+	#define OS_BOXP  1003
+	#define OS_BOX3D 1004
+	#define OS_TEXTB 1005 // Text Bold
+	#define OS_TEXTE 1006 // Text Extended
+
+	struct WINSCR {
+		LONG    record;
+		CHAR    *keypt;
+		};
+	
+	struct WS_DISPEXT // Struttura di display extern
+	{
+		SINT px,py;
+		SINT lx,ly;
+		RECT rClientArea;			// Rettangolo dell'area scrivibile senza barre di scorrimento
+		RECT rWindowArea;			// Rettangolo dell'intera area window (inteso come suboggetto Child non come OBJ - Nota per SCR sono differenti, vedi titolo e contorni vari)
+		SINT hdl,nfi;
+		LONG col1,col2;
+		SINT ncam;
+		SINT bEnable;
+		BOOL bFocus;	 // ex .selected quello evidenziato usando lo scroll
+		BOOL bSelected; // bSelected (se la riga è selezionata) (può essere anche multiplo
+
+		HDC	hdc;		// Da verificare
+	 };
+
+	//
+	// AUTOMOVE Manager
+	//
+	#define AMT_STOP 0
+	#define AMT_OBJ  1
+	#define AMT_OBJS 2
+	#define AMT_IPT  3
+
+	#define AMP_AUTO    10
+	#define AMP_FIX     11
+
+	#define AMP_TOP     12 // Posizione stabilita
+	#define AMP_BOTTOM  13
+	#define AMP_LEFT    14
+	#define AMP_RIGHT   15
+	#define AMP_HCENT   16
+	#define AMP_VCENT   17
+	#define AMP_PX      18
+	#define AMP_PY      19
+
+	#define AMP_HP25    40
+	#define AMP_HP33    41
+	#define AMP_HP66    43
+	#define AMP_HP75    44
+
+	#define AMP_VP25    50
+	#define AMP_VP33    51
+	#define AMP_VP66    53
+	#define AMP_VP75    54
+
+	#define AMA_TOP     20 // Posizione autocalcolata
+	#define AMA_BOTTOM  21
+	#define AMA_LEFT    22
+	#define AMA_RIGHT   23
+	#define AMA_CENTER  24
+	#define AMA_AUTO    25
+
+	#define AMA_PERC25  30
+	#define AMA_PERC33  31
+	#define AMA_PERC66  33
+	#define AMA_PERC75  34
+
+	// News fine 2002/quasi 2003
+	#define AMA_LINK    100 // Posizione autocalcolata in relazione ad un oggetto padre (sinitra o top)
+	#define AMA_LINKB   101 // Posizione autocalcolata in relazione ad un oggetto padre (destra o bottom) new 2007
+	#define ORP_TOP     110 // Auto Relation Position
+	#define ORP_BOTTOM  111
+	#define ORP_LEFT    112
+	#define ORP_RIGHT   113
+
+	void obj_AutoMoveAssign(AUTOMOVE *am);
+	void obj_AutoMoveMake(SINT win,BOOL Show);
+	void obj_AutoMoveRefresh(AUTOMOVE *Am);// New2000
+	void obj_AutoMoveAssignSolo(AUTOMOVE *Am,SINT iTipo,CHAR *lpNome); // New 2002
+	SINT obj_GetPosition(CHAR *nome,SINT *px,SINT *py,SINT *ph,SINT *lx); // New2003
+
+	//
+	// WINDOWS version
+	//
+	#ifdef _WIN32
+
+		#define SCRDRVMAX 5
+		void *ScrDrvTest(struct OBJ *pojCalled,SINT cmd,LONG info,CHAR *str);
+
+	struct WS_INFO {
+		LONG    sizecam; // Dimenzione orizzontale (obsoleto)
+		LONG    numcam;  // Linee verticali visualizzate
+		LONG    maxcam;  // Numero massimo di Item contenuti
+		LONG    offset;  // Indice prima linea in alto
+		LONG    selez;   // Indice della selezione
+		LONG    koffset; // Interno
+		LONG    kselez;  // Interno
+		BOOL    refre; // Refresh
+		BOOL    dispext; // Procedura per il display dei dati: FALSE=Interno; TRUE=Esterno
+		BOOL    doDrag; //  Drag & Drop ? : FALSE=NO, TRUE=SI
+		BOOL    doNoFollow;// ON/OFF Bloccaggio MouseFollow ??
+		LONG    dbult;
+
+		LONG    Enumcam;  // Numero delle righe "intere" visualizzate
+		BOOL	fNoBlankLine; // T/F per non "pulire" la riga prima della richiesta di stampa
+		BOOL    doDragExt; //  TRUE/FALSE : Drag & Drop Esterno  (CioË gestito da una terza parte e non da EH)
+
+		BOOL	bExtSelection; // T/F Gestione esterna della selezione (nuovo metodo 2008)
+		};
+
+		//void  obj_refresh(SINT win);
+//		void  I_objRepaint(
+//							CHAR *lpNome,		 // Una funzione derivata/semplificata di obj_AloRefreshSolo()
+//							  BOOL fDelete,		 // Cancello la vecchia posizione
+//							  BOOL fShow);		 // Mostro l'oggetto nella nuova posizione
+
+		void	Wobj_refresh(SINT win);
+		void	Wobj_disp(struct OBJ *poj);
+		void	Wpmenuriga(LPDRAWITEMSTRUCT DIs);
+		BOOL	WPmenuTranslate(WPARAM wParam);
+		DWORD	WPmenuKey(WPARAM wParam,LPARAM lParam);
+		//void	drawComboRow(LPDRAWITEMSTRUCT DIs); // (Use Internal only)
+		BOOL	WOListTranslate(WORD wNotify,LPARAM lParam);
+
+		//void   obj_dataRefreshI(struct OBJ *poj,LONG R_Inizio,LONG R_Fine);
+		void	obj_dataRefreshI(struct OBJ *poj,LONG R_Inizio,LONG R_Fine);
+		void	obj_LineH(CHAR *nome,SINT LineH,BOOL Show);
+		void	obj_SetText(CHAR *Nome,CHAR *Text);
+		SINT	OBJ_RangeAdjust(struct OBJ *poj,SINT Offset,SINT MaxCam,SINT NumCam);//,BOOL *Barra);
+		//SINT	obj_GetWidth(struct OBJ *poj);
+
+		//
+		//	Funzioni private uso interno
+		//
+		void	I_obj_ClientRectMake(EH_OBJ *poj);
+		void	I_objChildClientRect(EH_OBJ *poj,RECT *psScrRect,SIZE *psScrSize);
+		void	I_LightMouseOver(RECT *prcArea,RECT *prcGradient); // Luce con il mouse sopra oggetto
+		void	I_drawCombo(EH_OBJ *poj);
+		void	I_drawComboRow(LPDRAWITEMSTRUCT DIs);
+		void	I_drawButton(EH_OBJ *poj);
+		void	I_drawIconeKey(EH_OBJ *poj);
+
+		SINT	OBJInput(void);
+		SINT	OBJFocus(void);
+
+		//SINT   EHGetLine(SINT Leny,SINT CharY,BOOL Real);
+		SINT	EHGetLine(struct OBJ *poj,BOOL Real);
+	 	void	obj_RefreshSolo(CHAR *lpName,BOOL fDelete,BOOL fView);
+		void	obj_Refresh(BOOL fDelete,BOOL fView);
+		void	I_objRepaint(struct OBJ *pObj, // Posizione Alo = Cambio di posizione o grandezza
+							  BOOL fDelete, // Cancello la vecchia posizione
+							  BOOL fShow, // Mostro l'oggetto nella nuova posizione
+							  SINT win);  // Finestra di rimferimento
+
+		void	obj_StackClear(void);
+		BOOL	obj_StackControl(void); // New ultimi tristi giorni 2006 ...
+		//void	obj_VStack(CHAR *Nome);
+		//void	obj_PutStack(CHAR *Mess,...);
+		void	obj_addevent(CHAR *lpNome);
+		void	obj_putevent(CHAR *Mess,...);
+
+		BOOL	obj_StackFind(CHAR *lpNome);
+
+		void	objs_open(OBJS *Objs);
+		void	objs_show(void);
+		void	objs_disp(OBJS *Objs);
+		void	objs_GetRect(CHAR *Nome,RECT *Rect);
+		BOOL	obj_GetRect(CHAR *lpNome,RECT *lpRect); // New 2005
+		#define obj_tooltip(a,b) hmz_obj(a,b) // New 2006
+		SINT	obj_mgz(CHAR *pObjName,CHAR *pIcon,SINT ofx,SINT ofy); // new 2008
+
+		struct	OBJ *WndToObj(HWND hWnd);
+		void	WinFocus(SINT win);
+		BOOL	IsWinMaximize(void);
+		SINT	objs_dfind(OBJS *Objs,CHAR *Nome);
+		SINT	objs_find(CHAR *Nome);
+		void	win_StatusUpdate(HWND win);
+
+		// Assegnazione di nome alfanumero ad un oggetto del OS
+
+		#define IDA_OFFSET 0x6000 // (?) Boh ???
+		SINT	obj_IDLock(CHAR *Name);
+		BOOL	obj_IDUnlock(CHAR *Nome);
+		CHAR	*obj_IDNameFind(SINT Id);
+		void	win_HideAll(void); // new 2006
+
+	#endif
+
+	//
+	// DOS VERSION
+	//
+	#ifdef __DOS__
+
+			// Questo ä il DOS
+			typedef struct {
+			 CHAR *Name; // Add 2000
+			 SINT iType;
+			 SINT iPx,iPy;
+			 SINT iD1,iD2;
+			 SINT iD3,iD4;
+			 CHAR *lpChar1;
+			 SINT iD5;
+			 CHAR *lpChar2;
+			} OBJS;
+
+			struct OBJ {
+				CHAR tipo,nome[LUNNOMEOBJ+1]; // TIPO OGGETTO,NOME ASSEGNATO
+				SINT  status,lock;
+				SINT  px,py,col1,col2; //                        POSIZIONE E COLORI
+				CHAR text[40];   //                     TESTO DA SCRIVERE SULLO SCHERMO
+				CHAR grp[2];     //                     GRUPPO DI APPARTENENZA (x O_RADIO)
+				void * (*sub)(SINT cmd,LONG info,CHAR *str); //      CHIAMATA ALLA ROUTINE
+				CHAR **ptr; // Puntatore ad una lista di parametri aggiuntivi
+				SINT fonthdl;
+				SINT nfi;
+				};
+
+			struct WS_INFO {
+				LONG    sizecam;
+				LONG    numcam;
+				LONG    maxcam;
+				LONG    offset;
+				LONG    selez;
+				LONG    koffset;
+				LONG    kselez;
+				WORD    refre:1;
+				WORD    dispext:1; // OFF=Interno; ON=Esterno
+				WORD    doDrag:1; // ON/OFF Gestionre Drag
+				WORD    doNoFollow:1; // ON/OFF Bloccaggio MouseFollow
+				LONG    dbult;
+				};
+
+			struct OBJ_INFO {
+					SINT numobj;  // Numero di oggetti contenuti
+					SINT alo_hdl; // Handle_memory della ALO Table
+					struct OBJ_AMB *status; // Puntatore alla ALO
+					struct OBJ_ALO *alo; // Puntatore alla ALO
+					};
+
+	#endif
+
+	SINT obj_start(void);
+	void obj_end(void);
+
+	void obj_open(struct OBJ *mask);// reset e load oggetti
+	void obj_add(struct OBJ *mask);// aggiunge oggetti
+	void obj_close(void);// chiude gli oggetti
+	void obj_vedi(void); // mostra tutti gli oggetti
+	SINT obj_vedisolo(CHAR *nome);// mostra un oggetto
+	void obj_disp(struct OBJ *poj);
+
+	EH_OBJINFO *obj_info_get(void);
+
+	BOOL I_obj_EventProcessing(SINT iObjPt);
+
+	SINT  obj_press(BYTE *pName); // Ritorna se ä stato cliccato l'oggetto <nome>
+	SINT  obj_Mpress(CHAR *status,CHAR *lista);
+	SINT  obj_mouse(BYTE *pName); // Ritorna il numero di oggetto sotto il mouse
+	struct OBJ * obj_mouseover(BOOL bOnlyEnable);
+	struct OBJ * obj_fromPoint(POINT *psPoint,SINT *piNumber,BOOL bOnlyEnable);
+
+	SINT	obj_find(BYTE *pName); // Ritorna il numero dell'oggetto interno
+	SINT	obj_findEx(SINT iObjStruct,CHAR *lpNome);
+
+//	struct OBJ *obj_lpFind(CHAR *lpNome);
+	struct OBJ *obj_GetInfo(CHAR *lpNome); // era obj_lpFind
+
+	// New 2007
+	struct OBJ *obj_ptrEx(SINT iSection,BYTE *pName,BYTE *pWhoRequest);
+	#define obj_ptr(a,b) obj_ptrEx(OBJInput(),a,b);
+	void	obj_setsize(BYTE *pName,SINT iWidth,SINT iHeight,BOOL bShow);
+	void	obj_setposition(BYTE *pName,SINT ix,SINT iy,BOOL bShow);
+	struct OBJ *ObjFindStruct(struct OBJ *poj,CHAR *Nome);
+
+	SINT  obj_type(BYTE *pName); // Ritorna il tipo dell'oggetto nome
+	SINT  obj_sopra(BYTE *pName);// Ritorna se il mouse ä sull'oggetto <nome>
+	SINT  obj_lock(BYTE *pName);   // Chiude l'uso di un oggetto
+	SINT  obj_unlock(BYTE *pName); // Ripristina l'uso di un'oggetto
+	SINT  obj_lockgrp(CHAR grp[]);   // Chiude l'uso di un gruppo
+	SINT  obj_unlockgrp(CHAR grp[]); // Riapre l'uso di un gruppo
+	SINT  obj_status(BYTE *pName);
+	void  obj_setstatus(CHAR *Nome,BOOL Status);
+	BOOL  obj_freeze(CHAR *Nome,BOOL bFreeze); // new 2007
+
+	void  obj_visible(BYTE *pName,BOOL fTrue);   // Setta il flag di visibilit‡ dell'oggetto New 2007
+
+	SINT  obj_on(BYTE *pName);
+	SINT  obj_off(BYTE *pName);
+	// SINT  obj_prezoom(BYTE *pName);
+
+	SINT  obj_listset(BYTE *pName,SINT num);
+	SINT  obj_listget(BYTE *pName);
+	SINT  obj_listcodset(BYTE *pName,void *ptr);
+	void *obj_listcodget(BYTE *pName);
+
+	SINT  obj_barinc(BYTE *pName,SINT inc);
+	SINT  obj_barset(BYTE *pName,SINT inc);
+	SINT  obj_barproset(BYTE *pName,LONG inc,LONG limite);
+	SINT  obj_barget(BYTE *pName);
+	SINT  obj_font(CHAR *nome,CHAR *font,SINT nfi);
+	SINT  obj_grpfont(CHAR *grp,CHAR *font,SINT nfi);
+	SINT  obj_typefont(SINT tipo,CHAR *font,SINT nfi);
+
+	SINT	obj_reset(CHAR *nome,SINT flag);
+	SINT	obj_resetEx(SINT iWin,CHAR *nome,SINT flag); // new 2008
+
+	BOOL	obj_setfocus(BYTE *pName);
+	BOOL	I_obj_setfocus(EH_OBJ *poj);
+	SINT  obj_dataRefresh(CHAR *Nome,LONG R_Inizio,LONG R_Fine);
+
+	void *obj_message(CHAR *nome,SINT cmd,LONG info,void *str);
+	void *obj_messageEx(SINT iWin,CHAR *nome,SINT cmd,LONG info,void *str); // new 2007
+
+	void obj_MouseGhost(CHAR *Nome,BOOL fStatus);
+
+	void objs_vedi(OBJS *objs);
+
+	void drawKey(struct OBJ *poj);
+	void drw_mk(struct OBJ *poj);
+	void drawCheckbox(struct OBJ *poj);
+	void drawRadio(struct OBJ *poj);
+	void drw_scrol(struct OBJ *poj,SINT col);
+	void drw_list(struct OBJ *poj);
+	void drw_lstdat(SINT Npy,struct OBJ *poj,SINT offset);
+	void drw_bar(struct OBJ *poj);
+
+	void  scr_draw(SINT x1,SINT y1,SINT lxc,SINT lyc,SINT lock,SINT flagfrc,SINT fontalt,SINT col);
+	void  drawIconeKey(struct OBJ *poj);
+	SINT  sep_icone(CHAR *text,CHAR *iup,CHAR *idn);
+	void  grp_ctrl(struct OBJ *poj); // Sistema appartenenza al gruppo
+	SINT  obj_grpoff(CHAR grp[]);
+//	void  memo_vedi(SINT x1,SINT y1);
+	SINT  obj_listload(BYTE *pName);
+	void  drw_pmenu(struct OBJ *poj);
+	void  pmenu(struct OBJ *mask);
+	SINT  pmenu_font(CHAR *font,SINT nfi);
+
+	typedef enum {
+		EHM_STOP,
+		EHM_ITEM,
+		EHM_SEP,
+		EHM_CHECK,
+		EHM_UNCHECK,
+		EHM_HIDE=10
+	} EHN_MIT; // Menu Item Type)
+
+	typedef struct {
+		EHN_MIT iType;
+		TCHAR *lpItem;
+		BOOL fEnable;
+		CHAR *lpCode;
+		void *Link;
+		SINT iMacroImage;
+		UINT uiEnum;
+		HBITMAP hBmp;
+	} EH_MENUITEM;
+
+	HMENU ehMenuBuilder(EH_MENUITEM *psEmi,SINT iValue);
+	CHAR *ehMenuGetCode(EH_MENUITEM *Ehm,UINT uiEnum);
+
+	//
+	// <== OBJ SECTION (END) =======================================================
+	//
+
+	// =================================================================================
+	//
+	// ==> TEXT INPUT SECTION
+	//
+	// =================================================================================
+
+	SINT 	ipt_start(void);
+	void 	ipt_end(void);
+
+
+	#define NORM 0
+	#define RIGA 1
+	#define QUAD 2
+
+	#define IPTS_BOLD 1
+	#define IPTS_WRAP 2
+	#define IPTS_VSCROLL 4
+
+	#define IPTMODE_ALLEVENT      1 // Esce al verificarsi di ogni eventi
+	#define IPTMODE_AUTOSELECT    2 // Autoseleziona il campo in ingresso (tipo Windows)
+
+#if (defined(_ADB32)||defined(_ADB32P)) // In disuso
+	struct ADB_HOOK {
+			 CHAR pTableFieldName[30]; // Nome del campo NomeFld
+			 CHAR pObjName[30];	// NomeObj
+			 SINT iInput;
+			 };
+#endif
+	typedef struct {
+			 SINT iType;		// ALFA,NUME,DATA,BIND
+			 CHAR *pTableFieldName; // Nome del campo
+			 CHAR *pObjName; // Se bind indica dove verrà scritto il campo
+			 SINT iInput;
+			 } EH_TABLEHOOK;
+	BYTE * hookGetText(EH_TABLEHOOK *arHook,CHAR *pszFieldName,CHAR *pszBuffer,SIZE_T sizBuffer); // 2010
+
+	struct IPT {
+		CHAR	avanti,indietro;
+		SINT 	tipo;
+		SINT	tipovis;
+		SINT	x,y;
+		SINT 	dimx;
+		SINT	len;
+		LONG	col1;
+		LONG	col2;
+		SINT	num1,num2;
+		CHAR	lim1[15];
+		CHAR	lim2[15];
+		CHAR	*dati;
+		SINT	ofs_x;
+		SINT	ofs_y;
+		SINT	idxFont;
+		SINT	alt;
+
+		SINT	bFocus; // T/F se il campo è in focus (ex edit Di servizio per l'editor)
+		SINT	cx;
+		SINT	cy;
+		SINT	nrig; // Per le note
+		SINT	bEnable; // ON/OFF chiusura del campo
+
+		BOOL    fEnable; // T/F Editing
+		DWORD   dwStyle; // Style IPTS_BOLD|IPTS_WRAP
+		HWND	hWnd; // Oggetto Window agganciato
+		BOOL	bColorSet; // T/F se i colori sono stati cambiati
+	};
+
+	struct IPTINFO {
+		struct 	IPT *mask;// Puntatore alle tabelle di configurazione input
+	#ifdef _WIN32
+		SINT	WinIptPt; // Backup puntatore agli input in apertura nuovi input (new 99)
+	#endif
+		SINT  		numcampi; // Numero campi presenti
+		SINT  		campo;    // Numero campo corrente
+		SINT  		procampo; // Prossimo campo da "inputare"
+		SINT  		buf_hdl;  // Handle del buffer creato
+		CHAR 		*ptbuf;   // Puntatore al buffer dei campi
+		SINT 		objpass_hdl; // ptoggetti che otrepassano i controlli di campo
+		CHAR 		*objpass; // ptoggetti che otrepassano i controlli di campo
+		SINT		window;   // Window che contiene l'input
+		void		*Hook;// Vecchio sistema
+		SINT		Modo; // 0 = Non esce dall'ipt_ask() se non con i tasti standard
+									// Nuovo sistema
+									// 1 = Esce ad ogni pressione di tasto
+		};
+
+	CHAR	*mask(CHAR *num,SINT numcif,SINT dec,SINT sep,SINT segno);
+	SINT 	ipt_font(CHAR *font,SINT nfi);
+	SINT    ipt_fontnum(SINT numcampo,CHAR *font,SINT nfi);
+
+	void 	ipt_open(struct IPT *mask);
+#if (defined(_ADB32)||defined(_ADB32P))
+	void 	ipt_Hopen(struct IPT *mask,struct ADB_HOOK *Hook);
+#else
+	void 	ipt_Hopen(struct IPT *mask,EH_TABLEHOOK *arHook);
+#endif
+	void	ipt_close(void);
+
+	SINT	IptEventGet(EH_EVENT *psEvent);
+#define  ipt_ask() IptEventGet(NULL) // Per compatibilità
+
+	void 	ipt_reset(void);
+	void 	ipt_rescampo(SINT pt);
+	void	ipt_Hrescampo(CHAR *Campo);
+	SINT	ipt_noteriga(CHAR *dest,CHAR *sorg,SINT width,SINT riga);
+
+	void 	ipt_vedi(void);
+	void 	ipt_vedisolo(SINT pt);
+	void	ipt_Hvedisolo(CHAR *Campo);
+
+	SINT  	ipt_ctrlcampo(SINT pt);
+
+	void 	ipt_write(SINT pt,CHAR *buf,double num);
+	void 	ipt_Hwrite(CHAR *nome,CHAR *buf,double num);
+
+	void 	ipt_writevedi(SINT pt,CHAR buf[],double num);
+	void 	ipt_Hwritevedi(CHAR *nome,CHAR buf[],double num);
+
+	CHAR *	ipt_read(SINT pt);
+	CHAR *	ipt_Hread(CHAR *nome);
+
+	void 	ipt_err(SINT a,SINT b);
+	void	ipt_objpass(CHAR *pt);
+	SINT 	ipt_objctrl(CHAR *pt);
+	void	ipt_noedit(void);
+	SINT 	ipt_sel(void);
+	SINT 	ipt_next(void);
+
+	SINT 	ipt_setnum(SINT pro);
+	SINT	ipt_Hsetnum(CHAR *Campo);
+
+	SINT	ipt_prezoom(SINT pt);
+
+	void	ipt_lock(SINT pt);
+	void	ipt_unlock(SINT pt);
+	void	ipt_Hlock(CHAR *Campo);
+	void	ipt_Hunlock(CHAR *Campo);
+
+	void	ipt_mode(SINT modo);
+	SINT	ipt_mouseover(void);
+
+	//
+	//	Windows
+	//
+	#ifdef _WIN32
+		void    ipt_resize(struct IPT *pin,SINT px1,SINT py1,SINT px2,SINT py2);
+		void	ipt_hide(SINT pt);
+		void	ipt_disp(struct IPT *pin);
+		void	ipt_ObjectShow(SINT pt);
+		DWORD   ipt_GetStyle(SINT pt);
+		void	ipt_SetStyle(SINT pt,DWORD dwNewStyle,BOOL fView);
+		void    ipt_SetStatus(SINT,BOOL);
+		void	ipt_SetColor(SINT pt,SINT cText,SINT cBackground); // new 2007
+		struct IPT *ipt_GetInfo(SINT pt);
+
+	#endif
+
+
+	//
+	// <== TEXT INPUT SECTION (END) =======================================================
+	//
+#endif
+
+
+#if defined(EH_PRINT) || defined(EH_COMPLETED)
+
+	// =================================================================================
+	//
+	// ==> PRINTER SECTION
+	//
+	// =================================================================================
+
+	#define LPT_PORTRAIT  0
+	#define LPT_LANDSCAPE 1
+	#define LPT_MAX 3
+	#define LPTD -20
+
+	#ifdef _WIN32
+		SINT  lpt_ask(SINT Mode);
+		SINT	ehPrinterChoose(CHAR **ppszPrinterDefine,BOOL bUseDefaultSetting);
+		SINT	ehPrinterPage(CHAR **ppszPrinterDefine);
+		BOOL	ehPrinterGetDefault(CHAR **ppszPrinterDefine);
+		BOOL	ehPrinterExist(CHAR **ppszPrinterDefine,BOOL bAddInfo);
+		BYTE *	ehPrinterDeviceDefine(DEVMODE *psDevMode);
+		HDC		ehPrinterCreateDC(CHAR *pszDeviceDefine,DEVMODE **ppDev);
+		DEVMODE * ehPrinterGetDev(CHAR *pszDeviceDefine);
+
+
+	#else
+		#define LPT1 0
+		#define LPT2 1
+		#define LPT3 2
+		#define EPSON1 0
+		#define EPSON2 1
+		#define EPSON3 2
+		#define EPSON4 3
+
+		#define EPSON24_1 10
+		#define EPSON24_2 11
+		#define EPSON24_3 12
+		#define EPSON24_4 13
+
+		#define LPT_EPSON   0
+		#define LPT_EPSON24 1
+		#define LPT_HP      2
+
+		struct LPT_STS {
+			WORD timeout:1;
+			WORD no1:1;
+			WORD no2:1;
+			WORD errio:1;
+			WORD selez:1;
+			WORD paper:1;
+			WORD ack:1;
+			WORD busy:1;
+		};
+
+		struct LPT_STS lpt_init(SINT port);
+		struct LPT_STS lpt_status(SINT port);
+		SINT  lpt_bmp(CHAR file[],CHAR send[],SINT mode,SINT px,SINT py,SINT scl);
+		SINT  lpt_ask(void);
+	#endif
+
+	SINT  lpt_send(CHAR buf[],SINT len);
+	SINT  lprint(CHAR str[]);
+	SINT  lpt_file(CHAR file[]);
+	void  lpt_pag(void);
+	SINT  lprintn(CHAR *car);
+	SINT  lptspace(SINT num);
+	SINT  lptchar(SINT num,CHAR *ch);
+	SINT  lprintCRtype(SINT num,CHAR *buf);
+	SINT  lprintCRsel(SINT linea,CHAR *buf);
+
+	SINT  lpt_pagcont(CHAR *Titolo,CHAR *Campi);
+	void  lpt_start(void);
+	void  lpt_end(void);
+	CHAR *lpt_capture(SINT lpt,CHAR *file);
+	SINT  lpt_endcapture(SINT lpts,SINT lptd);
+	void  lpt_command(SINT lpt,CHAR *comando);
+	void  lpt_orient(SINT lpt,SINT flag);
+
+	void lpt_funON(void * (*LptFun)(SINT,LONG,CHAR *));
+	void lpt_funOFF(void);
+    void lpt_Margin(SINT left,SINT top,SINT right,SINT bottom);
+
+
+	#ifdef _WIN32
+	typedef struct {
+	  BOOL Bold;
+	  BOOL Italic;
+	  BOOL UnderLine;
+	  COLORREF ColorChar;
+	} PDESTYLE;
+
+	#define EHP_DEFAULT       0
+	#define EHPM_EMULATION    1
+	#define EHPM_DIRECT       2
+	#define EHP_ASKPAGE       3
+
+	struct LPT_INFO
+	{
+		SINT iMode;
+		CHAR file[MAXPATH];
+		FILE *ch;
+		LONG len;
+		//SINT  type;// LPT_EPSON,LPT_ESPON24,LPT_HP
+
+		// Per Printer Dos Emulation
+		SINT capture;
+		CHAR orientamento; // 0= Verticale 1 = orizzontale
+		UINT yChar;
+		UINT xChar;
+        UINT iCharsPerLine;
+        UINT iLinesPerPage;
+
+        UINT Page;
+		UINT VCx; // Virtual Cursor
+		UINT VCy;
+		PDESTYLE PStyle;
+
+		// Direct Information (Dati "diretti" alla stampante)
+		SINT iDirectActive;
+		SINT iDirectType;
+		CHAR szDirectName[100];
+		CHAR szDirectDesc[60];
+		SINT fDirectRemote;  // ON/OFF stampante remota
+		SINT fDirectClose;  // ON/OFF chiusura porta a fine stampa
+		SINT iDirectOrient; // 0= Verticale 1 = orizzontale
+		SINT iDirectMaxline_V; // Massimo numero di linee Verticali
+		SINT iDirectMaxline_O; // Massimo numero di linee orizzontali
+
+	};
+	void lpt_update(void);
+	void lpt_xChar(SINT num);
+	SINT lpt_SetMode(SINT Mode);
+	BOOL InizializePrinter(void);
+	BOOL lpt_GetDefault(void);
+
+	// new 2006
+	BOOL FGetPrinterDefault(TCHAR *pPrinterName,SINT iSize);
+	BOOL FSetPrinterDefault(TCHAR *pPrinterName);
+
+	#endif
+
+	#ifdef __DOS__
+		struct LPT_INFO
+			{
+				SINT attiva;
+				SINT capture;
+				CHAR file[120];  // c'era max path
+				FILE *ch;
+				LONG len;
+				CHAR nome[30];  // c'era max path
+				CHAR descrizione[60];  // c'era max path
+				SINT type;// LPT_EPSON,LPT_ESPON24,LPT_HP
+				SINT remota;  // ON/OFF stampante remota
+				SINT close;  // ON/OFF chiusura porta a fine stampa
+
+				CHAR orientamento; // 0= Verticale 1 = orizzontale
+				SINT maxline_V; // Massimo numero di linee Verticali
+				SINT maxline_O; // Massimo numero di linee orizzontali
+			};
+	#endif
+
+	//
+	// <== PRINTER SECTION (END) =======================================================
+	//
+
+#endif 
+
+
+
+//
+// Extensions
+//
+#ifdef __APPLE__
+#include "../ehtool/main/armaker.h"
+#include "../ehtool/main/datautil.h"
+#include "../ehtool/main/StrEncode.h"
+#else
+#include "/easyhand/ehtool/main/armaker.h"
+#include "/easyhand/ehtool/main/datautil.h"
+#include "/easyhand/ehtool/main/StrEncode.h"
+#endif
+
+#if (defined(EH_MAIL))
+	#include "/easyhand/inc/ehMail.h"
+#endif
+
+#ifndef __APPLE__
+
+#if (defined(_ADB32)||defined(_ADB32P))
+ #include "/easyhand/inc/eh_adb.h"
+#else
+ #include "/easyhand/inc/adbConst.h" // Solo le costanti e macro
+#endif
+
+#endif
+
+
+
+//
+// <== SQL SECTION (START) =======================================================
+//
+
+#ifdef EH_SQL_ODBC
+
+	#define EH_ODBC
+	#include "/easyhand/inc/eh_odbc.h"
+	#define SQL_RS EH_ODBC_RS
+	#define sql_count odbc_count
+	#define sql_query odbc_queryarg
+	#define sql_querybig odbc_queryargBig
+	#define sql_row odbc_queryrow
+	#define sql_store() odbc_store_result(100)
+	#define sql_fetch odbc_fetch_row
+	#define sql_free(a) {odbc_free_result(a); a=NULL;}
+	#define sql_int(a,b) odbc_fldint(a,b)
+	#define sql_ptr(a,b) odbc_fldptr(a,b)
+	#define sql_num(a,b) odbc_fldnum(a,b)
+#endif
+
+#ifdef EH_SQL_MYSQL
+
+#if (!defined(_MYSQL)&&!defined(_MYSQL_MT))
+	#define _MYSQL
+#endif
+	#include "/easyhand/ehtool/mySql.h"
+	#define SQL_RS EH_MYSQL_RS
+	#define sql_count mys_count
+	#define sql_query mys_queryarg
+	#define sql_querybig mys_queryargBig
+	#define sql_row mys_queryrow
+	#define sql_store() mys_store_result()
+	#define sql_fetch mys_fetch_row
+	#define sql_free(a) {mys_free_result(a); a=NULL;}
+	#define sql_int(a,b) mys_fldint(a,b)
+	#define sql_ptr(a,b) mys_fldptr(a,b)
+	#define sql_num(a,b) mys_fldnum(a,b)
+
+#endif
+
+#ifdef EH_SQL_SQLITE
+
+	#define EH_SQLITE
+	#include "/easyhand/ehtool/SQLite.h"
+	#define SQL_RS EH_SQLITE_RS
+	#define sql_count sqlite_count
+	#define sql_query sqlite_queryarg
+	#define sql_row sqlite_queryrow
+	#define sql_store() sqlite_store()
+	#define sql_fetch sqlite_fetch
+	#define sql_free(a) {sqlite_free(a); a=NULL;}
+	#define sql_int(a,b) sqlite_int(a,b)
+	#define sql_ptr(a,b) sqlite_ptr(a,b)
+	#define sql_num(a,b) sqlite_num(a,b)
+
+#endif
+
+#if (!defined(EH_SQL_SQLITE)&&defined(EH_SQLITE))
+	#include "/easyhand/ehtool/SQLite.h"
+#endif
+//
+// <== SQL SECTION (END) =======================================================
+//
+
+#ifdef __cplusplus
+}
+#endif

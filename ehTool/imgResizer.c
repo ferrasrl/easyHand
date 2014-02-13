@@ -1,0 +1,901 @@
+//   ---------------------------------------------
+//   | ImgResizer
+//   | Crea un'immagine di differente grandezza
+//   | 
+//   |          by Ferrà Art & Tecnology 1993-2002
+//   ---------------------------------------------
+
+#include "/easyhand/inc/easyhand.h"
+#include <fcntl.h>
+#include "/easyhand/ehtool/imgutil.h"
+#include "/easyhand/ehtool/imgtool.h"
+#include "/easyhand/ehtool/imgPowerToy.h"
+#include "/easyhand/inc/imgResizer.h"
+
+// SINT JPGGetFactor(SIZE *lpsSource,SIZE *lpsDest,SINT *lpiPerc)
+// Indicar
+static void TextProcessor(SINT hdlImageEnd,CHAR *lpText);
+void LPrint(HDC hdc,
+			SINT x,
+			SINT y,
+			LONG col1,
+			LONG col2,
+			CHAR *lpFont,
+			SINT iAlt,
+			BOOL fBold,
+			CHAR *lpString);
+
+static CHAR *LNoSpaceCue(CHAR *lp)
+{
+  CHAR *lpRet=lp;
+  SINT a,iLen;
+  iLen=strlen(lp); 
+  if (!iLen) return lpRet;
+  
+  lp=lp+(iLen-1);
+  for (a=0;a<iLen;a++,lp--)
+  {
+	if (*lp==' ') *lp=0; else break;		  
+  }
+  return lpRet;
+}
+
+//
+// imgResizer()
+//
+
+BOOL imgResizer(CHAR *	lpFile, 
+				CHAR *	lpAdd, 
+				SINT	iX,SINT iY,
+				SINT	iQuality,
+				INT		iOrientation,
+				BOOL	fMakeEver,
+				SINT	iResampling)
+{
+	CHAR szNewFile[255];
+	CHAR szExt[10];
+	CHAR *lpMess="";
+	SINT fTrack=FALSE;
+	CHAR *lp;
+	SINT iErr;
+
+	if (!lpFile) return 0;
+
+	//
+	// Controllo se esiste il file
+	//
+	if (!fileCheck(lpFile)) 
+	{
+		printf("ko:Il file %s non esiste",lpFile);
+		return TRUE;
+	}
+
+	strcpy(szNewFile,lpFile);
+	*szExt=0;
+	lp=strReverseStr(szNewFile,"."); if (lp) {strcpy(szExt,lp); *lp=0;}
+	strcat(szNewFile,lpAdd); strcat(szNewFile,".jpg");//szExt);
+	iErr=JPGNewFile(lpFile,szNewFile,iX,iY,iQuality,TRUE,iResampling,IMG_PIXEL_BGR);
+	if (iErr!=0)
+	{
+		if (!fMakeEver)
+		{
+			printf("ko");
+			switch (iErr)
+			{
+			case -1: printf("[%s] Errore in lettura file",lpFile); break;
+			case -2: printf("[%s] Errore in scrittura file",szNewFile); break;
+			case -3: printf("[%s] Errore in ridimensionamento",lpFile); break;
+			}
+		}
+		else
+		{
+			if (!CopyFile(lpFile,szNewFile,FALSE))
+			{
+				printf("ko");
+				printf("[%s] Errore in copia file",lpFile);
+			}
+		}
+	}
+
+	//printf("ok");
+	return FALSE;
+} // ExtSrcExecuteQuery
+
+//
+// imgResizerEx()
+//
+BOOL imgResizerEx(CHAR *	lpFileSource,		// Nome del file sorgente
+				  CHAR *	lpFileDest,			// Stringa da aggiungere al nome del file
+				  SIZE		sDim,				// Dimensioni della foto finale
+				  SINT		iQuality,			// 10>100 Qualità del JPG
+				  double	dPhotoPerc,			// Percentuale dell'immagine da occupare 25= 1/4
+				  BOOL		fMakeEver,			// T/F: Costruisce sempre
+				  SINT		iResampling,		// Tipo di ricampionamento TRS_LANCZOS=10
+				  EN_IMGPT	iPhotoAdatta,		// Tipo di adattamento alla foto
+												// 0= Proporzionale
+												// 1= Best in fit (Adatta al formato)
+												// 2= adatta al corto
+												// 3= adatta al lungo
+
+				  SINT		cBackColor,			// Colore di background (per riempire gli spazi vuoti)
+				  SINT		iAlignH,			// Allineamento foto orizzontale 0=Centrale, 1=Left, 2=Right
+				  SINT		iAlignV,			// Allineamento foto verticale   0=Centrale, 1=Top,  2=Down
+				  SINT		iPhotoOffsetX,		// Correzione su allineamento Orizzontale
+				  SINT		iPhotoOffsetY,		// Correzione su allineamento Verticale
+				  SINT		iImageAlpha,		// Percentuale di trasparenza dell'immagine con il background
+				  BOOL		fAutoLevel,
+				  SINT		iOrientation,		// Rotazione Exif dell'immagine
+
+				  CHAR *	lpLogoFile,			// Logo del file da fondere all'immagine (può non esserci)
+				  double	dLogoPerc,			// Percentuale dell'immagine da occupare 25= 1/4
+				  SINT		iLogoAlignH,		// Allineamento foto orizzontale 0=Centrale, 1=Left, 2=Right
+				  SINT		iLogoAlignV,		// Allineamento foto verticale 0=Centrale, 1=Top, 2=Down
+				  SINT		iLogoOffsetX,		// Correzione su allineamento Orizzontale
+				  SINT		iLogoOffsetY,		// Correzione su allineamento Verticale
+				  SINT		iLogoAlpha,
+				  BOOL		fLogoPos,			// 0 sulla nuova Immagine calcolata, 1= Sull'immagine originale
+
+				  CHAR *	lpText)				// Testo da stampare
+{
+	IMG_RESIZE sImgResize;
+	ZeroFill(sImgResize);
+	sImgResize.pszFileSource=lpFileSource;
+	sImgResize.pszFileDest=lpFileDest;
+	memcpy(&sImgResize.sDim,&sDim,sizeof(SIZE));
+	sImgResize.iQuality=iQuality;
+	sImgResize.fMakeEver=fMakeEver;
+	sImgResize.iResampling=iResampling;
+	sImgResize.iOrientation=iOrientation;
+	sImgResize.iPhotoAdatta=iPhotoAdatta;
+	sImgResize.cBackColor=cBackColor;
+	sImgResize.bAutoLevel=fAutoLevel;
+	sImgResize.lpText=lpText;
+	sImgResize.bQuickLoading=true;
+
+	sImgResize.sPhoto.dPercSize=dPhotoPerc;
+	sImgResize.sPhoto.iAlignHor=iAlignH;
+	sImgResize.sPhoto.iAlignVer=iAlignV;
+	sImgResize.sPhoto.iOffsetX=iPhotoOffsetX;
+	sImgResize.sPhoto.iOffsetY=iPhotoOffsetY;
+	sImgResize.sPhoto.iAlpha=iImageAlpha;
+
+	if (lpLogoFile)
+	{
+		sImgResize.sLogo.bPosWhere=fLogoPos;
+		strcpy(sImgResize.sLogo.szFile,lpLogoFile);
+		sImgResize.sLogo.iAlignHor=iLogoAlignH;
+		sImgResize.sLogo.iAlignVer=iLogoAlignV;
+		sImgResize.sLogo.iOffsetX=iLogoOffsetX;
+		sImgResize.sLogo.iOffsetY=iLogoOffsetY;
+		sImgResize.sLogo.iAlpha=iLogoAlpha;
+		sImgResize.sLogo.dPercSize=dLogoPerc;
+	}
+	return imgResize(&sImgResize);
+}
+
+
+
+//
+// imgResize(()
+//
+BOOL imgResize(IMG_RESIZE *psImgResize)
+{
+	CHAR *lpMess="";
+	SINT fTrack=FALSE;
+	SINT iErr;
+	EN_FILE_TYPE enImageType=0;
+    IMGHEADER ImgHead;
+	POINT pArea;
+	RECT srRectSource,srRectLogo;
+
+	SIZE sDest; // Dimensione destinazione
+	RECT rDest; // Rettangolo destinazione
+
+	SINT hdlImage;
+	SINT hdlImageNew;
+	SINT hdlImageEnd;
+	SIZE sPhotoDest;
+	DWORD dw;
+
+	if (!psImgResize->pszFileSource) return TRUE;
+
+	// 
+	// Controllo se esiste il file
+	//
+	if (!fileCheck(psImgResize->pszFileSource)) 
+	{
+		printf("Il file %s non esiste",psImgResize->pszFileSource);
+		ehLogWrite("Il file %s non esiste",psImgResize->pszFileSource);
+		return TRUE;
+	}
+
+	// 
+	// Controllo LogoFile
+	//
+	if (*psImgResize->sLogo.szFile)
+	{
+		if (!fileCheck(psImgResize->sLogo.szFile)) 
+		{
+			printf("Il logofile %s non esiste",psImgResize->sLogo.szFile);
+			ehLogWrite("Il logofile %s non esiste",psImgResize->sLogo.szFile);
+			return TRUE;
+		}
+	}
+
+//	remove(szNewFile);
+
+	// ------------------------------------------------------------------------
+	// A) Leggere le dimensioni del sorgente
+	//
+	
+	enImageType=IMG_UNKNOW;
+	switch (isImage(psImgResize->pszFileSource))
+	{
+		case IMG_JPEG:
+			if (JPGReadHeader(psImgResize->pszFileSource,&ImgHead,JME_HIDE)) enImageType=IMG_JPEG;
+			break;
+
+		case IMG_GIF:
+			if (GIFReadHeader(psImgResize->pszFileSource,&ImgHead,JME_HIDE)) enImageType=IMG_GIF;
+			break;
+
+		case IMG_PNG:
+			if (PNGReadHeader(psImgResize->pszFileSource,&ImgHead,JME_HIDE)) enImageType=IMG_PNG;
+			break;
+		
+		default:
+			break;
+	}
+
+	if (!enImageType)
+	{
+//		printf("ko");
+		printf("%s: errore in lettura Header",psImgResize->pszFileSource);
+		ehLogWrite("%s: errore in lettura Header",psImgResize->pszFileSource);
+		return TRUE;
+	}
+	
+	sPhotoDest.cx=(SINT) (psImgResize->sDim.cx*psImgResize->sPhoto.dPercSize/100);
+	sPhotoDest.cy=(SINT) (psImgResize->sDim.cy*psImgResize->sPhoto.dPercSize/100);
+
+	// 
+	// B) Calcolare le nuove dimensioni
+	//
+	IMGCalcSize(&ImgHead,      // Dimensioni del sorgente
+				sPhotoDest,	   // Area disponibile
+				psImgResize->iPhotoAdatta,  // Tipo di adattamento
+				psImgResize->sPhoto.iAlignHor,	   // Allineamento orizzontale
+				psImgResize->sPhoto.iAlignVer,	   // Allineamento verticale
+				&sDest,		   // Dimensioni della destinazione
+				&rDest,
+				&srRectSource); 	   // Posizionamento in destinazione
+	if (!sPhotoDest.cy||!sPhotoDest.cx) memcpy(&sPhotoDest,&sDest,sizeof(sDest));
+
+	//
+	// C) Carica il sorgente in memoria
+	//
+	switch (ImgHead.enType)
+	{
+		BOOL bError=false;
+		
+		case IMG_JPEG:
+
+			//
+			// Lettura veloce
+			//
+			if (psImgResize->bQuickLoading) {
+				INT iPerc,iFactor;
+				SIZE sizSource;
+				sizSource.cx=ImgHead.bmiHeader.biWidth;
+				sizSource.cy=ImgHead.bmiHeader.biHeight;
+				iFactor=JPGGetFactor(&sizSource,&sPhotoDest,&iPerc);
+				bError=!JPGReadFileEx(psImgResize->pszFileSource,&hdlImage,NULL,iFactor,JDCT_IFAST,NULL,FALSE,IMG_PIXEL_RGB);
+				if (!bError) {
+						
+					// Letto + piccolo, calcolo nuove dimensioni
+					IMGHEADER * psImgHead;
+					//printf("[%d:%d]" CRLF,bError,hdlImage);
+					if (hdlImage>-1) {
+						psImgHead=(IMGHEADER *) memoLock(hdlImage);
+						IMGCalcSize(psImgHead,      // Dimensioni del sorgente
+									sPhotoDest,	   // Area disponibile
+									psImgResize->iPhotoAdatta,  // Tipo di adattamento
+									psImgResize->sPhoto.iAlignHor,	   // Allineamento orizzontale
+									psImgResize->sPhoto.iAlignVer,	   // Allineamento verticale
+									&sDest,		   // Dimensioni della destinazione
+									&rDest,
+									&srRectSource); 	   // Posizionamento in destinazione				
+									}
+						memoUnlockEx(hdlImage,"a1");
+					} else bError=TRUE;
+			}
+			//
+			// Lettura dell'intera immagine
+			//
+			else {
+				bError=!JPGReadFile(psImgResize->pszFileSource,&hdlImage,NULL,NULL,FALSE,IMG_PIXEL_RGB);
+			}
+
+			if (bError)
+			{
+#ifdef EH_CONSOLE
+				printf("ko:[%s] errore in lettura JPG",psImgResize->pszFileSource);
+#endif
+				ehLogWrite("%s: errore in lettura JPG",psImgResize->pszFileSource);
+				return TRUE;
+			}
+			//hdlImage=IMGToRGB(hdlImage,1);
+			break;
+
+		case IMG_GIF:
+			if (!GIFReadFile(psImgResize->pszFileSource,&hdlImage,psImgResize->cBackColor,FALSE,IMG_PIXEL_RGB)) 
+			{
+				printf("ko");
+				printf("%s: errore in lettura GIF",psImgResize->pszFileSource);
+				ehLogWrite("%s: errore in lettura GIF",psImgResize->pszFileSource);
+				printf("Errore"); //getch();
+				return TRUE;
+			}
+			break;
+
+		case IMG_PNG:
+			if (!PNGReadFile(psImgResize->pszFileSource,&hdlImage,NULL,FALSE)) 
+			{
+				printf("ko");
+				printf("%s: errore in lettura PNG",psImgResize->pszFileSource);
+				ehLogWrite("%s: errore in lettura PNG",psImgResize->pszFileSource);
+				printf("Errore"); //getch();
+				return TRUE;
+			}
+			break;
+
+		default:
+			printf("ko");
+			printf("%s: formato non gestito",psImgResize->pszFileSource);
+			ehLogWrite("%s: formato non gestito",psImgResize->pszFileSource);
+			return TRUE;
+	}
+
+	// 
+	// D) Ridimensionarlo
+	//
+
+	if (sDest.cy<16) 
+		hdlImageNew=IMGRemaker(	hdlImage,
+								&srRectSource,
+								sDest.cx,
+								sDest.cy,
+								TRUE,
+								psImgResize->iResampling);
+		else
+		hdlImageNew=IMGResampling(	hdlImage,
+									&srRectSource,
+									sDest.cx,
+									sDest.cy,
+									psImgResize->iResampling);
+	if (hdlImageNew<0)
+	{
+#ifdef EH_CONSOLE
+		printf("ko:%s: errore in IMGRemaker() %d",psImgResize->pszFileSource,hdlImageNew);
+#endif
+		ehLogWrite("%s: errore in IMGRemaker() %d",psImgResize->pszFileSource,hdlImageNew);
+		memoFree(hdlImage,"Img1"); // Libero memoria immagine
+		hdlImage=-1;
+		return TRUE;
+	}
+
+	//
+	// DX) Eseguo (eventuali) rotazioni/mirror dell'immagine 
+	//
+	if (psImgResize->iOrientation>1) {
+
+		SINT hdlImage;
+		
+		switch (psImgResize->iOrientation) {
+		
+			case 2: // "flip horizontal",  // left right reversed mirror
+				IMGMirrorX(hdlImageNew);
+				break;
+
+			case 3: // Rotate 180
+				hdlImage=IMGRotation(ROT_180,hdlImageNew);
+				memoFree(hdlImageNew,"rot");
+				hdlImageNew=hdlImage;
+				break;
+
+			case 4: // upside down mirror
+				IMGMirrorY(hdlImageNew);
+				break;
+
+			case 5: // Flipped about top-left <--> bottom-right axis.
+			case 7: // flipped about top-right <--> bottom-left axis
+				IMGMirrorX(hdlImageNew);
+				IMGMirrorY(hdlImageNew);
+				break;
+
+			case 6: // rotate 90 cw to right it.
+				hdlImage=IMGRotation(ROT_270,hdlImageNew);
+				dw=sPhotoDest.cx; sPhotoDest.cx=sPhotoDest.cy; sPhotoDest.cy=dw;
+				memoFree(hdlImageNew,"rot");
+				hdlImageNew=hdlImage;
+				break;
+
+			case 8: // rotate 270 to right it.
+				hdlImage=IMGRotation(ROT_90,hdlImageNew);
+				dw=sPhotoDest.cx; sPhotoDest.cx=sPhotoDest.cy; sPhotoDest.cy=dw;
+				memoFree(hdlImageNew,"rot");
+				hdlImageNew=hdlImage;
+				break;
+				
+		}
+	}
+
+	// ------------------------------------------------------------------------
+	// E) Creare un'immagine con il colore di background scelto	 
+	//	  2012 release: se trasparente rimane tale
+	//
+	if (ImgHead.enPixelType!=IMG_PIXEL_RGB_ALPHA) {
+
+		hdlImageEnd=IMGCreate(IMG_PIXEL_RGB,"newImage",sPhotoDest.cx,sPhotoDest.cy,NULL,FALSE);
+
+	} else {
+
+		hdlImageEnd=IMGCreate(IMG_PIXEL_RGB_ALPHA,"newImage",sPhotoDest.cx,sPhotoDest.cy,NULL,FALSE);
+	
+	}
+	IMGFill(hdlImageEnd,psImgResize->cBackColor);
+
+	// ------------------------------------------------------------------------
+	// E2) Applico gli autolivelli se richiesto
+	//
+
+	if (psImgResize->bAutoLevel)
+	{
+		if (ImgHead.iChannels==3) 
+		{	
+			hdlImageNew=IMGAutoLevel(hdlImageNew);
+		}
+	}
+
+	//
+	//	Ricalcolo il posizionamento
+	//
+	if (psImgResize->iPhotoAdatta) {
+		RectCalcSize(sDest,		// Dimensioni del sorgente
+				  psImgResize->sDim,			// Dimensione Area destinazione
+				  IMGPT_NO, // Tipo di adattamento
+				  psImgResize->sPhoto.iAlignHor,		// Allineamento orizzontale
+				  psImgResize->sPhoto.iAlignVer,		// Allineamento verticale
+				  &sDest,		// Dimensioni della destinazione
+				  &rDest,
+				  NULL); 		// Posizionamento in destinazione
+	 } else ZeroFill(rDest);
+
+	// ------------------------------------------------------------------------
+	// F) Inserire il sorgente nella destinazione
+	//
+	pArea.x=rDest.left+psImgResize->sPhoto.iOffsetX;//iPhotoOffsetX;
+	pArea.y=rDest.top+psImgResize->sPhoto.iOffsetY;//iPhotoOffsetY;
+
+	IMGCopy(hdlImageEnd, // --> La destinazione
+			hdlImageNew, // <-- Il sorgente
+			pArea,		 // La posizione
+			psImgResize->sPhoto.iAlpha);
+	memoFree(hdlImageNew,"Img1");
+	memoFree(hdlImage,"Img1"); // Libero memoria immagine
+	hdlImage=-1;
+
+	// 
+	// G2) PAINT - Ping moltiplicato -------------------------------------------------------------
+	//
+	if (!strEmpty(psImgResize->sPaint.szFile))
+	{
+		SINT iErr;
+		SINT hdlLogo=-1,hdlLogoNew=-1;
+		IMGHEADER ImgLogoHead;
+		SIZE sLogoDest;
+		RECT rLogoDest;
+//		BOOL bOffset;
+		
+		// a) Carico il PNG in memoria
+		if (!PNGReadFile(psImgResize->sPaint.szFile,&hdlLogo,&iErr,FALSE))
+		{
+			printf("ko");
+			printf("%s: errore in PNGReadFile() %d",psImgResize->sPaint.szFile,iErr);
+			ehLogWrite("%s: errore in PNGReadFile() %d",psImgResize->sPaint.szFile,iErr);
+			memoFree(hdlImageEnd,"Img2");
+			return TRUE;
+		}
+
+		memcpy(&ImgLogoHead,memoLock(hdlLogo),sizeof(IMGHEADER));
+		memoUnlockEx(hdlLogo,"A3");
+
+		sLogoDest.cx=(SINT) (ImgLogoHead.bmiHeader.biWidth*psImgResize->sPaint.dPercSize/100);
+		sLogoDest.cy=(SINT) (ImgLogoHead.bmiHeader.biHeight*psImgResize->sPaint.dPercSize/100);
+
+		// b) Calcolo le nuove dimensioni
+		IMGCalcSize(&ImgLogoHead,      // Dimensioni del sorgente
+					sLogoDest,		   // Area disponibile
+					IMGPT_AL_FORMATO,  // Tipo di adattamento
+					0,	   // Allineamento orizzontale
+					0,	   // Allineamento verticale
+					&sLogoDest,		   // Dimensioni della destinazione
+					&rLogoDest,
+					&srRectLogo); 	   // Posizionamento in destinazione
+
+		
+		// c) Creo (ridimensionando) il nuovo Ping
+		hdlLogoNew=IMGResampling(hdlLogo,NULL,sLogoDest.cx,sLogoDest.cy,psImgResize->iResampling);
+		memoFree(hdlLogo,"Img1"); // Libero memoria immagine
+		hdlLogo=-1;
+
+		if (hdlLogoNew<0)
+		{
+			printf("ko");
+			printf("%s: errore in IMGRemaker(LOGO) %d",psImgResize->sPaint.szFile,hdlLogoNew);
+			ehLogWrite("%s: errore in IMGRemaker(LOGO) %d",psImgResize->sPaint.szFile,hdlLogoNew);
+			memoFree(hdlImageEnd,"Img2");
+			return TRUE;
+		}
+	
+		// Applico
+		for (pArea.y=(psImgResize->sPaint.iOffsetY-sLogoDest.cy);pArea.y<psImgResize->sDim.cy;pArea.y+=sLogoDest.cy)
+		{
+			SINT iOffset=psImgResize->sPaint.iOffsetX-sLogoDest.cx;
+
+			for (pArea.x=iOffset;pArea.x<psImgResize->sDim.cx;pArea.x+=sLogoDest.cx)
+			{
+				POINT pArea2;
+				// printf("Copio: %d,%d (%d)",pArea.x,pArea.y,iLogoAlpha);
+				IMGCopy(hdlImageEnd,	// La destinazione
+						hdlLogoNew,		// Il sorgente
+						pArea,			// La posizione
+						psImgResize->sPaint.iAlpha);
+
+				if (psImgResize->iEchoPaint)
+				{
+					pArea2.x=pArea.x+sLogoDest.cx/4;
+					pArea2.y=pArea.y+sLogoDest.cy/4;
+					IMGCopy(hdlImageEnd,	// La destinazione
+							hdlLogoNew,		// Il sorgente
+							pArea2,			// La posizione
+							psImgResize->sPaint.iAlpha+psImgResize->iEchoPaint);
+				}
+			}
+		}
+
+
+
+		// e) Libero le risorse impegnate
+		memoFree(hdlLogoNew,"Logo1"); // Libero memoria immagine
+	}
+
+
+	// 
+	// G) Fonde il Ping (se presente)
+	//
+	if (!strEmpty(psImgResize->sLogo.szFile))
+	{
+		SINT iErr;
+		SINT hdlLogo=-1,hdlLogoResized=-1;
+		IMGHEADER sImgLogoHead;
+		SIZE sLogoDest;
+		RECT rLogoDest;
+		
+		// a) Carico il PNG in memoria
+		if (!PNGReadFile(psImgResize->sLogo.szFile,&hdlLogo,&iErr,FALSE))
+		{
+			printf("ko");
+			printf("%s: errore in PNGReadFile() %d",psImgResize->sLogo.szFile,iErr);
+			ehLogWrite("%s: errore in PNGReadFile() %d",psImgResize->sLogo.szFile,iErr);
+			memoFree(hdlImageEnd,"Img2");
+			return TRUE;
+		}
+
+		memcpy(&sImgLogoHead,memoLock(hdlLogo),sizeof(IMGHEADER));
+		memoUnlockEx(hdlLogo,"A4");
+
+		if (psImgResize->sLogo.dPercSize<1) psImgResize->sLogo.dPercSize=100;
+		sLogoDest.cx=(SINT) (psImgResize->sDim.cx*psImgResize->sLogo.dPercSize/100);
+		sLogoDest.cy=(SINT) (psImgResize->sDim.cy*psImgResize->sLogo.dPercSize/100);
+
+		// b) Calcolo le nuove dimensioni
+		IMGCalcSize(&sImgLogoHead,      // Dimensioni del sorgente
+					sLogoDest,		   // Area disponibile
+					IMGPT_AL_FORMATO,  // Tipo di adattamento
+					0,	   // Allineamento orizzontale
+					0,	   // Allineamento verticale
+					&sLogoDest,		   // Dimensioni della destinazione
+					&rLogoDest,
+					&srRectLogo); 	   // Posizionamento in destinazione
+
+		// c) Creo (ridimensionando) il nuovo Ping
+		hdlLogoResized=IMGResampling(hdlLogo,NULL,sLogoDest.cx,sLogoDest.cy,psImgResize->iResampling);
+		memoFree(hdlLogo,"Img1"); // Libero memoria immagine
+		hdlLogo=-1;
+
+		if (hdlLogoResized<0)
+		{
+			printf("ko");
+			printf("%s: errore in IMGRemaker(LOGO) %d",psImgResize->sLogo.szFile,hdlLogoResized);
+			ehLogWrite("%s: errore in IMGRemaker(LOGO) %d",psImgResize->sLogo.szFile,hdlLogoResized);
+			memoFree(hdlImageEnd,"Img2");
+			return TRUE;
+		}
+	
+
+		// 
+		// Allineamento Orizzontale
+		//
+		switch (psImgResize->sLogo.iAlignHor)
+		{
+			case 1: // Left
+				if (psImgResize->sLogo.bPosWhere) pArea.x=rDest.left; else pArea.x=0; 
+				break;
+
+			case 2: // Right
+				if (psImgResize->sLogo.bPosWhere) 
+						pArea.x=rDest.right-sLogoDest.cx;
+						else
+						pArea.x=psImgResize->sDim.cx-sLogoDest.cx;
+				break;
+
+			default:
+			case 0: // Centra (Default)
+				pArea.x=((psImgResize->sDim.cx-sLogoDest.cx)/2);
+				break;
+		}
+
+		// 
+		// Allinamento Verticale
+		//
+		switch (psImgResize->sLogo.iAlignVer)
+		{
+			case 1: // Top
+				if (psImgResize->sLogo.bPosWhere) pArea.y=rDest.top; else pArea.y=0;
+				break;
+
+			case 2: // Bottom
+				if (psImgResize->sLogo.bPosWhere) pArea.y=rDest.bottom-sLogoDest.cy; else pArea.y=psImgResize->sDim.cy-sLogoDest.cy; // C'era un +1 cazzo
+				break;
+
+			default:
+			case 0: // Centra (Default)
+				pArea.y=((psImgResize->sDim.cy-sLogoDest.cy)/2);
+				break;
+		}
+		
+		pArea.x+=psImgResize->sLogo.iOffsetX;//iLogoOffsetX;
+		pArea.y+=psImgResize->sLogo.iOffsetY;//iLogoOffsetY;
+
+		// printf("Copio: %d,%d (%d)",pArea.x,pArea.y,iLogoAlpha);
+		IMGCopy(hdlImageEnd, // La destinazione
+				hdlLogoResized, // Il sorgente
+				pArea,		 // La posizione
+				psImgResize->sLogo.iAlpha); //(double) 100);//psImgResize->sLogo.iAlpha);  <-- da controllare il valore dell' alpha
+
+
+		// e) Libero le risorse impegnate
+		memoFree(hdlLogoResized,"Logo1"); // Libero memoria immagine
+	}
+
+
+	//
+	// Se ho dei comandi di testo li processo
+	//
+	if (!strEmpty(psImgResize->lpText)) TextProcessor(hdlImageEnd,psImgResize->lpText);
+
+
+	// ------------------------------------------------------------------------
+	// H) Salvare l'immagine
+	//
+	if (!psImgResize->enImageTypeSave) psImgResize->enImageTypeSave=IMG_JPEG; // Per compatibilità con il passato
+	switch (psImgResize->enImageTypeSave)
+	{
+		case IMG_PNG:
+			iErr=PNGSaveFile(psImgResize->pszFileDest,hdlImageEnd,psImgResize->iQuality);
+			break;
+
+		case IMG_JPEG:
+			iErr=JPGSaveFile(psImgResize->pszFileDest,hdlImageEnd,psImgResize->iQuality);
+			break;
+		
+		default:
+			ehError();
+			break;
+
+	}
+
+	memoFree(hdlImageEnd,"Img2");
+	if (!iErr)
+	{
+#ifdef EH_CONSOLE
+		printf("ko:%s: errore in JPGSave() %d",psImgResize->pszFileDest,iErr);
+#endif
+		ehLogWrite("%s: errore in JPGSave() %d",psImgResize->pszFileDest,iErr);
+		return TRUE;
+	}
+
+ //printf("ok");
+ return FALSE;
+}
+/*
+CHAR * AddToName(CHAR *lpFileSource,CHAR *lpAdd)
+{
+	static CHAR szNewFile[255];
+	CHAR *lp;
+	CHAR szExt[10];
+
+	strcpy(szNewFile,lpFileSource);
+	*szExt=0;
+	lp=strReverseStr(szNewFile,"."); if (lp) {strcpy(szExt,lp); *lp=0;}
+	strcat(szNewFile,lpAdd); strcat(szNewFile,szExt);
+	return szNewFile;
+}
+*/
+
+// ---------------------------------------
+// TextProcessor()
+// Processo i compandi di stampa del testo
+// ---------------------------------------
+
+static void TextProcessor(SINT hdlImage,CHAR *lpText)
+{
+	BYTE *lp;
+	CHAR szTesto[1024];
+	POINT pt;
+	IMGHEADER *Img;
+	HDC hDC,hDClone;
+	HBITMAP hbCopy;
+	BYTE *lpSorg;
+	SINT iLx,iLy;
+	BITMAPINFOHEADER *BmpHeader;
+	BITMAPINFO *BmpInfo;
+	SINT iAlt=12;
+	SINT iCol1=0;
+	SINT iCol2=-1;
+	BOOL fBold=FALSE;
+
+	// ----------------------------------------------------------------------------
+	// Creo una zona di memoria tipo video delle dimensioni dell'immagine
+	//
+	//memcpy(&ImgHeader,memoLock(hdlImage),sizeof(IMGHEADER));
+	printf("Elaborazione TextProcessor [%s]" CRLF,lpText); //Sleep(2000);
+	//ehLogWrite("> %s" CRLF,lpText);
+	if (!*lpText) return;
+
+	Img=memoLock(hdlImage);
+	BmpInfo=(BITMAPINFO *) &Img->bmiHeader;
+	BmpHeader=(BITMAPINFOHEADER *) &Img->bmiHeader;
+    iLy=BmpHeader->biHeight; if (iLy<0) iLy=-BmpHeader->biHeight;
+    iLx=BmpHeader->biWidth;
+
+    hDC=GetDC(NULL); hDClone=CreateCompatibleDC(hDC); 
+	SetMapMode(hDClone, MM_TEXT);
+	hbCopy = CreateCompatibleBitmap(hDC, iLx, iLy);
+	SelectObject(hDClone, hbCopy);
+	ReleaseDC(NULL,hDC);
+
+    lpSorg=(BYTE *) Img;  lpSorg+=Img->Offset;
+
+	// Scrivo l'immagine in questa zona di memoria
+	if (StretchDIBits(hDClone, 
+					  // Coordinate e dimensioni di stampa a video
+					  0,0,
+					  iLx, 
+					  iLy,
+
+					  // Coordinate e dimensioni di lettura nel sorgente
+					  0,
+					  iLy+1,
+					  iLx,
+					  -iLy,
+					  lpSorg,
+					  (BITMAPINFO *) &Img->bmiHeader,
+					  DIB_RGB_COLORS, 
+					  SRCCOPY) == GDI_ERROR) {printf("StretchDIBits Failed");}
+
+	// Ci faccio quello che ci devo fare con i comandi
+	lp=strtok(lpText,"|");
+	*szTesto=0;
+	ZeroFill(pt);
+	while (lp)
+	{
+		//printf("[%s]" CRLF,lp); 
+
+		if (!memcmp(lp,"TEXT=",5)) strcpy(szTesto,lp+5);
+		if (!memcmp(lp,"PX=",3)) pt.x=atoi(lp+3);
+		if (!memcmp(lp,"PY=",3)) pt.y=atoi(lp+3);
+		if (!memcmp(lp,"ALT=",3)) iAlt=atoi(lp+3);
+		if (!memcmp(lp,"COL=",4)) iCol1=ColorConvert(lp+4);
+		if (!memcmp(lp,"BG=",3)) iCol2=ColorConvert(lp+3);
+		if (!memcmp(lp,"BOLD=",5)) fBold=atoi(lp+5);
+		
+		if (*lp=='*') 
+		{
+			//printf("Stampo: %d,%d,%s" CRLF,pt.x,pt.y,szTesto);
+			//ehLogWrite("Stampo: %d,%d,%s",pt.x,pt.y,szTesto);
+			LPrint(hDClone,pt.x,pt.y,iCol1,iCol2,"Arial",iAlt,fBold,szTesto);
+		}
+
+		lp=strtok(NULL,"|");
+	}
+
+	// Mi riprendo la zona di memoria video e la rimetto nell'immagine
+	//BmpHeader->biHeight*=-1;
+	GetDIBits(
+		hDClone,           // handle to device context
+		hbCopy,      // handle to bitmap
+		0,   // first scan line to set in destination bitmap
+		iLy,   // number of scan lines to copy
+		lpSorg,    // address of array for bitmap bits
+		(BITMAPINFO *) &Img->bmiHeader, // address of structure with bitmap data
+		DIB_RGB_COLORS        // RGB or palette index
+		);
+	
+	if (!DeleteDC(hDClone)) 
+	{
+		ehLogWrite("Errore in cancellazione DC %d",GetLastError());
+		ehExit("Errore in cancellazione DC");
+	}
+
+	if (!DeleteObject(hbCopy))
+	{
+		ehLogWrite("Errore in cancellazione Bitmap %d",GetLastError());
+		ehExit("Errore in cancellazione Bitmap");
+	}
+
+	memoUnlockEx(hdlImage,"A5");
+	IMGMirrorY(hdlImage);
+	
+	// Libero le risorse
+
+	//TextOut(
+
+
+}
+
+
+void LPrint(HDC hdc,SINT x,SINT y,LONG col1,LONG col2,CHAR *lpFont,SINT iAlt,BOOL fBold,CHAR *lpString)
+{ 
+	HFONT hfont=NULL,hfontOld;
+
+	// --------------------------------------------
+	// Creo il Font
+	hfont=CreateFont(iAlt, // Altezza del carattere
+				     0, // Larghezza del carattere (0=Default)
+				     0, // Angolo di rotazione x 10
+				     0, //  Angolo di orientamento bo ???
+				     fBold ? FW_BOLD : 0, // Spessore del carattere (MACRO Ex: FW_BOLD)
+				     0,//sys.fFontItalic, // Flag Italico    ON/OFF
+				     0,//sys.fFontUnderline, // Flag UnderLine  ON/OFF
+				     0, // Flag StrikeOut  ON/OFF
+				     DEFAULT_CHARSET, // Tipo di codepage vedi CreateFont (0=Ansi)
+//					   FERRA_OUTPRECISION, // Output precision
+				     OUT_DEFAULT_PRECIS, // Output precision
+				     0, // Clipping Precision
+				     DEFAULT_QUALITY,//PROOF_QUALITY, // Qualità di stampa (DEFAULT,DRAFT ecc...)
+				     DEFAULT_PITCH,//!FONT_fix ? VARIABLE_PITCH : FIXED_PITCH, // Pitch & Family (???)
+				     //0,
+				     lpFont); // Nome del font
+
+	if (hfont!=NULL) hfontOld = SelectObject(hdc, hfont);
+
+	if (col2==-1) SetBkMode(hdc,TRANSPARENT); 
+	              else 
+				  {
+				   SetBkMode(hdc,OPAQUE);
+				   SetBkColor(hdc,col2);
+				  }
+
+	 SetTextColor(hdc,col1);
+	 TextOut(hdc, x, y, lpString,strlen(lpString));
+
+	 if (hfont!=NULL) 
+	 {
+		SelectObject(hdc, hfontOld);
+		DeleteObject(hfont);
+	 }
+
+}
+

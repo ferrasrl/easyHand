@@ -1,0 +1,1669 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE TAF SYSTEM "tango.dtd" >
+<TAF Version="0x02000002">
+	<Comments />
+
+	<!--Main program-->
+	<Program>
+		<ActionRef Ref="ValoriGlobali" />
+		<ActionRef Ref="La_Prima_Volta">
+			<ActionRef Ref="Assign" />
+		</ActionRef>
+		<ActionRef Ref="ReStylink" />
+		<ActionRef Ref="SortAssign">
+			<ActionRef Ref="Assign1" />
+		</ActionRef>
+		<ActionRef Ref="ListaBroker">
+			<ActionRef Ref="Listing" />
+		</ActionRef>
+		<ActionRef Ref="NuovoRecord">
+			<ActionRef Ref="Crea_Lista_Zone1" />
+			<ActionRef Ref="NewRecord" />
+		</ActionRef>
+		<ActionRef Ref="_Insert">
+			<ActionRef Ref="ControlloCampiMancanti">
+				<ActionRef Ref="CampiMancanti" />
+			</ActionRef>
+			<ActionRef Ref="ElseDoInsert">
+				<ActionRef Ref="Inserimento" />
+			</ActionRef>
+			<ActionRef Ref="Return3" />
+		</ActionRef>
+		<ActionRef Ref="EditingRecord">
+			<ActionRef Ref="Editing" />
+		</ActionRef>
+		<ActionRef Ref="_delete">
+			<ActionRef Ref="Delete1" />
+			<ActionRef Ref="Results1" />
+			<ActionRef Ref="Return1" />
+		</ActionRef>
+		<ActionRef Ref="_update">
+			<ActionRef Ref="Update" />
+			<ActionRef Ref="Return4" />
+		</ActionRef>
+		<ActionRef Ref="Footer" />
+		<ActionRef Ref="Return2" />
+	</Program>
+
+	<!--Program actions-->
+	<Actions>
+		<AssignAction ID="ValoriGlobali" Sig="asgn">
+			<AssignItem>
+				<Name>colorCom</Name>
+				<Value><![CDATA["#EAD793"]]></Value>
+				<Scope>User</Scope>
+			</AssignItem>
+			<AssignItem>
+				<Name>symbolCom</Name>
+				<Value><![CDATA[<img src="../images/blank.gif" width=2 border=0>
+<img src="../images/arrowR.gif" border=0>]]></Value>
+				<Scope>User</Scope>
+			</AssignItem>
+			<AssignItem>
+				<Name>iconeTitle</Name>
+				<Value><![CDATA[<img src="../images/MBIcone.gif" border=0>]]></Value>
+				<Scope>User</Scope>
+			</AssignItem>
+			<AssignItem>
+				<Name>demo</Name>
+				<Value>0</Value>
+				<Scope>User</Scope>
+			</AssignItem>
+		</AssignAction>
+		<IfAction ID="La_Prima_Volta" Sig="if  " Expanded="True">
+			<Expression><![CDATA[(!LEN('<@VAR user$BrokerSort>'))]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@VAR user$BrokerSort>]]></ExpLeft>
+				<ExpRight />
+				<Operator>iemp</Operator>
+			</ExpressionInfo>
+		</IfAction>
+		<AssignAction ID="Assign" Sig="asgn">
+			<AssignItem>
+				<Name>BrokerSort</Name>
+				<Value>DESCRIZIONE</Value>
+				<Scope>User</Scope>
+			</AssignItem>
+		</AssignAction>
+		<ResultAction ID="ReStylink" Sig="null">
+			<ResultsOutput Ref="ReStylink.Results" />
+		</ResultAction>
+		<IfAction ID="SortAssign" Sig="if  ">
+			<Expression><![CDATA[('<@ARG _sort>'>'!')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG _sort>]]></ExpLeft>
+				<ExpRight><![CDATA['!']]></ExpRight>
+				<Operator>gthn</Operator>
+			</ExpressionInfo>
+			<Comments>_sort: Assegno il tipo di ordinamento</Comments>
+		</IfAction>
+		<AssignAction ID="Assign1" Sig="asgn">
+			<AssignItem>
+				<Name>BrokerSort</Name>
+				<Value><![CDATA[<@ARG _sort>]]></Value>
+				<Scope>User</Scope>
+			</AssignItem>
+		</AssignAction>
+		<IfAction ID="ListaBroker" Sig="if  " Expanded="True">
+			<Expression><![CDATA[('<@ARG _action>'='') or ('<@ARG _action>'='list')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG _action>]]></ExpLeft>
+				<ExpRight />
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG _action>]]></ExpLeft>
+				<ExpRight>list</ExpRight>
+				<Conjunction>or  </Conjunction>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+			<Comments><![CDATA[_action="" o list:Lista i broker]]></Comments>
+		</IfAction>
+		<SearchAction UseDevelopmentDataSource="TRUE" DSID="MondialBrokerDb" DeploymentDSID="" ID="Listing" Sig="srch">
+			<Tables>
+				<TableName>Customer</TableName>
+			</Tables>
+			<DataDictionary>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>DESCRIZIONE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTDATAUP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTTIMEUP</ColumnName>
+				</Column>
+			</DataDictionary>
+			<SearchColumns>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>DESCRIZIONE</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>LASTDATAUP</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>LASTTIMEUP</ColumnName>
+				</ColumnReference>
+			</SearchColumns>
+			<OrderColumns>
+				<OrderColumn>
+					<Ascending>True</Ascending>
+					<TableOwner />
+					<TableName />
+					<ColumnName><![CDATA[Customer.<@VAR user$BrokerSort>]]></ColumnName>
+				</OrderColumn>
+			</OrderColumns>
+			<StartRow>1</StartRow>
+			<ResultsOutput Ref="Listing.Results" />
+		</SearchAction>
+		<ElseIfAction ID="NuovoRecord" Sig="elif" Expanded="True">
+			<Expression><![CDATA[('<@ARG _action>'='New')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG _action>]]></ExpLeft>
+				<ExpRight><![CDATA['New']]></ExpRight>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+			<Comments>_action=new:Nuovo inserimento</Comments>
+		</ElseIfAction>
+		<SearchAction UseDevelopmentDataSource="TRUE" DSID="MondialBrokerDb" DeploymentDSID="MondialBrokerDb.1" ID="Crea_Lista_Zone1" Sig="srch">
+			<Tables>
+				<TableName>Country</TableName>
+			</Tables>
+			<DataDictionary>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Country</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Country</TableName>
+					<ColumnName>ITZONE</ColumnName>
+				</Column>
+			</DataDictionary>
+			<SearchColumns>
+				<ColumnReference>
+					<TableName>Country</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Country</TableName>
+					<ColumnName>ITZONE</ColumnName>
+				</ColumnReference>
+			</SearchColumns>
+			<OrderColumns>
+				<OrderColumn>
+					<Ascending>True</Ascending>
+					<TableOwner />
+					<TableName />
+					<ColumnName>2</ColumnName>
+				</OrderColumn>
+			</OrderColumns>
+			<StartRow>1</StartRow>
+			<ResultsOutput Ref="Crea_Lista_Zone1.Results" />
+		</SearchAction>
+		<ResultAction ID="NewRecord" Sig="null">
+			<ResultsOutput Ref="NewRecord.Results" />
+		</ResultAction>
+		<ElseIfAction ID="_Insert" Sig="elif" Expanded="True">
+			<Expression><![CDATA[('<@ARG _action>'='_insert')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG _action>]]></ExpLeft>
+				<ExpRight>_insert</ExpRight>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+			<Comments>_action=_insert:Inserimento fisico nel dbase</Comments>
+		</ElseIfAction>
+		<IfAction ID="ControlloCampiMancanti" Sig="if  " Expanded="True">
+			<Expression><![CDATA[(!LEN('<@ARG CODICE>')) or (!LEN('<@ARG DESCRIZIONE>'))]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG CODICE>]]></ExpLeft>
+				<ExpRight />
+				<Operator>iemp</Operator>
+			</ExpressionInfo>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG DESCRIZIONE>]]></ExpLeft>
+				<ExpRight />
+				<Conjunction>or  </Conjunction>
+				<Operator>iemp</Operator>
+			</ExpressionInfo>
+		</IfAction>
+		<ResultAction ID="CampiMancanti" Sig="null">
+			<ResultsOutput Ref="CampiMancanti.Results" />
+		</ResultAction>
+		<ElseAction ID="ElseDoInsert" Sig="else" Expanded="True" />
+		<InsertAction UseDevelopmentDataSource="TRUE" DSID="MondialBrokerDb" DeploymentDSID="" ID="Inserimento" Sig="insr" AutoCommit="True">
+			<Tables>
+				<TableName>Customer</TableName>
+			</Tables>
+			<DataDictionary>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>DESCRIZIONE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBADDR1</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBADDR2</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBTEL</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBFAX</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBEMAIL</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBSUBIMAGE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>PASSWORDFTP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>PATHROOT</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LIMITEIMB</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>DATASCAD</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTDATAUP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTTIMEUP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTFILE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>AGGCOUNT</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>ZONAGEO</ColumnName>
+				</Column>
+			</DataDictionary>
+			<ResultsOutput Ref="Inserimento.Results" />
+			<ErrorOutput Ref="Inserimento.Error" />
+			<ValueList>
+				<ValueItem>
+					<Name>CODICE</Name>
+					<Value><![CDATA[<@ARG CODICE>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>DESCRIZIONE</Name>
+					<Value><![CDATA[<@ARG DESCRIZIONE>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBADDR1</Name>
+					<Value><![CDATA[<@ARG WEBADDR1>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBADDR2</Name>
+					<Value><![CDATA[<@ARG WEBADDR2>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBTEL</Name>
+					<Value><![CDATA[<@ARG WEBTEL>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBFAX</Name>
+					<Value><![CDATA[<@ARG WEBFAX>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBEMAIL</Name>
+					<Value><![CDATA[<@ARG WEBEMAIL>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBSUBIMAGE</Name>
+					<Value><![CDATA[<@ARG WEBSUBIMAGE>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>PASSWORDFTP</Name>
+					<Value><![CDATA[<@ARG PASSWORDFTP>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>PATHROOT</Name>
+					<Value><![CDATA[<@ARG PATHROOT>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>LIMITEIMB</Name>
+					<Value><![CDATA[<@ARG LIMITEIMB>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>DATASCAD</Name>
+					<Value><![CDATA[<@ARG DATASCAD>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>LASTDATAUP</Name>
+					<Value><![CDATA[<@ARG LASTDATAUP>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>LASTTIMEUP</Name>
+					<Value><![CDATA[<@ARG LASTTIMEUP>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>LASTFILE</Name>
+					<Value><![CDATA[<@ARG LASTFILE>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>AGGCOUNT</Name>
+					<Value><![CDATA[<@ARG AGGCOUNT>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>ZONAGEO</Name>
+					<Value><![CDATA[<@ARG ZONAGEO>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+			</ValueList>
+		</InsertAction>
+		<ReturnAction ID="Return3" Sig="stop" />
+		<ElseIfAction ID="EditingRecord" Sig="elif" Expanded="True">
+			<Expression><![CDATA[('<@ARG _action>'='edit')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG _action>]]></ExpLeft>
+				<ExpRight><![CDATA['edit']]></ExpRight>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+			<Comments>_action=edit:Editing di un Broker</Comments>
+		</ElseIfAction>
+		<SearchAction DistinctRows="True" UseDevelopmentDataSource="TRUE" DSID="MondialBrokerDb" DeploymentDSID="" ID="Editing" Sig="srch">
+			<Tables>
+				<TableName>Customer</TableName>
+			</Tables>
+			<DataDictionary>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>DESCRIZIONE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBADDR1</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBADDR2</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBTEL</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBFAX</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBEMAIL</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBSUBIMAGE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>PASSWORDFTP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>PATHROOT</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LIMITEIMB</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>DATASCAD</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTDATAUP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTTIMEUP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTFILE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>AGGCOUNT</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>ZONAGEO</ColumnName>
+				</Column>
+			</DataDictionary>
+			<SearchColumns>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>DESCRIZIONE</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>WEBADDR1</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>WEBADDR2</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>WEBTEL</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>WEBFAX</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>WEBEMAIL</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>WEBSUBIMAGE</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>PASSWORDFTP</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>PATHROOT</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>LIMITEIMB</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>DATASCAD</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>LASTDATAUP</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>LASTTIMEUP</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>LASTFILE</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>AGGCOUNT</ColumnName>
+				</ColumnReference>
+				<ColumnReference>
+					<TableName>Customer</TableName>
+					<ColumnName>ZONAGEO</ColumnName>
+				</ColumnReference>
+			</SearchColumns>
+			<OrderColumns>
+				<OrderColumn>
+					<Ascending>True</Ascending>
+					<TableOwner />
+					<TableName />
+					<ColumnName>1</ColumnName>
+				</OrderColumn>
+			</OrderColumns>
+			<Criteria>
+				<CriteriaItem>
+					<TableName>Customer</TableName>
+					<ColumnName>CODICE</ColumnName>
+					<Operator>iseq</Operator>
+					<Value><![CDATA[<@ARG _code>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>false</IncludeIfEmpty>
+				</CriteriaItem>
+			</Criteria>
+			<StartRow>1</StartRow>
+			<ResultsOutput Ref="Editing.Results" />
+			<NoResultsOutput Ref="Editing.NoResults" />
+			<ErrorOutput Ref="Editing.Error" />
+		</SearchAction>
+		<ElseIfAction ID="_delete" Sig="elif" Expanded="True">
+			<Expression><![CDATA[('<@ARG _action>'='_delete')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG _action>]]></ExpLeft>
+				<ExpRight>_delete</ExpRight>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+		</ElseIfAction>
+		<DeleteAction UseDevelopmentDataSource="TRUE" DSID="MondialBrokerDb" DeploymentDSID="" ID="Delete1" Sig="dele" AutoCommit="True">
+			<Tables>
+				<TableName>Customer</TableName>
+			</Tables>
+			<DataDictionary>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>DESCRIZIONE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBADDR1</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBADDR2</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBTEL</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBFAX</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBEMAIL</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBSUBIMAGE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>PASSWORDFTP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>PATHROOT</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LIMITEIMB</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>DATASCAD</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTDATAUP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTTIMEUP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTFILE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>AGGCOUNT</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>ZONAGEO</ColumnName>
+				</Column>
+			</DataDictionary>
+			<Criteria>
+				<CriteriaItem>
+					<TableName>Customer</TableName>
+					<ColumnName>CODICE</ColumnName>
+					<Operator>iseq</Operator>
+					<Value><![CDATA[<@ARG _code>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>false</IncludeIfEmpty>
+				</CriteriaItem>
+			</Criteria>
+			<Comments>_action=_delete: cancellazione fisica</Comments>
+		</DeleteAction>
+		<ResultAction ID="Results1" Sig="null">
+			<ResultsOutput Ref="Results1.Results" />
+		</ResultAction>
+		<ReturnAction ID="Return1" Sig="stop" />
+		<ElseIfAction ID="_update" Sig="elif" Expanded="True">
+			<Expression><![CDATA[('<@ARG _action>'='_update')]]></Expression>
+			<ExpressionInfo>
+				<ExpLeft><![CDATA[<@ARG _action>]]></ExpLeft>
+				<ExpRight>_update</ExpRight>
+				<Operator>iseq</Operator>
+			</ExpressionInfo>
+			<Comments>_action=_update:Aggiornamento di un record</Comments>
+		</ElseIfAction>
+		<UpdateAction UseDevelopmentDataSource="TRUE" DSID="MondialBrokerDb" DeploymentDSID="" ID="Update" Sig="updt" AutoCommit="True">
+			<Tables>
+				<TableName>Customer</TableName>
+			</Tables>
+			<DataDictionary>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>CODICE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>DESCRIZIONE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBADDR1</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBADDR2</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBTEL</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBFAX</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBEMAIL</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>WEBSUBIMAGE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>PASSWORDFTP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>PATHROOT</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LIMITEIMB</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>DATASCAD</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTDATAUP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTTIMEUP</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>LASTFILE</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>AGGCOUNT</ColumnName>
+				</Column>
+				<Column DataType="vcha" ColumnType="0">
+					<TableName>Customer</TableName>
+					<ColumnName>ZONAGEO</ColumnName>
+				</Column>
+			</DataDictionary>
+			<Criteria>
+				<CriteriaItem>
+					<TableName>Customer</TableName>
+					<ColumnName>CODICE</ColumnName>
+					<Operator>iseq</Operator>
+					<Value><![CDATA[<@ARG _code>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>false</IncludeIfEmpty>
+				</CriteriaItem>
+			</Criteria>
+			<ResultsOutput Ref="Update.Results" />
+			<ErrorOutput Ref="Update.Error" />
+			<ValueList>
+				<ValueItem>
+					<Name>DESCRIZIONE</Name>
+					<Value><![CDATA[<@ARG DESCRIZIONE>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBADDR1</Name>
+					<Value><![CDATA[<@ARG WEBADDR1>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBADDR2</Name>
+					<Value><![CDATA[<@ARG WEBADDR2>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBTEL</Name>
+					<Value><![CDATA[<@ARG WEBTEL>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBFAX</Name>
+					<Value><![CDATA[<@ARG WEBFAX>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBEMAIL</Name>
+					<Value><![CDATA[<@ARG WEBEMAIL>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>WEBSUBIMAGE</Name>
+					<Value><![CDATA[<@ARG WEBSUBIMAGE>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>PASSWORDFTP</Name>
+					<Value><![CDATA[<@ARG PASSWORDFTP>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>PATHROOT</Name>
+					<Value><![CDATA[<@ARG PATHROOT>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>LIMITEIMB</Name>
+					<Value><![CDATA[<@ARG LIMITEIMB>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>DATASCAD</Name>
+					<Value><![CDATA[<@ARG DATASCAD>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>LASTDATAUP</Name>
+					<Value><![CDATA[<@ARG LASTDATAUP>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>LASTTIMEUP</Name>
+					<Value><![CDATA[<@ARG LASTTIMEUP>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>LASTFILE</Name>
+					<Value><![CDATA[<@ARG LASTFILE>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>AGGCOUNT</Name>
+					<Value><![CDATA[<@ARG AGGCOUNT>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+				<ValueItem>
+					<Name>ZONAGEO</Name>
+					<Value><![CDATA[<@ARG ZONAGEO>]]></Value>
+					<QuoteValue>true</QuoteValue>
+					<IncludeIfEmpty>true</IncludeIfEmpty>
+					<NullValue>false</NullValue>
+				</ValueItem>
+			</ValueList>
+		</UpdateAction>
+		<ReturnAction ID="Return4" Sig="stop" />
+		<ResultAction ID="Footer" Sig="null">
+			<ResultsOutput Ref="Footer.Results" />
+		</ResultAction>
+		<ReturnAction ID="Return2" Sig="stop" />
+	</Actions>
+
+	<!--Data sources-->
+	<DataSources>
+		<DataSource ID="MondialBrokerDb">
+			<DSType>Pervasive.SQL</DSType>
+			<DSN>MondialBrokerDb</DSN>
+			<DBMS />
+			<Host>MondialBrokerDb</Host>
+			<Database />
+			<UserInfo Encrypted="True">
+				<UserName />
+				<Password />
+			</UserInfo>
+		</DataSource>
+		<DataSource ID="MondialBrokerDb.1">
+			<DSType />
+			<DSN>MondialBrokerDb</DSN>
+			<DBMS />
+			<Host>MondialBrokerDb</Host>
+			<Database />
+			<UserInfo Encrypted="True">
+				<UserName />
+				<Password />
+			</UserInfo>
+		</DataSource>
+	</DataSources>
+
+	<!--Output blocks-->
+	<Outputs>
+		<Output ID="ReStylink.Results" Type="HTML"><![CDATA[<style TYPE="text/css">
+A.newslink {
+text-decoration:none;
+text-align:center;
+color:yellow;
+font-size:9pt;
+font-weight:bold;
+font-style:serif;
+font-family:Arial;
+line-height:9pt;
+}
+</style>
+
+<style>
+<!--
+A:link {text-decoration: none; color=#0000DD; }
+A:visited {text-decoration: none; color=#0000DD; }
+A:hover {text-decoration: underline; color=#FF0000;}
+-->
+</style>]]></Output>
+		<Output ID="Listing.Results" Type="HTML"><![CDATA[<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+	<TITLE>About</TITLE>
+</HEAD>
+<BODY>
+
+<p align="center">
+<font face="Verdana" color="#000000">
+
+<@COMMENT> ---------------------------------------------------------------------------------
+	Intestazione
+---------------------------------------------------------------------------------</@COMMENT> 
+
+<table border=0 cellspacing="1" cellpadding="2" width="60%" bgcolor="#EEEEEE">
+  <tr>
+    <td width="100%" height="18" colspan="5" bgcolor="#3A1BBC"><font face="Verdana"
+    color="#FFFFFF"><strong>Gestione Brokers Associati<br>
+    </strong></font></td>
+  </tr>
+
+  <tr>
+    <td width="50%" height="18" colspan="5"><font face="Verdana"><small>
+	Elenco dei brokers presenti</td>
+  </tr>
+
+  <tr>
+    <td width="100%" height="18" colspan="5" bgcolor=@@user$colorCom>
+	<font face="Verdana" size=2>
+	<B>
+	<@VAR user$symbolCom ENCODING=none>
+	<a href="<@CGI><@APPFILE>?<@USERREFERENCEARGUMENT>&EnsureNoCache=<@RANDOM LOW='1' HIGH='10000'>&_Action=New">
+		Inserisci un nuovo Broker
+	</a>
+    </strong></font></td>
+  </tr>
+</table>
+<table border=0 cellspacing="1" cellpadding="0" width="60%" bgcolor="#EEEEEE">
+
+<@COMMENT> ---------------------------------------------------------------------------------
+	Gestione ordinamenti
+---------------------------------------------------------------------------------</@COMMENT> 
+<tr>
+	<td bgcolor="#CCCCCC" colspan=5>
+	<img srg="../images/blank.gif" width=1 height=1></td>
+	</tr>
+</tr>
+<tr>
+	<td bgcolor="#CCCCBC" valign=top nowrap>
+
+<@! Codice ---------------------------->
+	<img src="../images/blank.gif" width=1 height=1>
+	<font face="Verdana" size=2 color="#666644">
+	<@IF EXPR="@@user$BrokerSort='CODICE'">
+		<img src="../images/arrowDn.gif">
+		Codice
+	<@ELSE>
+		<a href=<@CGI><@APPFILE>?<@USERREFERENCEARGUMENT>&EnsureNoCache=<@RANDOM LOW='1' HIGH='10000'>&_sort=CODICE>
+		Codice</a>
+	</@IF>
+	</td>
+	<td bgcolor="#CCCCBC" colspan=4 nowrap>
+
+<@! Descrizione ----------------------->
+	<img src="../images/blank.gif" width=1 height=1>
+	<font face="Verdana" size=2 color="#666644">
+	<@IF EXPR="@@user$BrokerSort='DESCRIZIONE'">
+		<img src="../images/arrowDn.gif">
+		Descrizione
+	<@ELSE>
+		<a href=<@CGI><@APPFILE>?<@USERREFERENCEARGUMENT>&EnsureNoCache=<@RANDOM LOW='1' HIGH='10000'>&_sort=DESCRIZIONE>
+		Descrizione</a>
+	</@IF>
+	</td>
+</tr>
+
+<@COMMENT> ---------------------------------------------------------------------------------
+	Output elenco
+---------------------------------------------------------------------------------</@COMMENT> 
+
+<font face="Verdana" color="#000000" size=2>
+<tr>
+	<td bgcolor="#555555" colspan=5>
+	<img srg="../images/blank.gif" width=1 height=1></td>
+	</tr>
+</tr>
+<@ROWS>
+<tr>
+	<@IF EXPR="<@CURROW>%2">
+		<@ASSIGN cBack "#F0F0E6" SCOPE=LOCAL>
+	<@ELSE> 
+		<@ASSIGN cBack "#E8E8D9" SCOPE=LOCAL>
+	</@IF>
+
+	<@IF EXPR="@@user$LastCode=<@COLUMN 'Customer.CODICE'>">
+		<@ASSIGN cBack "#C8C8C9" SCOPE=LOCAL>
+	</@IF>
+
+	<td bgcolor=@@cBack><font face="Verdana" size=2>
+		<a href="<@CGI><@APPFILE>?<@USERREFERENCEARGUMENT>&EnsureNoCache=<@RANDOM LOW='1' HIGH='10000'>&_Action=Edit&_Code=<@COLUMN 'Customer.CODICE'>">
+				<B><@COLUMN 'Customer.CODICE'>
+		</a>
+	</td>
+	<td bgcolor=@@cBack><font face="Verdana" size=2>
+	<a href="<@CGI><@APPFILE>?<@USERREFERENCEARGUMENT>&EnsureNoCache=<@RANDOM LOW='1' HIGH='10000'>&_Action=Edit&_Code=<@COLUMN 'Customer.CODICE'>">
+	<B><@COLUMN 'Customer.DESCRIZIONE'></B>
+	</a>
+	</td >
+	<td bgcolor=@@cBack><font face="Verdana" size=2>
+	<@COLUMN 'Customer.LASTDATAUP'>
+	</td>
+	<td bgcolor=@@cBack><font face="Verdana" size=2>
+	<@COLUMN 'Customer.LASTTIMEUP'>
+	</td>
+	
+	<td bgcolor=@@cBack align=center><font face="Verdana" size=2>
+
+	<@IF @@user$demo>
+	   <img src="../images/deldoc.gif" border=0 alt="Cancella broker">
+	<@ELSE>
+	 <a href="<@CGI><@APPFILE>?<@USERREFERENCEARGUMENT>&EnsureNoCache=<@RANDOM LOW='1' HIGH='10000'>&_Action=_delete&_Code=<@COLUMN 'Customer.CODICE'>">
+	   <img src="../images/deldoc.gif" border=0 alt="Cancella broker">
+	 </a>
+	</@IF>
+
+	</td>
+</tr>
+</@ROWS>
+<tr>
+	<td bgcolor="#0000DD" colspan=5>
+	<img srg="../images/blank.gif" width=1 height=1></td>
+	</tr>
+</tr>
+
+<Table>]]></Output>
+		<Output ID="Crea_Lista_Zone1.Results" Type="HTML"><![CDATA[<@ASSIGN listZone "" ENCODING='NONE'>
+<@ROWS>
+	<@ASSIGN szCodice <@COLUMN 'Country.CODICE'> SCOPE=LOCAL>
+	<@ASSIGN szDesc <@COLUMN 'Country.ITZONE'> SCOPE=LOCAL>
+	<@ASSIGN listZone "@@listZone<option " SCOPE=USER>
+	<@ASSIGN listZone "@@listZone value='@@szCodice'>@@szDesc</option><@CRLF>" SCOPE=USER>
+</@ROWS>
+
+]]></Output>
+		<Output ID="NewRecord.Results" Type="HTML"><![CDATA[<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+	<TITLE>Nuovo inserimento</TITLE>
+</HEAD>
+<BODY>
+<font face="Verdana" color="#000000" size=2>
+<P align=center>
+
+<@IF @@user$demo>
+ <FORM METHOD="POST" ACTION="<@CGI><@APPFILE>?_action=list&<@UserReferenceArgument>">
+<@ELSE>
+ <FORM METHOD="POST" ACTION="<@CGI><@APPFILE>?_action=_insert&<@UserReferenceArgument>">
+</@IF>
+<table border=0 cellspacing="0" cellpadding="2" width="60%">
+
+<@!  Titolo della finestra  ------------------------------------------------->
+  <tr>
+    <td width="100%" height="18" colspan="5" bgcolor="#3A1BBC"><font face="Verdana"
+    color="#FFFFFF"><strong>Gestione Brokers Associati<br>
+    </strong></font></td>
+  </tr>
+
+  <tr>
+    <td width="50%" height="18" colspan="5" bgcolor="#EEEEEE"><font face="Verdana"><small>
+	Inserimento nuovo broker</td>
+  </tr>
+
+<@COMMENT> ---------------------------------------------------------------------------------
+	Definizione della tabella di editing
+---------------------------------------------------------------------------------</@COMMENT> 
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Codice
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="CODICE" TYPE=TEXT SIZE=10 MAXLENGTH=8 Value="">
+	</TD>
+</TR>
+
+<TR ALIGN="LEFT" VALIGN="TOP">
+
+ 	<TD bgcolor="#F0F0E6">
+		<small>Descrizione
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="DESCRIZIONE" TYPE=TEXT SIZE=40 MAXLENGTH=100 Value="">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Indirizzo 1
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBADDR1" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Indirizzo 2
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBADDR2" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Telefono
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBTEL" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Fax
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBFAX" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>E-mail
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBEMAIL" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Scritta subimage
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBSUBIMAGE" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="">
+	</TD>
+</TR>
+<@! Zona Geografica ------------------------------------------------------------------------->
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Zona geografica
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<SELECT NAME="ZONAGEO" SIZE=1>
+		<OPTION VALUE="">Indefinita</OPTION>
+		<@VAR user$listZone ENCODING=none>
+		</SELECT>
+	</TD>
+</TR>
+
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>PasswordFTP
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="PASSWORDFTP" TYPE=TEXT SIZE=20 MAXLENGTH=20 value="">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>NT PathRoot
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="PATHROOT" TYPE=TEXT SIZE=60 MAXLENGTH=254 value="">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Limite Inserimenti
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="LIMITEIMB" TYPE=TEXT SIZE=5 MAXLENGTH=5 value="">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Scadenza contratto
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="DATASCAD" TYPE=TEXT SIZE=8 MAXLENGTH=8 value="">
+	</TD>
+</TR>
+
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor=@@user$colorCom>
+	<INPUT TYPE=SUBMIT VALUE="Inserisci"> 
+	</TD>
+ 	<TD align=right bgcolor=@@user$colorCom>
+	<INPUT TYPE=RESET VALUE="Cancella i campi">
+	</TD>
+</TR>
+
+</TABLE>
+</FORM>
+]]></Output>
+		<Output ID="CampiMancanti.Results" Type="HTML"><![CDATA[<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+
+</body>
+</html>
+
+<HEAD>
+	<TITLE>Errore: Campi mancanti</TITLE>
+</HEAD>
+
+<BODY>
+<p align="center">
+<img src="../images/cart01.gif" width="57" height="47"><br>
+<BR>
+<font face="Verdana" size=2>
+Per la registrazione risultano mancanti i sequenti campi:
+</font>
+<font face="Verdana" size=2>
+<p align="center">
+<table border=0>
+<tr>
+<td width="10%">
+</td>
+<td>
+	<UL TYPE=SQUARE>
+	<@IFEMPTY <@ARG CODICE>>
+		<LI>CODICE
+	</@IF>
+	<@IFEMPTY <@ARG DESCRIZIONE>>
+		<LI>DESCRIZIONE
+	</@IF>
+	</UL>
+</td>
+</TR>
+</TABLE>
+
+<p align="center"><strong>
+Si prega di tornare indietro e compilare i campi mancati, grazie.
+</p>
+</BODY>
+
+</HTML>]]></Output>
+		<Output ID="Inserimento.Results" Type="HTML"><![CDATA[<html>
+<HTML>
+<META HTTP-EQUIV="Refresh" CONTENT="2; URL=<@CGI><@APPFILE>?_action=list">
+</html>
+
+<@ASSIGN LastCode "<@ARG CODICE>" SCOPE=user> 
+<head>
+<title>Gestione MondialBroker</title>
+</head>
+
+<body>
+<div align="center"><center>
+
+<table border="0" width="80%">
+  <tr>
+    <td width="100%" bgcolor="#2230D7"><p align="center"><font face="Verdana" color="#FFFFFF">Broker<br>
+    <strong><@ARG CODICE> <@ARG DESCRIZIONE><br>
+    </strong>Inserito correttamente</font></td>
+  </tr>
+</table>
+</center></div>
+<BR><BR>
+]]></Output>
+		<Output ID="Inserimento.Error" Type="HTML"><![CDATA[<html>
+
+<head>
+<title>Errore in creazione</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+</head>
+
+<body>
+
+<p align="center"><img src="../images/cart01.gif"
+width="57" height="47"><br>
+<br>
+<font face="Verdana"><strong>Errore in creazione Record<br>
+</strong><br>
+<small>Tornare indietro e controllare i campi di inserimento</small></font></p>
+</body>
+</html>
+]]></Output>
+		<Output ID="Editing.Results" Type="HTML"><![CDATA[<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+
+<HEAD>
+	<TITLE>Editing di un record</TITLE>
+</HEAD>
+<BODY>
+<font face="Verdana" color="#000000" size=2>
+<P align=center>
+
+<@ASSIGN LastCode "<@COLUMN 'Customer.CODICE'>" SCOPE=user> 
+
+<@IF @@user$demo>
+ <FORM METHOD="POST" ACTION="<@CGI><@APPFILE>?_action=list">
+<@ELSE>
+ <FORM METHOD="POST" ACTION="<@CGI><@APPFILE>?_action=_update&<@UserReferenceArgument>&_code=<@COLUMN 'Customer.CODICE'>">
+</@IF>
+<table border=0 cellspacing="0" cellpadding="2" width="60%">
+
+<@!  Titolo della finestra  ------------------------------------------------->
+  <tr>
+    <td width="100%" height="18" colspan="5" bgcolor="#3A1BBC"><font face="Verdana"
+    color="#FFFFFF"><strong>Gestione Brokers Associati<br>
+    </strong></font></td>
+  </tr>
+
+  <tr>
+    <td width="50%" height="18" colspan="5" bgcolor="#EEEEEE"><font face="Verdana"><small>
+	Editing di un broker</td>
+  </tr>
+  <tr>
+    <td width="50%" height="18" colspan="5" bgcolor=@@user$colorCom><font face="Verdana"><small>
+	<@VAR user$symbolCom ENCODING=none>
+	<a href="<@CGI>EDCustomOffer.taf?_action=list&<@UserReferenceArgument>&_code=<@COLUMN 'Customer.CODICE'>">
+	<B>Editing delle offerte del broker
+	</a>
+	</td>
+  </tr>
+
+
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD colspan=2 bgcolor="#E8E8D9">
+		<font face="Verdana" color="#303030" size=2>Broker codice:<B>
+		<@COLUMN 'Customer.CODICE'> - <@COLUMN 'Customer.DESCRIZIONE'></B>
+	</TD>
+</TR>
+
+<@COMMENT> ---------------------------------------------------------------------------------
+	Definizione della tabella di editing
+---------------------------------------------------------------------------------</@COMMENT> 
+
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Descrizione
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="DESCRIZIONE" TYPE=TEXT SIZE=40 MAXLENGTH=100 Value="<@COLUMN 'Customer.DESCRIZIONE'>">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Indirizzo 1
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBADDR1" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="<@COLUMN 'Customer.WEBADDR1'>">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Indirizzo 2
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBADDR2" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="<@COLUMN 'Customer.WEBADDR2'>">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Telefono
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBTEL" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="<@COLUMN 'Customer.WEBTEL'>">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Fax
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBFAX" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="<@COLUMN 'Customer.WEBFAX'>">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>E-mail
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBEMAIL" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="<@COLUMN 'Customer.WEBEMAIL'>">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Scritta subimage
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="WEBSUBIMAGE" TYPE=TEXT SIZE=40 MAXLENGTH=100 value="<@COLUMN 'Customer.WEBSUBIMAGE'>">
+	</TD>
+</TR>
+
+<@! Zona Geografica ------------------------------------------------------------------------->
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Zona geografica
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<SELECT NAME="ZONAGEO" SIZE=1>
+		<OPTION VALUE="">Indefinita</OPTION>
+		<@VAR user$listZone ENCODING=none>
+		</SELECT>
+	</TD>
+</TR>
+
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>PasswordFTP
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="PASSWORDFTP" TYPE=TEXT SIZE=20 MAXLENGTH=20 value="<@COLUMN 'Customer.PASSWORDFTP'>">
+	</TD>
+</TR>
+
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>NT PathRoot
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="PATHROOT" TYPE=TEXT SIZE=60 MAXLENGTH=254 value="<@COLUMN 'Customer.PATHROOT'>">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Limite Inserimenti
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="LIMITEIMB" TYPE=TEXT SIZE=5 MAXLENGTH=5 value="<@COLUMN 'Customer.LIMITEIMB'>">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Scadenza contratto
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<INPUT NAME="DATASCAD" TYPE=TEXT SIZE=8 MAXLENGTH=8 value="<@COLUMN 'Customer.DATASCAD'>">
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Ultimo aggiornamento
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<@COLUMN 'Customer.LASTDATAUP'> - <@COLUMN 'Customer.LASTTIMEUP'>
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Ultimo file
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<@COLUMN 'Customer.LASTFILE'>
+	</TD>
+</TR>
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor="#F0F0E6">
+		<small>Numero aggiornamenti
+	</TD>
+
+ 	<TD bgcolor="#F0F0E6">
+		<@COLUMN 'Customer.AGGCOUNT'>
+	</TD>
+</TR>
+
+<TR ALIGN="LEFT" VALIGN="TOP">
+ 	<TD bgcolor=@@user$colorCom>
+	<INPUT TYPE="SUBMIT" VALUE="Salva le modifiche"> 
+	</TD>
+
+ 	<TD bgcolor=@@user$colorCom align=right>
+	<INPUT TYPE="RESET" VALUE="Ripristina i valori originali">
+	</TD>
+</TR>
+
+</FORM>
+</TABLE>
+]]></Output>
+		<Output ID="Editing.NoResults" Type="HTML">No result</Output>
+		<Output ID="Editing.Error" Type="HTML">Errore HTML</Output>
+		<Output ID="Results1.Results" Type="HTML"><![CDATA[<HTML>
+<META HTTP-EQUIV="Refresh" CONTENT="0; URL=<@CGI><@APPFILE>?_action=list">
+</html>
+]]></Output>
+		<Output ID="Update.Results" Type="HTML"><![CDATA[<html>
+<HTML>
+<META HTTP-EQUIV="Refresh" CONTENT="2; URL=<@CGI><@APPFILE>?_action=list">
+</html>
+
+<@ASSIGN LastCode "<@ARG _code>" SCOPE=user> 
+<head>
+<title>Gestione MondialBroker</title>
+</head>
+
+<body>
+<div align="center"><center>
+
+<table border="0" width="80%">
+  <tr>
+    <td width="100%" bgcolor="#2230D7"><p align="center"><font face="Verdana" color="#FFFFFF">Broker<br>
+    <strong><@ARG CODICE> <@ARG DESCRIZIONE><br>
+    </strong>Aggiornamento completato</font></td>
+  </tr>
+<@COMMENT>
+  <tr>
+	<td bgcolor="#EEEEEE"><font face="Verdana" size=2>
+	 <a href="<@APPFILE>?	<@USERREFERENCEARGUMENT>&EnsureNoCache=<@RANDOM LOW='1' HIGH='10000'>">
+	 <B>Elenco dei Brokers</a>
+	</td>
+  </tr>
+  <tr>
+	<td bgcolor="#EEEEEE"><font face="Verdana" size=2>
+	 <a href="<@APPFILE>?<@USERREFERENCEARGUMENT>&EnsureNoCache=<@RANDOM LOW='1' HIGH='10000'>&_action=New">
+	 <B>Nuovo inserimento</a>
+	</td>
+  </tr>
+</@COMMENT>
+</table>
+</center></div>
+<BR><BR>
+]]></Output>
+		<Output ID="Update.Error" Type="HTML"><![CDATA[<html>
+
+<head>
+<title>Errore in aggiornamento</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+</head>
+
+<body>
+
+<p align="center"><img src="../images/cart01.gif"
+width="57" height="47"><br>
+<br>
+<font face="Verdana"><strong>Errore in aggiornamento Record<br>
+</strong><br>
+<small>Tornare indietro e controllare i campi di inserimento</small></font></p>
+</body>
+</html>
+]]></Output>
+		<Output ID="Footer.Results" Type="HTML"><![CDATA[<body>
+<font face="Verdana" size=1>
+<table border="0" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td width="100%" bgcolor="#C0C0C0"><img src="../images/blanksx.gif" width="1" height="2"></td>
+  </tr>
+  <tr>
+    <td width="100%"><p align="center"><font face="Verdana"><small><small><small>«</small><strong><font
+    color="#004080">The MondialBroker Engine 2.0</font></strong><small>»</small></small><br>
+    <small><small>Created by <a href="http://www.ferra.com" target="_blank">Ferrà A&amp;T</a>
+    © 2ØØØ</small></small></small></font><br>
+    <small><small>Powered by <a href="http://www.pervasive.com" target="_blank">Pervasive Tango 2ØØØ</a>
+    </small></small></small></font></td>
+  </tr>
+</table>
+<p align="center">&nbsp;</p>
+</font>
+</body>
+</html>
+]]></Output>
+	</Outputs>
+</TAF>

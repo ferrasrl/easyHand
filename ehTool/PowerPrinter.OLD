@@ -1,0 +1,4048 @@
+//-----------------------------------------------------------------------
+// PowerPrinter	   Gestione di un documento in stampa	
+//				   Ex LptReportImg
+//											                            |
+//											                            |
+//	Principio di funzionamento 									        |
+//	HEADER                  				                            |
+//	1) WS_OPEN Apro un Report                                           |
+//	   Passo in *ptr un puntatore ad una struttura LRINIT               |
+//	   che contiene i parametri di inizializzazione della stampa        |
+//	   (Tipo del Layout,titolo,sottotitolo,margini,font da usare,ecc..) |
+//											                            |
+//	2) WS_ADD,WS_SETFLAG Dichiaro il formato del campo del report       |
+//	   Passo in *ptr un puntatore ad una struttura LRFIELDS             |
+//	   che contiene la formattazione ed il nome del campo               |
+//	   WS_SETFLAG aiuta a presettare i valori di un tipo ALFA o NUME    |
+//											                            |
+//	3) WS_DO Fine dichiarazione campi                                   |
+//	   Segnala la fine della dichiarazione dei campi                    |
+//	   PowerPrinter calcola le dimensioni in "dot" dei vari campi e linee  |
+//											                            |
+//	BODY									                            |
+//	4) WS_LINK    Inizio assegnazione valore campi di una linea         |
+//	5) WS_REALSET Assegnazione valore di un campo 						|
+//	6) WS_INSERT  Fine assegnazione ed inserimento della linea          |
+//											                            |
+//	END                                                                 |
+//	7) WS_CLOSE     						                            |
+//	   Preview e/o stampa del report                                    |
+//											                            |
+//											                            |
+//											                            |
+//										 Creato da G.Tassistro          |
+//										 Ferrà Art & Technology 1999    |
+//										 Ferrà Art & Technology 2000    |
+//										 Ferrà Art & Technology 2001    |
+//	Versione 2.1                    	 Ferrà Art & Technology 2002    |
+//	Versione 2.2                    	 Ferrà Art & Technology 2003    
+//	Versione 3                     		 Ferrà srl 2007
+//	Versione 3.2 e cambio di nome  		 Ferrà srl 2008
+//-----------------------------------------------------------------------
+
+/*
+	Istruzioni
+	a) Sostituire lreport.h con PowerPrinter.h (in tutto il progetto)
+	b) Sostituire LptReport( con PowerPrinter(
+
+
+
+*/
+
+/*
+   lpszFilename :=
+'C:\WINDOWS\system32\spool\DRIVERS\COLOR\Photoshop4DefaultCMYK.icc';
+
+   hDC_ := GetPrinterDC();
+   if hDC_ = 0 then
+       RaiseLastOSError;
+
+   // Fill in the DOCINFO structure
+   diDocInfo.cbSize := sizeof(DOCINFO);
+   diDocInfo.lpszDocName := 'sdft';
+   diDocInfo.lpszOutput := nil;
+   diDocInfo.lpszDatatype := nil;
+   diDocInfo.fwType := 0;
+
+   // Start the document
+   if StartDoc(hDC_, diDocInfo) = SP_ERROR then
+       RaiseLastOSError;
+
+   // Start the page
+   if StartPage(hDC_) = SP_ERROR then
+       RaiseLastOSError;
+
+   // I tested although ICM_ON
+   if SetICMMode(hDC_, ICM_DONE_OUTSIDE_DC) = 0 then
+       RaiseLastOSError;
+
+   if not SetICMProfile(hdc_, lpszFilename) then
+       RaiseLastOSError;
+*/
+
+//#define WINVER 0x400
+
+#include "\ehtool\include\ehsw_i.h"
+#include "\ehtool\imgutil.h"
+#include "\ehtool\PowerPrinter.h"
+
+#ifndef ICM_DONE_OUTSIDE_DC
+#define ICM_DONE_OUTSIDE_DC 4
+#endif
+
+// p:300=x:lpLRInit->xInchDot
+#define LocInchToDotX(p) (SINT) (p*lpLRInit->xInchDot/300.00)
+#define LocInchToDotY(p) (SINT) (p*lpLRInit->yInchDot/300.00)
+
+#define DotToVideoX(p) rVideoPrintArea.left+VideoOffset.x+(sVideoPrintSize.cx*p/lpLRInit->sPaper.cx)
+#define DotToVideoY(p) rVideoPrintArea.top+VideoOffset.y+(sVideoPrintSize.cy*p/lpLRInit->sPaper.cy)
+
+#define DotToPixelX(p) (sVideoPrintSize.cx*p/lpLRInit->sPaper.cx)
+#define DotToPixelY(p) (sVideoPrintSize.cy*p/lpLRInit->sPaper.cy)
+
+#define LRE_ENDFILE   0
+//#define LRE_TEXT      1
+
+#define LRE_CHAR      2
+#define LRE_CHAREX    3
+#define LRE_BOX       4
+#define LRE_BOXP      5
+#define LRE_BOXR      11
+#define LRE_BOXPR     12
+//#define LRE_LINK      6 // Area di Link
+#define LRE_HBITMAP   7
+#define LRE_HBITMAPD  8 // Stampa DIRETTA senza strech
+//#define LRE_CHARJUST  8
+#define LRE_LINE      9
+#define LRE_CHARBOX   10 // New 2002 Testo in box
+
+typedef struct {
+  BOOL  HideX;
+  BOOL  HideY;
+
+  SINT  AreaY;
+  SINT  AreaX;
+
+  SINT  CharY;
+  SINT  CharX;
+  LONG  Lines;
+  LONG  LineVideoX;
+  LONG  LineVideoY;
+
+  SINT iVScrollPos;
+  SINT iVScrollMax;
+  SINT iHScrollPos;
+  SINT iHScrollMax;
+} TLAYOUT;
+
+//-----------------------------------------------------------------------
+//	Stampa di un report                                                 |
+//-----------------------------------------------------------------------
+
+static void LREFileLoad(void);
+static void LREFileFreeResource(BOOL bDeleteFile);
+static void LRETagReplace(void);
+static BYTE * LREGetNext(BYTE *ptr);
+static SINT LRToStyles(LRINIT *lpLRInit);
+
+static CHAR szTempPath[500];
+static CHAR szTempFile[500];
+static FILE *chTempFile=NULL;
+static LRINIT *lpLRInit=NULL;
+//static LRFIELDS **LRFields=NULL;
+static SINT LRHdl=-1;
+static BOOL fArray=FALSE;
+
+static BOOL LREPreview(CHAR *);
+static BOOL LREPrintDirect(CHAR *lpParam);
+
+static SIZE  sVideoPage;
+static RECT  rVideoPrintArea;
+static SIZE  sVideoPrintSize;
+
+// -------------------------------------------------
+// Giustificazione di un testo in un RECT
+// New 2001
+// by Vadora/Tassistro
+// Ritorna l'altezza del testo effettivo
+// -------------------------------------------------
+/*
+static SINT LTextJustify(HDC hdc,CHAR *pText,RECT *prc,SINT iInterLinea,BOOL fOutput)
+{
+	SINT  xStart, yStart, iBreakCount ;
+	PSTR pBegin, pEnd ;
+	SIZE size ;
+	BOOL bGiustifico;
+
+	yStart = prc->top ;
+	do                            // for each text line
+	{
+		iBreakCount=0;
+		while (*pText == ' ') pText++;  // skip over leading blanks (Salta i blank in testa)
+		pBegin=pText;
+		do                       // until the line is known / (Trova la linea piu lunga che sta nel Rect)
+		{
+			pEnd=pText;
+			while (*pText != '\0' && *pText++ != ' ');
+			// for each space, calculate extents
+			iBreakCount++;
+			SetTextJustification(hdc, 0, 0) ;
+			GetTextExtentPoint32(hdc, pBegin, pText - pBegin - 1, &size) ;
+			//if (*pText == '\0') break;
+			if (!*pText) break;
+		} while ((SINT) size.cx < (prc->right - prc->left)) ;
+		iBreakCount-- ;
+		while (*(pEnd - 1) == ' ')   // eliminate trailing blanks (Elimina i blank in coda)
+		{
+			pEnd-- ;
+			iBreakCount-- ;
+		}
+		// Se la linea non è l'ultima giustifico
+		bGiustifico=TRUE;
+		if ((!*pText && (SINT) size.cx < (prc->right - prc->left)) || iBreakCount <= 0)
+		{
+			pEnd=pText;
+			bGiustifico=FALSE;
+		}
+		SetTextJustification(hdc, 0, 0) ;
+		GetTextExtentPoint32(hdc, pBegin, pEnd - pBegin, &size) ;
+		if (bGiustifico) SetTextJustification(hdc,prc->right - prc->left - size.cx,iBreakCount) ;
+		xStart = prc->left ;
+		if (fOutput) TextOut(hdc, xStart, yStart, pBegin, pEnd - pBegin) ;
+		yStart+= size.cy + iInterLinea;
+		pText= pEnd;
+	
+	} while (*pText && yStart < prc->bottom);
+	SetTextJustification(hdc, 0, 0) ;
+	return (yStart-prc->top);
+}
+*/
+static SINT LTextInBox(HDC hdc,LRT_CHARBOX *LCharBox,CHAR *pTextOriginal,BOOL fOutput,SINT *lpiRows,SINT iMaxRows)
+{
+	SINT  xStart, yStart, iBreakCount ;
+	PSTR pBegin, pEnd ;
+	SIZE size ;
+	BOOL bJustify;
+	BOOL bCRLF;
+	SINT iRowsCount=0;
+	SINT iStrLen;
+	BYTE *pMemory,*pText;
+
+	// Regole
+	// A) La linea và troncata con CR o LF
+	// B) CR e LF devono essere tolti
+	// C) Se la linea finisce con CR (ed è piu corta dello spazio, NON VIENE GIUSTIFICATA)
+	//
+	pMemory=pText=StringAlloc(ChrTrim(pTextOriginal));
+	while (StrReplace(pText,CRLF,"\r"));
+	while (StrReplace(pText,"\n\r","\r"));
+
+	yStart = LCharBox->rArea.top ;
+	do                            // for each text line
+	{
+		iBreakCount=0;
+	//	while (*pText==' ') pText++;  // skip over leading blanks (Salta i blank in testa)
+		pBegin=pText;
+		
+		// Trova la linea piu lunga che sta nel Rect
+		// iBreakCount,contiene gli spazi di separazione delle parole
+		bCRLF=FALSE;
+		do                       // until the line is known / 
+		{
+			pEnd=pText;
+			// Cerca uno spazio (Punto di interruzione possibile
+			//while (*pText!='\0'&&*pText++!=' '); // Era così
+			for (;*pText;pText++)
+			{
+				if (*pText==' ') {pText++; break;}
+				if (*pText=='\n'||*pText=='\r') {pEnd=pText; bCRLF=TRUE; break;}
+			}
+
+			// Fino alla fine o allo spazio
+			// Avanzo; Fino alla fine della stringa o al primo spazio o al primo ritorno a capo
+			// for each space, calculate extents
+			iBreakCount++;
+			SetTextJustification(hdc,0,0);
+//			GetTextExtentPoint32(hdc, pBegin, pText - pBegin - 1, &size) ;
+			GetTextExtentPoint32(hdc, pBegin, pText - pBegin, &size) ;
+			//if (*pText=='\n'||*pText=='\r') break;			
+			if (!*pText) break;
+			if (bCRLF) break; // E' un fine linea mi fermo
+		} while ((SINT) size.cx < (LCharBox->rArea.right - LCharBox->rArea.left)) ;
+		iBreakCount--; 
+
+		while (*(pEnd - 1)==' ')   // eliminate trailing blanks (Elimina i blank in coda)
+		{
+			pEnd--; iBreakCount--;
+		}
+		
+		// Elimina il cr/lf
+		//if (bCRLF) while (*pEnd=='\n'||*pEnd=='\r') {pEnd--;}
+
+		//win_infoarg("[%s]",pBegin);
+
+		// Controllo se è l'ultima linea
+		bJustify=TRUE;
+		if ((!*pText && (SINT) size.cx < (LCharBox->rArea.right - LCharBox->rArea.left)) || iBreakCount <= 0)
+		{
+			pEnd=pText;
+			if (!LCharBox->bJustifyLast) bJustify=FALSE; // new 2007
+		}
+		// Controllo se finisce con un ritorno a capo
+		if (bCRLF) bJustify=FALSE; // E' un fine linea mi fermo
+		
+		iStrLen=pEnd-pBegin;
+		if (iStrLen>0) iRowsCount++;
+		if (iMaxRows&&iRowsCount>=iMaxRows) break; // new 2004
+
+		// Stampa dell'oggetto
+		if (fOutput) 
+		{
+		 SetTextJustification(hdc, 0, 0) ;
+		 GetTextExtentPoint32(hdc, pBegin, iStrLen, &size) ;
+		 if (bJustify&&LCharBox->xAllinea==LR_JUSTIFY) SetTextJustification(hdc,LCharBox->rArea.right - LCharBox->rArea.left - size.cx,iBreakCount) ;
+		 switch (LCharBox->xAllinea)
+		 {
+			case LR_JUSTIFY:
+		    case LR_LEFT: 
+				xStart = LCharBox->rArea.left; 
+				break;
+
+			case LR_RIGHT: 
+				xStart = LCharBox->rArea.right-size.cx; 
+				break;
+
+			case LR_CENTER: 
+				xStart = LCharBox->rArea.left+((LCharBox->rArea.right-LCharBox->rArea.left)>>1)-(size.cx>>1); 
+				break;
+		 }
+		 TextOut(hdc, xStart, yStart, pBegin, iStrLen) ;
+		}
+	
+		yStart+= size.cy + LCharBox->yInterlinea;
+		// Se c'è un CR o LF avanzo
+		while (*pEnd=='\n'||*pEnd=='\r') {pEnd++;}
+		pText= pEnd;
+
+	} while (*pText);// && yStart < LCharBox->rArea.bottom);
+
+	EhFree(pMemory);
+	SetTextJustification(hdc, 0, 0) ;
+	*lpiRows=iRowsCount;
+	return (yStart-LCharBox->rArea.top);
+}
+
+//-------------------------------------------
+//| LREMakeItem                             |
+//| Aggiunge un Item di stampa nel file     |
+//|                                         |
+//| ATENZIONE:Va liberata la memoria        |
+//|                                         |
+//|                           by Ferrà 2002 |
+//-------------------------------------------
+static void *LREMakeItem(UINT uType,void *lpStruct,SINT iLenStruct,void *lpDati,SINT iLenDati,SINT *lpiSize)
+{
+    LRETAG PT;
+	BYTE *lpMemo=NULL;
+	BYTE *lpPoint;
+	SINT iMemoSize;
+	
+	PT.iLenTag=0;
+	PT.iPage=lpLRInit->iPageCount;
+    
+    PT.iType=uType;
+    PT.iOfsDynamics=iLenStruct;
+    PT.iLenDynamics=iLenDati;
+
+	switch(uType)
+	{
+		case LRE_BOX: 
+		case LRE_BOXP: 
+		case LRE_BOXR: 
+		case LRE_BOXPR: 
+		case LRE_HBITMAP: 
+		case LRE_HBITMAPD: 
+		case LRE_LINE: 
+			PT.iLenTag=iLenStruct+iLenDati;
+			break;
+	   
+		case LRE_CHAR: 
+		case LRE_CHAREX: 
+		//case LRE_CHARJUST: 
+		case LRE_CHARBOX:
+			iLenDati=strlen((CHAR *) lpDati)+1;
+			PT.iLenTag=iLenStruct+iLenDati;
+			break;
+
+		case LRE_ENDFILE: 
+		    PT.iLenTag=0;
+			break;
+
+		default:
+		   PRG_end("LRE:???");
+	}
+
+	// LRETAG+(STRUCT)+(DATI) 
+	iMemoSize=sizeof(PT)+iLenStruct+iLenDati;
+	lpPoint=lpMemo=EhAlloc(iMemoSize); if (lpMemo==NULL) PRG_end("LREMAkeItem: out of memory");
+
+	//    f_put(ch,NOSEEK,&PT,sizeof(PT)); 
+	memcpy(lpPoint,&PT,sizeof(PT)); lpPoint+=sizeof(PT);
+
+	if (lpStruct) {memcpy(lpPoint,lpStruct,iLenStruct); lpPoint+=iLenStruct;} //f_put(ch,NOSEEK,lpStruct,iLenStruct); 
+
+	// Se ci sono accoda i dati dinamici
+	switch(uType)
+	{
+		case LRE_ENDFILE:
+			break;
+
+		case LRE_CHAR: 
+		case LRE_CHAREX: 
+		//case LRE_CHARJUST: 
+		case LRE_CHARBOX:
+	    default:
+			if (iLenDati) //f_put(ch,NOSEEK,lpDati,strlen((CHAR *) lpDati)+1);
+				{memcpy(lpPoint,lpDati,iLenDati); lpPoint+=iLenDati;}
+			break;
+	}
+
+	*lpiSize=iMemoSize;
+	return lpMemo;
+}
+
+// Scrive l'idem su disco
+static BOOL LREAddItem(UINT uType,void *lpStruct,SINT iLenStruct,void *lpDati,SINT iLenDati)
+{
+	SINT iSize;
+	BYTE *lpResult;
+	lpResult=LREMakeItem(uType,lpStruct,iLenStruct,lpDati,iLenDati,&iSize);
+	f_put(chTempFile,NOSEEK,lpResult,iSize);
+	EhFree(lpResult);
+	return FALSE;
+}
+
+// ------------------------------------------------
+// Gestione di un buffer di Linea
+// Progettato nel 01/2002 per permettere la traslazione 
+// di una linea dinamica sulla pagina successiva
+// ------------------------------------------------
+
+static BYTE *lpItemBuffer=NULL;
+static LONG lItemBufferSize=0;
+static LONG lItemBufferCount=0;
+
+static BOOL LREAddLineBuffer(UINT uType,void *lpStruct,SINT iLenStruct,void *lpDati,SINT iLenDati)
+{
+	SINT iSize;
+	BYTE *lpResult;
+	lpResult=LREMakeItem(uType,lpStruct,iLenStruct,lpDati,iLenDati,&iSize);
+	
+	// Se è la prima volta
+	if (lItemBufferSize==0) 
+		{lItemBufferSize=2048;  // Buffer iniziale 2k
+		 lItemBufferCount=0;
+		 lpItemBuffer=EhAlloc(lItemBufferSize);
+		 if (lpItemBuffer==NULL) PRG_end("LREAddLineBuffer: out of memory A");
+		}
+	
+	// Se andiamo fuori dal buffer
+	if ((lItemBufferCount+iSize)>=lItemBufferSize)
+	{
+		lItemBufferSize=lItemBufferCount+iSize+128;
+		lpItemBuffer=realloc(lpItemBuffer,lItemBufferSize);
+		if (lpItemBuffer==NULL) PRG_end("LREAddLineBuffer: out of memory B");
+	}
+	
+	memcpy(lpItemBuffer+lItemBufferCount,lpResult,iSize);
+	lItemBufferCount+=iSize;
+	EhFree(lpResult);
+	return FALSE;
+}
+
+static void LREFlushBuffer(BOOL fOutput)
+{
+	if (lpItemBuffer==NULL) return;
+	if (fOutput) {f_put(chTempFile,NOSEEK,lpItemBuffer,lItemBufferCount);}
+	EhFree(lpItemBuffer);
+	lpItemBuffer=NULL;
+	lItemBufferSize=0;
+}
+
+static void LREBufferRemap(void)
+{
+  BYTE *pt=lpItemBuffer; 
+  LRETAG *Lre;
+  LRT_CHAR	  *lpLrtChar;
+  LRT_CHAREX  *lpLrtCharEx;
+  LRT_CHARBOX *lpLrtCharBox;
+
+  if (pt==NULL) PRG_end("LREBufferRemap:Null");
+  
+  while (pt<(lpItemBuffer+lItemBufferCount))
+  {
+	Lre=(LRETAG *) pt;
+
+	Lre->iPage=lpLRInit->iPageCount; // Setta la pagina attuale
+	lpLrtChar=(LRT_CHAR *) (pt+sizeof(LRETAG)); 
+	switch(Lre->iType)
+	{
+	/*
+		case LRE_BOX: 
+		case LRE_BOXP: 
+		case LRE_HBITMAP: 
+		case LRE_LINE: 
+			PT.iLenTag=iLenStruct+iLenDati;
+			break;
+	  */ 
+		case LRE_CHAR:    
+			lpLrtChar->Point.y=lpLRInit->iRowOffset+lpLRInit->rFieldPadding.top;
+			break;
+		case LRE_CHAREX:  
+			lpLrtCharEx=(LRT_CHAREX *) lpLrtChar; 
+			lpLrtCharEx->Point.y=lpLRInit->iRowOffset+lpLRInit->rFieldPadding.top;
+			break;
+		case LRE_CHARBOX: 
+			lpLrtCharBox=(LRT_CHARBOX *) lpLrtChar; 
+			lpLrtCharBox->rArea.top=lpLRInit->iRowOffset+lpLRInit->rFieldPadding.top;
+			break;
+
+		default:
+		   PRG_end("LRE:???");
+	}
+
+
+   pt+=sizeof(LRETAG)+Lre->iLenTag;
+  }
+ 
+}
+
+
+// Crea la stringa relativa alla pagina
+//static CHAR *GiveLayPag(LRINIT *lpLRInit)
+static CHAR *GiveLayPag(void)
+{
+	static CHAR Buf[40];
+	*Buf=0;
+	switch (lpLRInit->iPagStyle)
+	{
+		case 0: sprintf(Buf,"Pag. %d",lpLRInit->iPageCount);
+				break;
+		case 1: sprintf(Buf,"%d",lpLRInit->iPageCount);
+				break;
+		case 2: sprintf(Buf,"%03d",lpLRInit->iPageCount);
+				break;
+	}
+	return Buf;
+}
+
+
+// -----------------------------------------------------------------------------------------------------------------
+// LAYOUT della Pagina
+// -----------------------------------------------------------------------------------------------------------------
+static void LptReportLayout(void)
+{
+	LRT_CHAREX LRTCharEx;
+	LRT_CHAR   LRTChar;
+	LRT_BOX    LRTBox;
+	SINT a;
+	//SINT yTitle;
+//	CHAR Buf[80];
+
+	switch (lpLRInit->iLayStyle)
+	{
+		case LR_LAYHIDE: // Non header
+				break;
+
+		case LR_LAYTYPE0:
+			
+			// -------------------------------------------------------
+			// LayOut Tipo 0 : Standard DOS
+			// -------------------------------------------------------
+			// DATA: Scrivo la data di oggi in alto a destra
+			// -------------------------------------------------------
+			  if (lpLRInit->fDate)
+			  {
+				  memset(&LRTCharEx,0,sizeof(LRTCharEx));
+				  LRTCharEx.Point.x=lpLRInit->rPage.left;
+				  LRTCharEx.Point.y=lpLRInit->rPage.top;
+				  LRTCharEx.xAllinea=LR_LEFT;
+				  LRTCharEx.yChar=LocInchToDotY(40);
+				  LRTCharEx.fFix=FALSE;
+				  strcpy(LRTCharEx.szFontName,"Arial");
+				  LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),data_sep(data_oggi(),lpLRInit->lpDate),0);
+			  }
+
+			  // PAGINA: Scrivo il numero di pagina
+			  if (lpLRInit->fPag)
+			  {
+				  memset(&LRTCharEx,0,sizeof(LRTCharEx));
+				  LRTCharEx.Point.x=lpLRInit->rPage.right;
+				  LRTCharEx.Point.y=lpLRInit->rPage.top;
+				  LRTCharEx.xAllinea=LR_RIGHT;
+				  LRTCharEx.yChar=LocInchToDotY(40);
+				  LRTCharEx.fFix=FALSE;
+				  strcpy(LRTCharEx.szFontName,"Tahoma");
+				  LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),GiveLayPag(),0);
+			  }
+			  
+			  // TITOLO : Scrivo il titolo centrato
+			  if (lpLRInit->lpTitolo)
+			  {
+				  memset(&LRTCharEx,0,sizeof(LRTCharEx));
+				  LRTCharEx.Point.x=lpLRInit->rPage.left+lpLRInit->sPage.cx/2;
+				  LRTCharEx.Point.y=lpLRInit->rPage.top;
+				  LRTCharEx.xAllinea=LR_CENTER;
+				  LRTCharEx.yChar=LocInchToDotY(60);
+				  //LRTCharEx.fBold=TRUE;
+				  LRTCharEx.iStyles=STYLE_BOLD;
+				  LRTCharEx.fFix=FALSE;
+				  strcpy(LRTCharEx.szFontName,"Tahoma");
+				  LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),lpLRInit->lpTitolo,0);
+			  }
+
+			  // SOTTOTITOLO : Scrivo il sotto titolo centrato
+			  if (lpLRInit->lpSottoTitolo)
+			  {
+				  memset(&LRTCharEx,0,sizeof(LRTCharEx));
+				  LRTCharEx.Point.x=lpLRInit->rPage.left+(lpLRInit->sPage.cx>>1);
+				  LRTCharEx.Point.y=lpLRInit->rPage.top+LocInchToDotY(55);
+				  LRTCharEx.xAllinea=LR_CENTER;
+				  LRTCharEx.yChar=LocInchToDotY(40);
+				  //LRTCharEx.fBold=TRUE;
+				  LRTCharEx.iStyles=STYLE_ITALIC;
+//				  LRTCharEx.fItalic=TRUE;
+				  LRTCharEx.fFix=FALSE;
+				  strcpy(LRTCharEx.szFontName,"Tahoma");
+				  LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),lpLRInit->lpSottoTitolo,0);
+			  }
+				
+			  //---------------------------------------------------
+			  // Scrivo l'intestazione dei campi in stampa
+			  //---------------------------------------------------
+//			  yTitle=(lpLRInit->yBodyTop-lpLRInit->ySectDot+1);
+			  
+			  // Posizione di inizio del titolo
+			  lpLRInit->yHeadBottom=(lpLRInit->yBodyTop-(lpLRInit->rFieldPadding.top+lpLRInit->rFieldPadding.bottom)-lpLRInit->iTitleHeight);
+			  for (a=0;a<lpLRInit->iFieldNum;a++)
+			  {
+  				 if (*lpLRInit->LRFields[a]->szTitolo)
+				 {
+				  // Sfondo
+				  memset(&LRTBox,0,sizeof(LRTBox));
+				  LRTBox.rRect.left=lpLRInit->LRFields[a]->xPosStartDot;
+			      LRTBox.rRect.right=lpLRInit->LRFields[a]->xPosEndDot;
+				  LRTBox.rRect.top=lpLRInit->yHeadBottom;//(yTitle+lpLRInit->LRFields[a]->iLine*lpLRInit->iTitleHeight);
+				  LRTBox.rRect.bottom=lpLRInit->yBodyTop-1;//LRTBox.rRect.top+lpLRInit->yChar-1;
+
+			      LRTBox.Colore=lpLRInit->LRFields[a]->lColTitBack;
+				  LREAddItem(LRE_BOXP,&LRTBox,sizeof(LRTBox),0,0);
+
+				  LRTBox.Colore=lpLRInit->LRFields[a]->lColChar;
+				  LREAddItem(LRE_BOX,&LRTBox,sizeof(LRTBox),0,0);
+
+				  // Scritta
+				  memset(&LRTChar,0,sizeof(LRTChar));
+				  switch (lpLRInit->LRFields[a]->iAllineaTitolo)
+				  {
+					case LR_LEFT : LRTChar.Point.x=lpLRInit->LRFields[a]->xPosStartDot+lpLRInit->LRFields[a]->rPadding.left;//LocInchToDotX(4); 
+								   LRTChar.xAllinea=LR_LEFT;				   
+								   break;
+
+					case LR_RIGHT: LRTChar.Point.x=lpLRInit->LRFields[a]->xPosEndDot-lpLRInit->LRFields[a]->rPadding.right;//-LocInchToDotX(2); 
+								   LRTChar.xAllinea=LR_RIGHT;				   
+								   break;
+				
+					case LR_CENTER:LRTChar.Point.x=lpLRInit->LRFields[a]->xPosStartDot+((lpLRInit->LRFields[a]->xPosEndDot-lpLRInit->LRFields[a]->xPosStartDot)>>1); 
+								   LRTChar.xAllinea=LR_CENTER;				   
+								   break;
+				  }
+				 
+				  LRTChar.Point.y=lpLRInit->yHeadBottom+lpLRInit->LRFields[a]->rPadding.top;//+LRTBox.rRect.top+((lpLRInit->ySectDot-lpLRInit->iTitleHeight)>>1);
+				  LRTChar.yChar=lpLRInit->iTitleHeight;
+				  //LRTChar.fBold=TRUE;
+				  LRTChar.iStyles=STYLE_BOLD;
+				  LRTChar.fFix=FALSE;
+				  LRTChar.lColore=lpLRInit->LRFields[a]->lColTitChar;
+				  LREAddItem(LRE_CHAR,&LRTChar,sizeof(LRTChar),lpLRInit->LRFields[a]->szTitolo,0);
+
+				 }
+			}
+			break;
+
+		case LR_LAYTYPE1:
+
+			// -------------------------------------------------------
+			// LayOut Tipo 1 : Nuovo Tipo
+			// -------------------------------------------------------
+			// DATA: Scrivo la data di oggi in alto a destra
+			// -------------------------------------------------------
+			  if (lpLRInit->fDate)
+			  {
+				  memset(&LRTCharEx,0,sizeof(LRTCharEx));
+				  LRTCharEx.Point.x=lpLRInit->rPage.right;
+				  LRTCharEx.Point.y=lpLRInit->rPage.top;
+				  LRTCharEx.xAllinea=LR_RIGHT;
+				  LRTCharEx.yChar=LocInchToDotY(50);
+				  LRTCharEx.fFix=FALSE;
+				  strcpy(LRTCharEx.szFontName,"Arial");
+				  LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),data_sep(data_oggi(),lpLRInit->lpDate),0);
+			  }
+
+			  // PAGINA: Scrivo il numero di pagina
+			  if (lpLRInit->fPag)
+			  {
+				  memset(&LRTCharEx,0,sizeof(LRTCharEx));
+				  LRTCharEx.Point.x=lpLRInit->rPage.right;
+				  LRTCharEx.Point.y=lpLRInit->rPage.bottom-LocInchToDotY(40);
+				  LRTCharEx.xAllinea=LR_RIGHT;
+				  LRTCharEx.yChar=LocInchToDotY(40);
+				  LRTCharEx.fFix=FALSE;
+				  strcpy(LRTCharEx.szFontName,"Tahoma");
+				  LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),GiveLayPag(),0);
+			  }
+			  
+			  // TITOLO : Scrivo il titolo centrato
+			  if (lpLRInit->lpTitolo)
+			  {
+				  memset(&LRTCharEx,0,sizeof(LRTCharEx));
+				  LRTCharEx.Point.x=lpLRInit->rPage.left;
+				  LRTCharEx.Point.y=lpLRInit->rPage.top;
+				  LRTCharEx.xAllinea=LR_LEFT;
+				  LRTCharEx.yChar=LocInchToDotY(70);
+//				  LRTCharEx.fFix=FALSE;
+				  strcpy(LRTCharEx.szFontName,"Tahoma");
+				  LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),lpLRInit->lpTitolo,0);
+			  }
+
+			  // SOTTOTITOLO : Scrivo il sotto titolo centrato
+			  if (lpLRInit->lpSottoTitolo)
+			  {
+				  memset(&LRTCharEx,0,sizeof(LRTCharEx));
+				  LRTCharEx.Point.x=lpLRInit->rPage.left;
+				  LRTCharEx.Point.y=lpLRInit->rPage.top+LocInchToDotY(60);
+				  LRTCharEx.xAllinea=LR_LEFT;
+				  LRTCharEx.yChar=LocInchToDotY(40);
+				  //LRTCharEx.fBold=TRUE;
+				  LRTCharEx.iStyles=STYLE_ITALIC;
+//				  LRTCharEx.fItalic=TRUE;
+				  LRTCharEx.fFix=FALSE;
+				  strcpy(LRTCharEx.szFontName,"Tahoma");
+				  LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),lpLRInit->lpSottoTitolo,0);
+			  }
+			  
+			  //---------------------------------------------------
+			  // Tiro una linea di divisione
+			  //---------------------------------------------------
+			  lpLRInit->yHeadBottom=(lpLRInit->yBodyTop-(lpLRInit->iLinePerRiga*lpLRInit->iTitleHeight)+1)-(lpLRInit->rFieldPadding.bottom+lpLRInit->rFieldPadding.top); //lpLRInit->ySectDot
+
+			  memset(&LRTBox,0,sizeof(LRTBox));
+			  LRTBox.rRect.left=lpLRInit->rPage.left;
+			  LRTBox.rRect.right=lpLRInit->rPage.right;
+			  LRTBox.rRect.top=lpLRInit->yHeadBottom-LocInchToDotY(6);
+			  LRTBox.rRect.bottom=lpLRInit->yHeadBottom;
+			  LRTBox.Colore=lpLRInit->LRFields[0]->lColChar;
+			  LREAddItem(LRE_BOXP,&LRTBox,sizeof(LRTBox),0,0);
+				
+			  memset(&LRTBox,0,sizeof(LRTBox));
+			  LRTBox.rRect.left=lpLRInit->rPage.left;
+			  LRTBox.rRect.right=lpLRInit->rPage.right;
+			  LRTBox.rRect.top=lpLRInit->yBodyTop-LocInchToDotY(3);
+			  LRTBox.rRect.bottom=lpLRInit->yBodyTop;
+			  LRTBox.Colore=lpLRInit->LRFields[0]->lColChar;
+			  LREAddItem(LRE_BOXP,&LRTBox,sizeof(LRTBox),0,0);
+
+			  LRTBox.rRect.top=lpLRInit->yBodyBottom-LocInchToDotY(3);
+			  LRTBox.rRect.bottom=lpLRInit->yBodyBottom;
+			  LREAddItem(LRE_BOXP,&LRTBox,sizeof(LRTBox),0,0);
+
+			  //---------------------------------------------------
+			  // Scrivo l'intestazione dei campi in stampa
+			  //---------------------------------------------------
+			  for (a=0;a<lpLRInit->iFieldNum;a++)
+			  {
+  				 if (*lpLRInit->LRFields[a]->szTitolo)
+				 {
+				  // Sfondo
+				  memset(&LRTBox,0,sizeof(LRTBox));
+			      LRTBox.rRect.left=lpLRInit->LRFields[a]->xPosStartDot;
+			      LRTBox.rRect.right=lpLRInit->LRFields[a]->xPosEndDot;
+			      LRTBox.rRect.top=lpLRInit->yHeadBottom;//+lpLRInit->LRFields[a]->iLine*lpLRInit->yChar;
+				  LRTBox.rRect.bottom=lpLRInit->yBodyTop-1;
+			      LRTBox.Colore=lpLRInit->LRFields[a]->lColTitBack;
+				  //LREAddItem(LRE_BOXP,&LRTBox,sizeof(LRTBox),0,0);
+
+				  //LRTBox.Colore=lpLRInit->LRFields[a]->lColChar;
+				  //LREAddItem(LRE_BOX,&LRTBox,sizeof(LRTBox),0,0);
+
+				  // Scritta
+				  memset(&LRTChar,0,sizeof(LRTChar));
+				  switch (lpLRInit->LRFields[a]->iAllineaTitolo)
+				  {
+					case LR_LEFT : LRTChar.Point.x=lpLRInit->LRFields[a]->xPosStartDot+lpLRInit->LRFields[a]->rPadding.left;//LocInchToDotY(4); 
+								   LRTChar.xAllinea=LR_LEFT;				   
+								   break;
+
+					case LR_RIGHT: LRTChar.Point.x=lpLRInit->LRFields[a]->xPosEndDot-lpLRInit->LRFields[a]->rPadding.right;//-LocInchToDotY(2); 
+								   LRTChar.xAllinea=LR_RIGHT;				   
+								   break;
+				
+					case LR_CENTER:LRTChar.Point.x=lpLRInit->LRFields[a]->xPosStartDot+((lpLRInit->LRFields[a]->xPosEndDot-lpLRInit->LRFields[a]->xPosStartDot)>>1); 
+								   LRTChar.xAllinea=LR_CENTER;				   
+								   break;
+				  }
+				 
+				  LRTChar.Point.y=lpLRInit->yHeadBottom+lpLRInit->LRFields[a]->rPadding.top;//LRTBox.rRect.top+((lpLRInit->ySectDot-lpLRInit->iTitleHeight)>>1);
+				  LRTChar.yChar=lpLRInit->iTitleHeight;
+//				  LRTChar.fBold=TRUE;
+				  LRTChar.iStyles=STYLE_BOLD;
+				  LRTChar.fFix=FALSE;
+//				  LRTChar.lColore=lpLRInit->LRFields[a]->lColTitChar;
+				  LRTChar.lColore=lpLRInit->LRFields[a]->lColChar;
+				  LREAddItem(LRE_CHAR,&LRTChar,sizeof(LRTChar),lpLRInit->LRFields[a]->szTitolo,0);
+				 }
+			}
+			break;
+	}
+
+	// Se esite solo una linea di stampa 
+	// Ed è abilitata 
+	// creo la divisione delle righe
+	if (lpLRInit->iLinePerRiga==1)
+	{
+		for (a=0;a<lpLRInit->iFieldNum;a++)
+		{
+			memset(&LRTBox,0,sizeof(LRTBox));
+			LRTBox.rRect.left=lpLRInit->LRFields[a]->xPosStartDot;
+			LRTBox.rRect.right=lpLRInit->LRFields[a]->xPosEndDot;
+			LRTBox.rRect.top=lpLRInit->yBodyTop;
+			LRTBox.rRect.bottom=lpLRInit->yBodyBottom;
+			       
+			// Colore di sfondo
+			if (lpLRInit->LRFields[a]->lColBack!=-1) 
+				   {   
+					   LRTBox.Colore=lpLRInit->LRFields[a]->lColBack;
+					   LREAddItem(LRE_BOXP,&LRTBox,sizeof(LRTBox),0,0);
+				   }
+	
+			if (lpLRInit->fLineVertField)
+			{
+				//LRTBox.Colore=lpLRInit->LRFields[a]->lColChar;
+				if (!a)
+				{
+					LRLine( LRTBox.rRect.left,
+							LRTBox.rRect.top,
+							LRTBox.rRect.left,
+							LRTBox.rRect.bottom,
+							lpLRInit->LRFields[a]->lColChar,
+							1,
+							PS_SOLID,
+							SET);
+				}
+				LRLine( LRTBox.rRect.right,
+						LRTBox.rRect.top,
+						LRTBox.rRect.right,
+						LRTBox.rRect.bottom,
+						lpLRInit->LRFields[a]->lColChar,
+						1,
+						PS_SOLID,
+						SET);
+
+				//LREAddItem(LRE_BOX,&LRTBox,sizeof(LRTBox),0,0);
+			}
+		}
+	}
+}
+
+// ------------------------------------------
+// | CREA6 Builder  by Ferrà A&T 10/08/1999 |
+// ------------------------------------------+
+static SINT MyWin=-1;
+
+#ifndef _CONSOLE			
+static void WinStart(void)
+{
+// Creato dal progetto : Nuovo.vpg 
+
+  static struct IPT ipt[]={
+	{ 1, 1,NUME,RIGA,105, 42, 37,  4,  0, 15,  0,  1,"No","No"},
+	{ 0, 0,STOP}
+	};
+
+//  Header di attivazione
+	JOBBER; // Riconoscimento programma
+	win_open(EHWP_SCREENCENTER,42,160,75,-1,3,ON,"Attendere ...");
+	MyWin=WIN_ult;
+	ico_disp(13,32,"STAMPA");
+	dispf(63,39,0,-1,0,"SMALL F",3,"Pagina");
+
+//  Carico OBJ & variazioni sui Font
+	ipt_font("SMALL F",3);
+	ipt_open(ipt);
+	//ipt_fontnum(0,"SMALL F",3);
+	ipt_reset(); ipt_vedi();
+	mouse_inp();
+}
+#endif
+void *PowerPrinter(SINT cmd,LONG info,void *ptr)
+{
+	LRFIELDS *lpLRField;
+//	LRFIELD LRField;
+	SINT a;
+	LONG l;
+	SINT iAuto=0;
+	double dTotPerc=0;
+	CHAR Buf[80];
+	SINT iFieldPerRiga;
+//    SINT yTitle;
+
+//	LRT_CHAREX LRTCharEx;
+	LRT_CHAR    LRTChar;
+	LRT_CHARBOX LRTCharBox;
+	LRT_BOX     LRTBox;
+
+	double Valore;
+	CHAR *lp;
+	CHAR *lpText;
+#ifndef _CONSOLE
+	WINSCENA WScena;
+#endif
+	LRT_LINK sLRALink;
+
+	switch (cmd)
+	{
+	//-----------------------------------------------------------------------
+	//	WS_OPEN                         		                            |
+	//											                            |
+	//	Apertura del server di Stampa report                                |
+	//  info=0                                                              |
+	//  ptr= * LRINIT (Inizializzazione dei parametri)                      |
+	//                                                                      |
+	//-----------------------------------------------------------------------
+		case WS_OPEN: // Inizializzazione del report
+			
+			LREFlushBuffer(FALSE);
+			if (lpLRInit!=NULL) PowerPrinter(WS_CLOSE,FALSE,NULL);
+			lpLRInit=(LRINIT *) ptr;
+
+			// Inizializzo il resto della struttura
+			lpLRInit->iPageCount=0;
+			lpLRInit->bBold=FALSE;
+			lpLRInit->bItalic=FALSE;
+			lpLRInit->bUnderLine=FALSE;
+			fArray=FALSE; LRHdl=-1;
+
+			// Apro un'array di LRField
+			if (lpLRInit->iLayStyle!=LR_PAGEFREE)
+			{
+			 a=sizeof(LRFIELDS);
+			 ARMaker(WS_OPEN,&a);
+			 fArray=TRUE; 
+			}
+			
+			lpLRInit->iFieldNum=0;
+			GetTempPath(sizeof(szTempPath),szTempPath);
+			GetTempFileName(szTempPath,"LREP",0,szTempFile);
+			if (f_open(szTempFile,"wb",&chTempFile)) PRG_end("LR1");
+
+			lpLRInit->iLinePerRiga=0; // Azzero il numero di linee per riga (gestione multi riga)
+			lpLRInit->iRowsSize=0;
+			if (lpLRInit->HookSubProc!=NULL)
+				{
+					(*lpLRInit->HookSubProc)(WS_OPEN,0,NULL);
+				}
+
+#ifndef _CONSOLE			
+			WinStart();
+#endif
+			break;
+
+	//-----------------------------------------------------------------------
+	//	WS_CLOSE                        		                            |
+	//											                            |
+	//	Chiusura del server di Stampa report                                |
+	//  info=FALSE non stampare (abort)                                     |
+	//		 TRUE  stampa il rapport                                        |
+	//											                            |
+	//	ptr = NULL stampa diretta                                           |
+	//  ptr = !=NULL  Preview della stampa                                  |
+	//                                                                      |
+	//-----------------------------------------------------------------------
+		case WS_CLOSE: // Stampa/Preview del report
+
+			// Ho una pagina in sospeso (chiudo la pagina)
+			if (lpLRInit->bPageInProgress)
+			{
+				ZeroFill(sLRALink);
+				sLRALink.iType=LRA_FOOT;
+				sLRALink.bLastPage=TRUE;
+				sLRALink.rRect.left=lpLRInit->rPage.left;
+				sLRALink.rRect.top=lpLRInit->yBodyBottom;//>rPage.bottom-lpLRInit->yCueDot;
+				sLRALink.rRect.right=lpLRInit->rPage.right;
+				sLRALink.rRect.bottom=lpLRInit->rPage.bottom;
+				(*lpLRInit->HookSubProc)(WS_DO,0,&sLRALink);
+				lpLRInit->bPageInProgress=FALSE;
+			}
+
+#ifndef _CONSOLE			
+			win_close();
+#endif
+			// Chiudo il file
+			LREAddItem(LRE_ENDFILE,NULL,0,NULL,0);
+			f_close(chTempFile); 
+
+			LRETagReplace();
+
+#ifndef _CONSOLE			
+			if (info) // stampare
+			{
+			  if (ptr!=NULL) 
+					LREPreview((CHAR *) ptr);	
+					else
+					LREPrintDirect((CHAR *) ptr);
+			}
+#else
+			LREPrintDirect((CHAR *) ptr);
+#endif
+			if (lpLRInit->HookSubProc!=NULL)
+			{
+				(*lpLRInit->HookSubProc)(WS_CLOSE,0,NULL);
+			}
+
+			remove(szTempFile);
+			if (fArray) LRHdl=ARMaker(WS_CLOSE,"*LRFields");
+			if (LRHdl!=-1) memo_libera(LRHdl,"*LRFields");
+			fArray=FALSE; LRHdl=-1;
+			lpLRInit->LRFields=NULL;
+			lpLRInit=NULL;
+			break;
+	
+	//-----------------------------------------------------------------------
+	//	WS_SETFLAG                      		                            |
+	//											                            |
+	//	Inizializzo la struttura LRFIELD con i dati di default              |
+	//  ptr= * LRFIELD                                                      |
+	//                                                                      |
+	//-----------------------------------------------------------------------
+
+		case WS_SETFLAG:
+			
+			if (ptr==NULL) PRG_end("LR2");
+			lpLRField=(LRFIELDS *) ptr;
+			memset(lpLRField,0,sizeof(LRFIELDS));
+			lpLRField->iRowsSize=1; // Altezza di default
+			switch (info)
+			{
+				case ALFA:
+
+					lpLRField->fFix=FALSE;
+					lpLRField->iAllinea=LR_LEFT;
+					lpLRField->iTipo=ALFA;
+					lpLRField->iAllineaTitolo=LR_LEFT;
+					break;
+
+				case NUME:
+
+					lpLRField->fFix=TRUE;
+					lpLRField->iAllinea=LR_RIGHT;
+					lpLRField->iTipo=NUME;
+					lpLRField->iAllineaTitolo=LR_RIGHT;
+					break;
+			}
+
+			lpLRField->lColTitChar=ColorGray(0);
+			lpLRField->lColTitBack=ColorGray(60);
+			lpLRField->lColBack=-1;
+			lpLRField->lColChar=0;
+			break;
+
+	//-----------------------------------------------------------------------
+	//	WS_ADD                          		                            |
+	//											                            |
+	//	Aggiunge un definizione di un campo                                 |
+	//  ptr= * LRFIELD                                                      |
+	//                                                                      |
+	//-----------------------------------------------------------------------
+		case WS_ADD:
+			switch (info)
+			{
+				// Aggiunga la definizione di un campo
+				case LR_ADDFIELD: 
+					if (ptr==NULL) PRG_end("LR5");
+					lpLRField=(LRFIELDS *) ptr;
+					// Controlla il numero di linee
+					if (lpLRField->iLine>lpLRInit->iLinePerRiga) lpLRInit->iLinePerRiga=lpLRField->iLine;
+					// Controlla il numero di "rows" per linea
+					if (lpLRField->iRowsSize!=LR_ROWSDYNAMIC) 
+					{
+					 if ((lpLRField->iLine+lpLRField->iRowsSize)>lpLRInit->iRowsSize) 
+						lpLRInit->iRowsSize=lpLRField->iLine+lpLRField->iRowsSize;
+					}
+					else
+					{
+						lpLRInit->bRowsDynamic=TRUE; // Segnalo che sono presenti linee dinamiche
+					}
+
+					ARMaker(WS_ADD,ptr);
+					break;
+
+				case LR_ADDPAGE:
+
+					if (lpLRInit->bPageInProgress)
+					{
+					   ZeroFill(sLRALink);
+					   sLRALink.iType=LRA_FOOT;
+					   sLRALink.rRect.left=lpLRInit->rPage.left;
+					   sLRALink.rRect.top=lpLRInit->yBodyBottom;
+					   sLRALink.rRect.right=lpLRInit->rPage.right;
+					   sLRALink.rRect.bottom=lpLRInit->rPage.bottom;
+					   (*lpLRInit->HookSubProc)(WS_DO,0,&sLRALink);
+					   lpLRInit->bPageInProgress=FALSE;
+					}
+
+					lpLRInit->iVirtualLineCount=0;
+					lpLRInit->iRowOffset=lpLRInit->yBodyTop;
+					lpLRInit->iPageCount++; 
+#ifndef _CONSOLE
+					WinWriteSet(MyWin,&WScena);
+					ipt_writevedi(0,"",lpLRInit->iPageCount);
+					WinWriteRestore(&WScena);
+#endif
+					LptReportLayout();
+
+					// Se esiste un HookSubProc segnalo il cambio di pagina
+					if (lpLRInit->HookSubProc!=NULL)
+					{
+			   
+						ZeroFill(sLRALink);
+						sLRALink.iType=LRA_HEAD;
+						sLRALink.rRect.left=lpLRInit->rPage.left;
+						sLRALink.rRect.top=lpLRInit->rPage.top;
+						sLRALink.rRect.right=lpLRInit->rPage.right;
+						sLRALink.rRect.bottom=lpLRInit->yHeadBottom;
+						(*lpLRInit->HookSubProc)(WS_DO,0,&sLRALink);
+						lpLRInit->bPageInProgress=TRUE;
+
+/*			   
+						ZeroFill(LRALink);
+						LRALink.iType=LRA_CUE;
+						LRALink.rRect.left=lpLRInit->rPage.left;
+						LRALink.rRect.top=lpLRInit->yBodyBottom;
+						LRALink.rRect.right=lpLRInit->rPage.right;
+						LRALink.rRect.bottom=lpLRInit->rPage.bottom;
+						(*lpLRInit->HookSubProc)(WS_DO,0,&LRALink);
+						*/
+
+					}
+			}
+			break;
+
+	//-----------------------------------------------------------------------
+	//	WS_DO                           		                            |
+	//											                            |
+	//	Prima elaborazione e definizione array                              |
+	//											                            |
+	//	Chiudo l'array di definizione campi                                 |
+	//  Nessun parametro                                                    |
+	//-----------------------------------------------------------------------
+		
+		case WS_DO:
+		
+			if (lpLRInit->iLayStyle!=LR_PAGEFREE) 
+			{
+				if (!fArray) PRG_end("LR6"); 
+				fArray=FALSE;
+				LRHdl=ARMaker(WS_CLOSE,"*LRFields");
+				lpLRInit->LRFields=memo_heap(LRHdl);
+				// Conto i campi 
+				for (a=0;;a++)
+				{
+				if (lpLRInit->LRFields[a]==NULL) break;
+				//win_infoarg("%d) [%s]",a,lpLRInit->LRFields[a]->szTitolo);
+				}
+			 lpLRInit->iFieldNum=a;
+			} else lpLRInit->LRFields=NULL;
+			
+
+			// -------------------------------------------------------------------------
+			// Leggo e calcolo i dati metrici del foglio di stampa
+			// -------------------------------------------------------------------------
+			lpLRInit->iLinePerRiga++;
+
+			lpLRInit->sPhysicalPage.cx=GetDeviceCaps(sys.pd.hDC,PHYSICALWIDTH);
+			lpLRInit->sPaper.cx=GetDeviceCaps(sys.pd.hDC,HORZRES);
+			lpLRInit->sPhysicalPage.cy=GetDeviceCaps(sys.pd.hDC,PHYSICALHEIGHT);
+			lpLRInit->sPaper.cy=GetDeviceCaps(sys.pd.hDC,VERTRES);
+			/*
+			{
+				DEVMODE *lpDevMode;
+				lpDevMode=GlobalLock(sys.pd.hDevMode);
+				win_infoarg("%s\n[%d,%d] [%d,%d]",
+						    lpDevMode->dmDeviceName,
+							lpLRInit->sPaper.cx,lpLRInit->sPaper.cy,
+							GetDeviceCaps(sys.pd.hDC,HORZRES),
+							(SINT) lpDevMode->dmPaperLength);
+				GlobalUnlock(sys.pd.hDevMode);
+			}
+*/
+						
+			lpLRInit->xInchDot=GetDeviceCaps(sys.pd.hDC,LOGPIXELSX);
+			lpLRInit->yInchDot=GetDeviceCaps(sys.pd.hDC,LOGPIXELSY);
+
+			// Dovrei settarlo in modo parametrico
+			// Field Margin
+			lpLRInit->rFieldPadding.left=LocInchToDotX(8);
+			lpLRInit->rFieldPadding.right=LocInchToDotX(8); // LocInchToDotX(2);
+			lpLRInit->rFieldPadding.top=LocInchToDotY(8);
+			lpLRInit->rFieldPadding.bottom=LocInchToDotY(8);
+			
+			lpLRInit->iRowHeight=LocInchToDotY(lpLRInit->ptRowHeight);
+//			lpLRInit->ySectDot=lpLRInit->iRowsSize*lpLRInit->yChar;
+
+			lpLRInit->iTitlePadded=(lpLRInit->iRowsSize*lpLRInit->iTitleHeight)+(lpLRInit->rFieldPadding.top+lpLRInit->rFieldPadding.bottom);
+			lpLRInit->iRowPadded=(lpLRInit->iRowsSize*lpLRInit->iRowHeight)+(lpLRInit->rFieldPadding.top+lpLRInit->rFieldPadding.bottom);
+
+			// Tolgo i margini e calcolo le dimensioni possibili della pagina
+
+			lpLRInit->rPage.left=LocInchToDotX(lpLRInit->rMargin.left);
+			lpLRInit->rPage.right=(lpLRInit->sPaper.cx-1)-LocInchToDotX(lpLRInit->rMargin.right);
+			lpLRInit->rPage.top=LocInchToDotY(lpLRInit->rMargin.top);
+			lpLRInit->rPage.bottom=(lpLRInit->sPaper.cy-1)-LocInchToDotY(lpLRInit->rMargin.bottom);
+			lpLRInit->sPage.cx=lpLRInit->rPage.right-lpLRInit->rPage.left+1;
+			lpLRInit->sPage.cy=lpLRInit->rPage.bottom-lpLRInit->rPage.top+1;
+			
+			lpLRInit->iTitleHeight=LocInchToDotY(lpLRInit->ptTitleHeight);
+			
+			if (lpLRInit->ptHeadHeight==0)  
+				{
+					switch (lpLRInit->iLayStyle)
+					{
+						case 0:
+						case 1: lpLRInit->yBodyTop=LocInchToDotY(110)+lpLRInit->iTitlePadded; break;
+						case 2: lpLRInit->yBodyTop=LocInchToDotY(140)+lpLRInit->iTitlePadded; break;
+					}
+				}
+				else 
+				lpLRInit->yBodyTop=LocInchToDotY(lpLRInit->ptHeadHeight);//(LONG) (lpLRInit->sPage.cy*lpLRInit->fHeadPerc)/100;
+
+			if (lpLRInit->ptFootHeight==0)   
+				{
+					switch (lpLRInit->iLayStyle)
+					{
+						case 0:
+						case 1: lpLRInit->yFootHeight=LocInchToDotY(1); break;
+						case 2: lpLRInit->yFootHeight=LocInchToDotY(60); break;
+					}
+				}
+				else 
+				lpLRInit->yFootHeight=LocInchToDotY(lpLRInit->ptFootHeight);//lpLRInit->yCueDot=(LONG) (lpLRInit->sPage.cy*lpLRInit->fCuePerc)/100;
+			
+			lpLRInit->yBodyHeight=lpLRInit->sPage.cy-(lpLRInit->yBodyTop+lpLRInit->yFootHeight);
+			
+			lpLRInit->yBodyTop+=lpLRInit->rPage.top;
+//			lpLRInit->yCueDot=lpLRInit->rPage.bottom-lpLRInit->yCueDot;
+			lpLRInit->yBodyBottom=lpLRInit->rPage.bottom-lpLRInit->yFootHeight;
+			
+//			lpLRInit->iRowHeightReal=LocInchToDotY(lpLRInit->iRowHeight)+lpLRInit->rFieldPadding.top+lpLRInit->rFieldPadding.bottom;
+//			lpLRInit->iTitleHeightReal=LocInchToDotY(lpLRInit->iTitleHeight)+lpLRInit->rFieldPadding.top+lpLRInit->rFieldPadding.bottom;
+
+			lpLRInit->iVirtualLinePerPage=0; // Azzero il numero di linee per pagina
+			lpLRInit->iVirtualLineCount=0;  // Azzero il contatorei di linee per pagina
+			lpLRInit->iRowOffset=lpLRInit->yBodyTop;
+
+			// -------------------------------------------------------------------------
+			// Trasformo le dimensioni dei campi in percentuali in dimensioni fisiche
+			// Calcolo quante linee ci stanno nell'area tolta la testa e la coda
+			// -------------------------------------------------------------------------
+			if (lpLRInit->iRowPadded) lpLRInit->iVirtualLinePerPage=(LONG) lpLRInit->yBodyHeight/lpLRInit->iRowPadded;
+			lpLRInit->iVirtualLineCount=lpLRInit->iVirtualLinePerPage; // Per stampare la prima pagina
+			
+			// Se la stampa è senza campi, cioe PAGEFREE mi fermo quà
+			if (lpLRInit->LRFields==NULL) break;
+
+			for (l=0;l<lpLRInit->iLinePerRiga;l++)
+			{
+			 // -------------------------------------------------------------------------------------------
+			 // A) Calcolo il totale delle percentuali stabilite e conti i campi per linea (colonne)
+		     // -------------------------------------------------------------------------------------------
+			 iFieldPerRiga=0; iAuto=0; dTotPerc=0;
+			 for (a=0;a<lpLRInit->iFieldNum;a++)
+			 {
+				if (lpLRInit->LRFields[a]->iLine!=l) continue;
+				if (lpLRInit->LRFields[a]->xPercSize<.01F) 
+						{iAuto++; lpLRInit->LRFields[a]->xPercSize=0;} else {dTotPerc+=lpLRInit->LRFields[a]->xPercSize;}
+				iFieldPerRiga++;
+			 }
+			 if (!iFieldPerRiga) break; // Finito
+			 
+			 // Calcolo i campi per riga
+			 lpLRInit->iFieldPerRiga[l]=iFieldPerRiga;
+			
+		     // -------------------------------------------------------------------------------------------
+			 // B) Sistemo le percentuali per i campi non stabiliti                                     
+		     // -------------------------------------------------------------------------------------------
+			 dTotPerc=100-dTotPerc;
+			 if (iAuto&&(dTotPerc>0))
+			 {
+				for (a=0;a<lpLRInit->iFieldNum;a++)
+				{
+					if (lpLRInit->LRFields[a]->iLine!=l) continue;
+					if (lpLRInit->LRFields[a]->xPercSize==0) lpLRInit->LRFields[a]->xPercSize=dTotPerc/iAuto;
+				}
+			 }
+
+			 // -------------------------------------------------------------------------------------------
+			 // C) Calcolo le percentuali di posizione e la grandezza fisica dei campi                  
+		     // -------------------------------------------------------------------------------------------
+			 dTotPerc=0;
+			 for (a=0;a<lpLRInit->iFieldNum;a++)
+			 {
+				if (lpLRInit->LRFields[a]->iLine!=l) continue;
+				lpLRInit->LRFields[a]->xPercPos=dTotPerc;
+				dTotPerc+=lpLRInit->LRFields[a]->xPercSize;
+
+				// Se non indicato diversamente, setto il patting del campo uguale a quello di default della tabella
+				if (!lpLRInit->LRFields[a]->bPadding) memcpy(&lpLRInit->LRFields[a]->rPadding,&lpLRInit->rFieldPadding,sizeof(RECT));
+
+				// Grandezza Fisica
+				// x:lpLRInit->xPageDot=Perc:100;				
+				lpLRInit->LRFields[a]->xPosStartDot   =lpLRInit->rPage.left+ (LONG) (lpLRInit->sPage.cx*lpLRInit->LRFields[a]->xPercPos/100);
+				lpLRInit->LRFields[a]->xPosEndDot     =lpLRInit->rPage.left+ (LONG) (lpLRInit->sPage.cx*dTotPerc/100);
+				if (lpLRInit->LRFields[a]->xPosEndDot>lpLRInit->rPage.right) lpLRInit->LRFields[a]->xPosEndDot=lpLRInit->rPage.right;
+			    /*
+				win_infoarg("Assegno: %.2f , %.2f   -   %d,%d",
+					        lpLRInit->LRFields[a]->xPercPos,dTotPerc,
+							lpLRInit->LRFields[a]->xPosStartDot,
+							lpLRInit->LRFields[a]->xPosEndDot);
+							*/
+			 }
+			}
+
+			break;
+	
+	//-----------------------------------------------------------------------
+	//	WS_LINK                         		                            |
+	//											                            |
+	//	Start passaggio campi della RIGA                                    |
+	//  info  Long di riferimento alla linea: usato per la PostPaint()      |
+	//	ptr   (non usato)					                                |
+	//											                            |
+	//-----------------------------------------------------------------------
+
+		case WS_LINK:
+			
+			// ----------------------------------
+			// Cambio di Pagina
+			// Intestazione Pagina
+			// ----------------------------------
+			//win_infoarg("%d - %d",lpLRInit->iLineCount,lpLRInit->iLinePerRiga);
+
+			//
+			// Dovrebbe essere
+			// Se la dimensione della nuova linea non sta nella pagina dovrei creare una pagina nuova
+			// Per fare questo dovrei prima memorizzarmi la fine della linea per determinare
+			// l'altezza dinamica e poi quindi determinare se ci sta all'interno dell'area del corpo
+			//
+//			win_infoarg("%d,%d",lpLRInit->iVirtualLineCount,lpLRInit->iVirtualLinePerPage);
+			if (lpLRInit->iVirtualLineCount>=lpLRInit->iVirtualLinePerPage) 
+			{
+			//
+			// Ho una pagina in sospeso (chiudo la pagina)
+			//
+			  if (lpLRInit->bPageInProgress)
+			  {
+				   ZeroFill(sLRALink);
+				   sLRALink.iType=LRA_FOOT;
+				   sLRALink.rRect.left=lpLRInit->rPage.left;
+				   sLRALink.rRect.top=lpLRInit->yBodyBottom;//>rPage.bottom-lpLRInit->yCueDot;
+				   sLRALink.rRect.right=lpLRInit->rPage.right;
+				   sLRALink.rRect.bottom=lpLRInit->rPage.bottom;
+				   (*lpLRInit->HookSubProc)(WS_DO,0,&sLRALink);
+				   lpLRInit->bPageInProgress=FALSE;
+			  }
+
+			  lpLRInit->iVirtualLineCount=0;
+			  lpLRInit->iRowOffset=lpLRInit->yBodyTop;
+			  lpLRInit->iPageCount++; 
+			  lpLRInit->bPageInProgress=TRUE;
+			  //lpLRInit->yCurrentLine=lpLRInit->yBodyTop+1;
+
+#ifndef _CONSOLE
+			  WinWriteSet(MyWin,&WScena);
+			  ipt_writevedi(0,"",lpLRInit->iPageCount);
+			  WinWriteRestore(&WScena);
+#endif
+			  LptReportLayout();
+
+			  // Se esiste un HookSubProc segnalo il cambio di pagina
+			  if (lpLRInit->HookSubProc!=NULL)
+			  {
+			   LRT_LINK LRALink;
+			   
+			   ZeroFill(LRALink);
+			   LRALink.iType=LRA_HEAD;
+			   LRALink.rRect.left=lpLRInit->rPage.left;
+			   LRALink.rRect.top=lpLRInit->rPage.top;
+			   LRALink.rRect.right=lpLRInit->rPage.right;
+			   LRALink.rRect.bottom=lpLRInit->yHeadBottom;
+			   (*lpLRInit->HookSubProc)(WS_DO,0,&LRALink);
+
+			   /*
+			   ZeroFill(LRALink);
+			   LRALink.iType=LRA_CUE;
+			   LRALink.rRect.left=lpLRInit->rPage.left;
+			   LRALink.rRect.top=lpLRInit->yBodyBottom;//>rPage.bottom-lpLRInit->yCueDot;
+			   LRALink.rRect.right=lpLRInit->rPage.right;
+			   LRALink.rRect.bottom=lpLRInit->rPage.bottom;
+			   (*lpLRInit->HookSubProc)(WS_DO,0,&LRALink);
+			   */
+
+			  }
+			}
+			
+//			if (lpLRInit->bRowsDynamic) lpLRInit->iRowsLastLine=1;
+			//if (lpLRInit->bRowsDynamic) {lpLRInit->iRowLastVirtualLine=1; lpLRInit->iRowLastHeight=lpLRInit->iRowPadded;}
+			if (lpLRInit->bRowsDynamic) {lpLRInit->iRowLastVirtualLine=1;}
+			break;
+	
+	//-----------------------------------------------------------------------
+	//	WS_REALSET                      		                            |
+	//											                            |
+	//	Start passaggio campi della linea                                   |
+	//  info Numero del campo a cui si fa riferimento                       |
+	//	ptr  Puntatore al valore                                            |
+	//		 ALFA      CHAR *                                               |
+	//		 NUME      double *                                             |
+	//											                            |
+	//	Aggiungo al buffer di linea                                         |
+	//											                            |
+	//											                            |
+	//-----------------------------------------------------------------------
+		case WS_REALSET:
+
+			lpText=(ptr!=NULL) ? ptr : "<?>";
+			if (info>=lpLRInit->iFieldNum) PRG_end("LR RealSet: Field Errato");
+			a=info;
+			
+			// Controllo se lpText và pulito
+			if (lpLRInit->LRFields[a]->fCharClean)
+			{
+				CHAR *lpEnd;
+				while (*lpText) {if ((UINT) *lpText>' ') break; else lpText++;} // Mi sposto in avanti fino a trovare un carattere valido
+				
+				// Tolgo caratteri in coda
+				for (lpEnd=lpText+strlen(lpText)-1;lpEnd>lpText;lpEnd--)
+				{
+					if ((UINT) *lpEnd>' ') break; else *lpEnd=0;
+				}
+			}
+
+			// Inserisce il colore di sfondo
+			ZeroFill(LRTBox);
+			LRTBox.rRect.left=lpLRInit->LRFields[a]->xPosStartDot;
+			LRTBox.rRect.right=lpLRInit->LRFields[a]->xPosEndDot;
+//			LRTBox.rRect.top=lpLRInit->yBodyTop+1+(lpLRInit->iLineCount*lpLRInit->ySectDot)+lpLRInit->LRFields[a]->iLine*lpLRInit->yChar;
+			LRTBox.rRect.top=lpLRInit->iRowOffset+(lpLRInit->LRFields[a]->iLine*lpLRInit->iRowHeight)+1;
+			if (lpLRInit->LRFields[a]->iRowsSize==LR_ROWSDYNAMIC) 
+					LRTBox.rRect.bottom=LRTBox.rRect.top+lpLRInit->iRowHeight-1;
+					else
+					LRTBox.rRect.bottom=LRTBox.rRect.top+(lpLRInit->iRowHeight*lpLRInit->LRFields[a]->iRowsSize)-1;
+				  
+
+			// Colore di sfondo
+//			if (lpLRInit->LRFields[a]->lColBack&&(lpLRInit->iLinePerRiga>1))
+			if (lpLRInit->LRFields[a]->lColBack!=-1)
+			{
+				LRTBox.Colore=lpLRInit->LRFields[a]->lColBack;
+				LREAddLineBuffer(LRE_BOXP,&LRTBox,sizeof(LRTBox),0,0);
+			}
+
+			// ------------------------------------------------------------------
+			// Stampa ad una linea
+			//
+			if (lpLRInit->LRFields[a]->iRowsSize==1)
+			{
+			 memset(&LRTChar,0,sizeof(LRTChar));
+			 LRTChar.Point.y=LRTBox.rRect.top+lpLRInit->LRFields[a]->rPadding.top;
+			 switch (lpLRInit->LRFields[a]->iAllinea)
+			 {
+				case LR_LEFT: LRTChar.Point.x=lpLRInit->LRFields[a]->xPosStartDot+lpLRInit->LRFields[a]->rPadding.left;//lpLRInit->rFieldMargin.left; 
+							  LRTChar.xAllinea=LR_LEFT;				   
+							  break;
+
+				case LR_RIGHT: LRTChar.Point.x=lpLRInit->LRFields[a]->xPosEndDot-lpLRInit->LRFields[a]->rPadding.right;//-lpLRInit->rFieldMargin.right; 
+							   LRTChar.xAllinea=LR_RIGHT;				   
+							   break;
+				
+				case LR_CENTER: LRTChar.Point.x=lpLRInit->LRFields[a]->xPosStartDot+((lpLRInit->LRFields[a]->xPosEndDot-lpLRInit->LRFields[a]->xPosStartDot)>>1); 
+							    LRTChar.xAllinea=LR_CENTER;				   
+								break;
+
+				case LR_JUSTIFY: LRTChar.Point.x=lpLRInit->LRFields[a]->xPosStartDot+lpLRInit->LRFields[a]->rPadding.left;;//+lpLRInit->rFieldMargin.left; 
+							     LRTChar.xAllinea=LR_JUSTIFY;				   
+							     break;
+			 }
+
+			 /*
+			 LRTChar.fBold=lpLRInit->bBold;
+			 LRTChar.fItalic=lpLRInit->bItalic;
+			 LRTChar.fUnderLine=lpLRInit->bUnderLine;
+*/
+			 LRTChar.iStyles=LRToStyles(lpLRInit);
+			 if (lpLRInit->fGColor) LRTChar.lColore=lpLRInit->lGColor;
+								    else 
+								    LRTChar.lColore=lpLRInit->LRFields[a]->lColChar;
+
+			 switch (lpLRInit->LRFields[info]->iTipo)
+			 {
+				 case ALFA: // Campo alfanumerico
+
+				  // Scritta
+					LRTChar.yChar=lpLRInit->iRowHeight;
+					if (ptr) {if (!* (CHAR *) ptr) break;} // Salto i campi vuoti
+					//LREAddItem(LRE_CHAR,&LRTChar,sizeof(LRTChar),lpText,0);
+					LREAddLineBuffer(LRE_CHAR,&LRTChar,sizeof(LRTChar),lpText,0);
+					break;
+
+				 case NUME:
+					if (ptr!=NULL) 
+					{
+					 Valore=* (double *) ptr;
+					 strcpy(Buf,Snummask(Valore,lpLRInit->LRFields[a]->iCifre,lpLRInit->LRFields[a]->iDec,lpLRInit->LRFields[a]->fSep,0));
+					}
+				    
+					LRTChar.yChar=lpLRInit->iRowHeight;
+					LRTChar.fFix=lpLRInit->LRFields[a]->fFix;
+					if (lpLRInit->fNoDecimal) {lp=strstr(Buf,","); if (lp) *lp=0;}
+				   // LREAddItem(LRE_CHAR,&LRTChar,sizeof(LRTChar),lpText,0);
+					lpText=Buf;
+					LREAddLineBuffer(LRE_CHAR,&LRTChar,sizeof(LRTChar),lpText,0);
+				    break;
+			 }
+			}
+			else
+			// ------------------------------------------------------------------
+			// Stampa a più linee
+			//
+			{
+			 ZeroFill(LRTCharBox);
+			 memcpy(&LRTCharBox.rArea,&LRTBox.rRect,sizeof(RECT));
+			 LRTCharBox.rArea.left+=lpLRInit->LRFields[a]->rPadding.left;//lpLRInit->rFieldMargin.left;
+			 LRTCharBox.rArea.right-=lpLRInit->LRFields[a]->rPadding.right;
+			 LRTCharBox.rArea.top+=lpLRInit->LRFields[a]->rPadding.top;
+			 LRTCharBox.rArea.bottom-=lpLRInit->LRFields[a]->rPadding.bottom;
+			 LRTCharBox.xAllinea=lpLRInit->LRFields[a]->iAllinea;
+/*
+			 LRTCharBox.fBold=lpLRInit->bBold;
+			 LRTCharBox.fItalic=lpLRInit->bItalic;
+			 LRTCharBox.fUnderLine=lpLRInit->bUnderLine;
+			 */
+			 LRTCharBox.iStyles=LRToStyles(lpLRInit);
+
+			 LRTCharBox.yInterlinea=0;
+			 if (lpLRInit->fGColor) LRTCharBox.lColore=lpLRInit->lGColor;
+								    else 
+								    LRTCharBox.lColore=lpLRInit->LRFields[a]->lColChar;
+			 LRTCharBox.yChar=lpLRInit->iRowHeight;
+				  
+			 if (ptr) {if (!* (CHAR *) ptr) break;} // Salto i campi vuoti
+			 strcpy(LRTCharBox.szFontName,lpLRInit->lpFontBodyDefault);
+			 // Prima di aggiungere l'Idem :
+			 // A) Verifico se sto stampando in un sistema "dinamico"
+			 // B) Verifico se è un campo ad altezza "Rows" dinamico
+			 if (lpLRInit->bRowsDynamic&&
+				 lpLRInit->LRFields[a]->iRowsSize)
+			 {
+				SINT yAlt,iFieldBottom;
+				SINT iRows;
+				yAlt=LRGetDispInBoxAlt(&LRTCharBox,lpText,&iRows);
+//				win_infoarg("Controllo\n%s, %d, %dpx",lpText,iRows,yAlt);
+
+				//
+				// E) SI: Inserisco l'oggetto
+				// LREAddItem(LRE_CHARBOX,&LRTCharBox,sizeof(LRTCharBox),lpText,0);
+				//
+				LREAddLineBuffer(LRE_CHARBOX,&LRTCharBox,sizeof(LRTCharBox),lpText,0);
+
+				//
+				// C) Verifico se è POSSIBILE CONTENERE il campo all'interno della pagina
+				//
+//				if ((lpLRInit->iLineCount+iRows+lpLRInit->LRFields[a]->iLine)>lpLRInit->iLinePerPage)
+				lpLRInit->iRowLastHeight=yAlt+(lpLRInit->LRFields[a]->rPadding.top+lpLRInit->LRFields[a]->rPadding.bottom);
+				iFieldBottom=lpLRInit->iRowOffset+lpLRInit->iRowLastHeight;
+
+				if (iFieldBottom>lpLRInit->yBodyBottom)//>=lpLRInit->yBodyTop;
+				{
+//					win_infoarg("qui: %d > %d",iFieldBottom,lpLRInit->yBodyBottom);
+					// D) NO! E che cazzo
+					// .1 Cambio pagina
+					lpLRInit->iVirtualLineCount=lpLRInit->iVirtualLinePerPage;
+					PowerPrinter(WS_LINK,0,NULL); 
+
+					// .2 Rimappo tutti i componenti inseriti della linea corrente
+					LREBufferRemap();
+					if (lpLRInit->iRowPadded>0) lpLRInit->iRowLastVirtualLine=(yAlt/lpLRInit->iRowPadded);//iRows+lpLRInit->LRFields[a]->iLine;
+
+				}
+				else
+				{
+				 // F) In entrambi i casi calcolo la dimensione dell'oggetto e la scrivo in ->iRowsLastLine se più grande
+				if ((iRows+lpLRInit->LRFields[a]->iLine)>lpLRInit->iRowLastVirtualLine)
+				{
+					lpLRInit->iRowLastVirtualLine=(yAlt/lpLRInit->iRowPadded);//iRows+lpLRInit->LRFields[a]->iLine;
+				 }
+				}
+			 }
+			 else
+			 //LREAddItem(LRE_CHARBOX,&LRTCharBox,sizeof(LRTCharBox),lpText,0);
+			 LREAddLineBuffer(LRE_CHARBOX,&LRTCharBox,sizeof(LRTCharBox),lpText,0);
+			}
+			break;
+	
+	//-----------------------------------------------------------------------
+	//	WS_INSERT                       		                            |
+	//											                            |
+	//	Inserisco i valori caricati nel file di appoggio                    |
+	//  info Non usato                                                      |
+	//	ptr  Non Usato                                                      |
+	//											                            |
+	//											                            |
+	//	flush del buffer
+	//-----------------------------------------------------------------------
+		case WS_INSERT:
+			
+			// Scrivo il buffer nel file
+			LREFlushBuffer(TRUE);
+			
+			// Se esiste un SubPaintProcedure 
+			// La chiamo con l'informazione della linea
+			if (lpLRInit->HookSubProc!=NULL)
+			{
+			   LRT_LINK LRALink;
+			   ZeroFill(LRTBox);
+			   memset(&LRALink,0,sizeof(LRALink));
+			   LRALink.iType=LRA_BODY;
+			   LRALink.rRect.left=lpLRInit->rPage.left;
+			   LRALink.rRect.top=lpLRInit->iRowOffset;//lpLRInit->yBodyTop+(lpLRInit->iLineCount*lpLRInit->ySectDot);
+			   LRALink.rRect.right=lpLRInit->rPage.right;
+//			   LRTBox.rRect.bottom=LRTBox.rRect.top+lpLRInit->ySectDot-1;
+			   LRALink.rRect.bottom=LRALink.rRect.top+lpLRInit->iRowPadded-1;
+			   //LREAddItem(LRE_LINK,&LRALink,sizeof(LRALink),NULL,0);
+			   (*lpLRInit->HookSubProc)(WS_DO,0,&LRALink);
+			}
+
+			if (lpLRInit->bRowsDynamic)
+			{
+				lpLRInit->iVirtualLineCount+=lpLRInit->iRowLastVirtualLine;
+//				lpLRInit->iRowOffset+=(lpLRInit->iRowHeight*lpLRInit->iRowsLastLine)+(lpLRInit->rFieldPadding.top+lpLRInit->rFieldPadding.bottom);
+				lpLRInit->iRowOffset+=lpLRInit->iRowLastHeight;
+			 //lpLRInit->yCurrentLine+=(lpLRInit->ySectDot*lpLRInit->iRowsLastLine);
+			}
+			else
+			{
+			 lpLRInit->iVirtualLineCount++;			
+			 lpLRInit->iRowOffset+=lpLRInit->iRowPadded;
+			}
+
+			//-----------------------------------------------------------------------
+			// Linea orizzontale
+			//-----------------------------------------------------------------------
+			if (lpLRInit->fLineHorzField)
+			{
+				LRLine(	lpLRInit->rPage.left,lpLRInit->iRowOffset,
+						lpLRInit->rPage.right,lpLRInit->iRowOffset,
+						lpLRInit->iLineHorzColor,//LRFields[0]->lColChar,
+						1,//(lpLRInit->iLinePerRiga>1)?2:1,
+						lpLRInit->iLineHorzStyle,//PS_SOLID,
+						SET);
+			}
+		
+			//
+			// Line verticali
+			//
+			if (lpLRInit->fLineVertField&&lpLRInit->iLinePerRiga>1)
+			{
+				SINT yBase=lpLRInit->iRowOffset-lpLRInit->iRowHeight;
+				// Linea verticale di sinistra
+				ZeroFill(LRTBox);
+				LRTBox.rRect.left=lpLRInit->rPage.left;
+				LRTBox.rRect.right=lpLRInit->rPage.left;
+				LRTBox.rRect.top=yBase;
+				LRTBox.rRect.bottom=lpLRInit->iRowOffset;
+				LRTBox.Colore=0;
+				LREAddItem(LRE_BOX,&LRTBox,sizeof(LRTBox),0,0);
+
+				for (a=0;a<lpLRInit->iFieldNum;a++)
+				{
+					// Linea verticale
+					ZeroFill(LRTBox);
+					LRTBox.rRect.left=lpLRInit->LRFields[a]->xPosEndDot;
+					LRTBox.rRect.right=lpLRInit->LRFields[a]->xPosEndDot;
+					LRTBox.rRect.top=yBase+(lpLRInit->LRFields[a]->iLine*lpLRInit->iRowHeight);
+					LRTBox.rRect.bottom=LRTBox.rRect.top+(lpLRInit->iRowHeight*lpLRInit->LRFields[a]->iRowsSize)-1;
+					LRTBox.Colore=0;
+					LREAddItem(LRE_BOX,&LRTBox,sizeof(LRTBox),0,0);
+					
+					if (lpLRInit->fLineHorzField&&(lpLRInit->LRFields[a]->iLine<(lpLRInit->iLinePerRiga-1)))
+					{
+					 // Linea orizzontale
+					 ZeroFill(LRTBox);
+					 LRTBox.rRect.left=lpLRInit->LRFields[a]->xPosStartDot;
+					 LRTBox.rRect.right=lpLRInit->LRFields[a]->xPosEndDot;
+					 //TBox.rRect.top=lpLRInit->yCurrentLine+(lpLRInit->LRFields[a]->iLine*lpLRInit->yChar);
+					 LRTBox.rRect.top=LRTBox.rRect.bottom=yBase+(lpLRInit->LRFields[a]->iLine*lpLRInit->iRowHeight)+(lpLRInit->iRowHeight*lpLRInit->LRFields[a]->iRowsSize)-1;
+					 LRTBox.Colore=0;
+					 LREAddItem(LRE_BOX,&LRTBox,sizeof(LRTBox),0,0);
+					}
+				}
+			}
+			break;
+
+	}
+ return NULL;
+}
+
+// -------------------------------------------------------------------------------
+// SERVICE FUNCTION FOR PRINTER                                                  |
+// -------------------------------------------------------------------------------
+
+BOOL bUserAbort;
+HWND hDlgPrint=NULL;
+
+#ifndef _CONSOLE
+
+static BOOL CALLBACK PrintDlgProc (HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+     {
+     switch (msg)
+          {
+          case WM_INITDIALOG :
+               EnableMenuItem (GetSystemMenu(hDlg, FALSE), SC_CLOSE,MF_GRAYED) ;
+               return TRUE ;
+
+          case WM_COMMAND :
+               bUserAbort = TRUE ;
+               EnableWindow (GetParent (hDlg), TRUE) ;
+               DestroyWindow (hDlg) ;
+               hDlgPrint = 0 ;
+               return TRUE ;
+          }
+     return FALSE ;
+     }          
+
+#endif
+static BOOL CALLBACK AbortProc (HDC hPrinterDC, SINT iCode)
+     {
+     MSG msg ;
+
+     while (!bUserAbort && PeekMessage (&msg, NULL, 0, 0, PM_REMOVE))
+          {
+          if (!hDlgPrint || !IsDialogMessage (hDlgPrint, &msg))
+               {
+               TranslateMessage (&msg) ;
+               DispatchMessage (&msg) ;
+               }
+          }
+     return !bUserAbort ;
+     }
+
+// -------------------------------------------------------------------------------
+// PRINT CONSOLE PREVIEW                                                         |
+// -------------------------------------------------------------------------------
+
+static LRESULT CALLBACK LayProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
+static HWND   LayWnd=NULL;
+static SINT   LREOwner;
+static HWND   OwnerWnd=NULL;
+static RECT   LayClient;
+static UINT   yBarra=45;         // Spesso TOOLBAR in alto
+//static UINT   yClient,xClient;   // Altezza del layout Video
+static UINT   yBorder,xBorder;   // Margini
+//static UINT   VLx,VLy;         // Altezza della Pagina nel Video Virtuale
+static UINT   xPos,yPos;      // Posizione su video della Pagina virtuale
+//static UINT   yLChar,xLChar;   // Dimensioni del carattere stabilito
+static SHORT  LayOrientation;
+//static UINT   xPage,yPage;
+
+//static BYTE   *lpData;
+
+
+static SINT hdlFileTemp=0; // L'handle del file in memoria
+static SINT   iLRE_Elements;
+static LRETAG **arElement=NULL;
+static SINT   *arPageIndex=NULL;
+static SINT   iPageView;
+static HFONT  hFontBase=NULL;
+static SINT iZoom=0;
+static TLAYOUT TLayOut;
+static POINT VideoOffset;
+
+// Visualizza una stringa pacchetizzata come LRT_CHAREX
+static void LDispLex(BOOL Printer,HDC hDC,LRT_CHAREX *Lex,CHAR *ptext,RECT *lpRect)
+{
+ HFONT hFont,OldFont; 
+ SINT  yChar,xChar;
+ SINT x,y;
+ SIZE SizeEx;
+ CHAR *NewText;
+
+ if (Printer)
+ {
+  xChar=Lex->xChar;
+  yChar=Lex->yChar;
+  x=Lex->Point.x;
+  y=Lex->Point.y;
+ }
+ else
+ {
+
+  x=DotToVideoX(Lex->Point.x);
+  y=DotToVideoY(Lex->Point.y);
+  xChar=DotToPixelX(Lex->xChar);
+  yChar=DotToPixelY(Lex->yChar);
+ }
+
+ if (yChar<1) return;
+ NewText=EhAlloc(strlen(ptext)+1);
+ if (sys.OemTranslate) OemToChar(ptext,NewText); else strcpy(NewText,ptext);
+
+ hFont=CreateFont(yChar, // Altezza del carattere
+				  xChar, // Larghezza del carattere (0=Default)
+				  0, // Angolo di rotazione x 10
+				  0, //  Angolo di orientamento bo ???
+/*
+				  Lex->fBold ? FW_BOLD : 0, // Spessore del carattere (MACRO Ex: FW_BOLD)
+				  Lex->fItalic, // Flag Italico    ON/OFF
+				  Lex->fUnderLine, // Flag UnderLine  ON/OFF
+				  */
+
+				  (Lex->iStyles&STYLE_BOLD)?FW_BOLD:0,//lpLRInit->fBold;//sys.fFontBold;
+				  (Lex->iStyles&STYLE_ITALIC)?1:0,//lpLRInit->fItalic;//sys.fFontItalic;
+				  (Lex->iStyles&STYLE_UNDERLINE)?1:0,//lpLRInit->fUnderLine;//sys.fFontItalic;					 
+
+				  0, // Flag StrikeOut  ON/OFF
+				  DEFAULT_CHARSET, // Tipo di codepage vedi CreateFont (0=Ansi)
+//				  FERRA_OUTPRECISION, // Output precision
+				  OUT_DEFAULT_PRECIS, // Output precision
+				  0, // Clipping Precision
+				  DEFAULT_QUALITY,//PROOF_QUALITY, // Qualità di stampa (DEFAULT,DRAFT ecc...)
+				  DEFAULT_PITCH,//FIXED_PITCH, // Pitch & Family (???)
+				  //0,
+				  //"Arial"); // Nome del font
+				  Lex->szFontName); // Nome del font "Courier New"
+
+ OldFont=SelectObject(hDC, hFont);
+ SetBkMode(hDC,TRANSPARENT); 
+ SetTextColor(hDC,Lex->lColore);
+ SetMapMode(hDC, MM_TEXT);
+ SetTextCharacterExtra(hDC,0);
+ // Allineamento
+ GetTextExtentPoint32(hDC, NewText, strlen(NewText),&SizeEx);
+ switch (Lex->xAllinea)
+ {
+	case LR_LEFT: break;
+	case LR_RIGHT: x-=SizeEx.cx+1; break;
+	case LR_CENTER: x-=(SizeEx.cx>>1); break;
+		return;
+ }
+
+ // Se esiste un range
+ // Controllo se il Box da fare è nel range richiesto
+ if (lpRect)
+ {
+	 if (((x+SizeEx.cx-1)<lpRect->left)||
+	      (x>lpRect->right)||
+	      (y>lpRect->bottom)||
+		  ((y+yChar-1)<lpRect->top)) {} else TextOut (hDC,x,y, NewText,strlen(NewText));
+ } else TextOut (hDC,x,y, NewText,strlen(NewText));
+
+ SelectObject(hDC, OldFont);
+ DeleteObject(hFont);
+ EhFree(NewText);
+}
+
+// Visualizza una stringa pacchetizzata come LRT_CHARJUST
+/*
+static void LDispJust(BOOL Printer,HDC hDC,LRT_CHARJUST *LCharJust,CHAR *ptext,RECT *lpRect)
+{
+ HFONT hFont,OldFont; 
+ SINT  yChar,xChar;
+ CHAR *NewText;
+ RECT Rect;
+ SINT iInterLinea;
+
+ if (Printer)
+ {
+  xChar=LCharJust->xChar;
+  yChar=LCharJust->yChar;
+  memcpy(&Rect,&LCharJust->rArea,sizeof(RECT));
+  iInterLinea=LCharJust->yInterlinea;
+ }
+ else
+ {
+  // Vlx:xPage:x:yChar;
+  //yChar=Lex->yChar*VLy/yPage;
+  //xChar=Lex->xChar*VLx/xPage;
+  Rect.left=DotToVideoX(LCharJust->rArea.left);
+  Rect.right=DotToVideoX(LCharJust->rArea.right);
+  Rect.top=DotToVideoY(LCharJust->rArea.top);
+  Rect.bottom=DotToVideoY(LCharJust->rArea.bottom);
+  xChar=DotToPixelX(LCharJust->xChar);
+  yChar=DotToPixelY(LCharJust->yChar);
+  iInterLinea=DotToPixelY(LCharJust->yInterlinea);
+ }
+
+ if (yChar<1) return;
+ NewText=EhAlloc(strlen(ptext)+1);
+ if (sys.OemTranslate) OemToChar(ptext,NewText); else strcpy(NewText,ptext);
+
+ hFont=CreateFont(yChar, // Altezza del carattere
+				  xChar, // Larghezza del carattere (0=Default)
+				  0, // Angolo di rotazione x 10
+				  0, //  Angolo di orientamento bo ???
+				  LCharJust->fBold ? FW_BOLD : 0, // Spessore del carattere (MACRO Ex: FW_BOLD)
+				  LCharJust->fItalic, // Flag Italico    ON/OFF
+				  LCharJust->fUnderLine, // Flag UnderLine  ON/OFF
+				  0, // Flag StrikeOut  ON/OFF
+				  DEFAULT_CHARSET, // Tipo di codepage vedi CreateFont (0=Ansi)
+//				  FERRA_OUTPRECISION, // Output precision
+				  OUT_DEFAULT_PRECIS, // Output precision
+				  0, // Clipping Precision
+				  DEFAULT_QUALITY,//PROOF_QUALITY, // Qualità di stampa (DEFAULT,DRAFT ecc...)
+				  DEFAULT_PITCH,//FIXED_PITCH, // Pitch & Family (???)
+				  //0,
+				  //"Arial"); // Nome del font
+				  LCharJust->szFontName); // Nome del font "Courier New"
+
+ OldFont=SelectObject(hDC, hFont);
+ SetBkMode(hDC,TRANSPARENT); 
+ SetTextColor(hDC,LCharJust->lColore);
+ SetMapMode(hDC, MM_TEXT);
+
+ // Allineamento
+ //GetTextExtentPoint32(hDC, NewText, strlen(NewText),&SizeEx);
+ 
+ // Se esiste un range
+ // Controllo se il Box da fare è nel range richiesto
+ if (lpRect)
+ {
+	 if ((Rect.right<lpRect->left)||
+	      (Rect.left>lpRect->right)||
+	      (Rect.top>lpRect->bottom)||
+		  (Rect.bottom<lpRect->top)) {} else LTextJustify(hDC,NewText,&Rect,iInterLinea,TRUE);
+ } else LTextJustify(hDC,NewText,&Rect,iInterLinea,TRUE);
+
+ SelectObject(hDC, OldFont);
+ DeleteObject(hFont);
+
+ EhFree(NewText);
+}
+*/
+// Visualizza una stringa pacchetizzata come LRT_CHARJUST
+static void LDispCharInBox(BOOL Printer,HDC hDC,LRT_CHARBOX *lpLCharBox,CHAR *ptext,RECT *lpRect)
+{
+ HFONT hFont,OldFont; 
+ LRT_CHARBOX LCharBox;
+// SINT  yChar,xChar;
+ CHAR *NewText;
+// RECT Rect;
+// SINT iInterLinea;
+ BOOL fView;
+ SINT iRows;
+
+ memcpy(&LCharBox,lpLCharBox,sizeof(LRT_CHARBOX));
+ if (!Printer)
+ {
+  // Vlx:xPage:x:yChar;
+  LCharBox.rArea.left=DotToVideoX(lpLCharBox->rArea.left);
+  LCharBox.rArea.right=DotToVideoX(lpLCharBox->rArea.right);
+  LCharBox.rArea.top=DotToVideoY(lpLCharBox->rArea.top);
+  LCharBox.rArea.bottom=DotToVideoY(lpLCharBox->rArea.bottom);
+  LCharBox.xChar=DotToPixelX(lpLCharBox->xChar);
+  LCharBox.yChar=DotToPixelY(lpLCharBox->yChar);
+  LCharBox.yInterlinea=DotToPixelY(lpLCharBox->yInterlinea);
+ }
+
+ if (LCharBox.yChar<1) return;
+ NewText=EhAlloc(strlen(ptext)+1);
+ if (sys.OemTranslate) OemToChar(ptext,NewText); else strcpy(NewText,ptext);
+
+ hFont=CreateFont(LCharBox.yChar, // Altezza del carattere
+				  LCharBox.xChar, // Larghezza del carattere (0=Default)
+				  0, // Angolo di rotazione x 10
+				  0, //  Angolo di orientamento bo ???
+/*
+				  lpLCharBox->fBold ? FW_BOLD : 0, // Spessore del carattere (MACRO Ex: FW_BOLD)
+				  lpLCharBox->fItalic, // Flag Italico    ON/OFF
+				  lpLCharBox->fUnderLine, // Flag UnderLine  ON/OFF
+				  */
+				  (lpLCharBox->iStyles&STYLE_BOLD)?FW_BOLD:0,//lpLRInit->fBold;//sys.fFontBold;
+				  (lpLCharBox->iStyles&STYLE_ITALIC)?1:0,//lpLRInit->fItalic;//sys.fFontItalic;
+				  (lpLCharBox->iStyles&STYLE_UNDERLINE)?1:0,//lpLRInit->fUnderLine;//sys.fFontItalic;					 
+
+				  0, // Flag StrikeOut  ON/OFF
+				  DEFAULT_CHARSET, // Tipo di codepage vedi CreateFont (0=Ansi)
+				  OUT_DEFAULT_PRECIS, // Output precision
+				  0, // Clipping Precision
+				  DEFAULT_QUALITY,//PROOF_QUALITY, // Qualità di stampa (DEFAULT,DRAFT ecc...)
+				  DEFAULT_PITCH,//FIXED_PITCH, // Pitch & Family (???)
+				  //0,
+				  //"Arial"); // Nome del font
+				  lpLCharBox->szFontName); // Nome del font "Courier New"
+ 
+ OldFont=SelectObject(hDC, hFont);
+ SetBkMode(hDC,TRANSPARENT); 
+ SetTextColor(hDC,lpLCharBox->lColore);
+ SetMapMode(hDC, MM_TEXT);
+ SetTextCharacterExtra(hDC,lpLCharBox->iExtraCharSpace);
+
+ // Allineamento
+ //GetTextExtentPoint32(hDC, NewText, strlen(NewText),&SizeEx);
+ 
+ // Se esiste un range
+ // Controllo se il Box da fare è nel range richiesto
+ fView=TRUE;
+ /*
+ if (lpRect)
+ {
+	 if ((LCharBox.rArea.right<lpRect->left)||
+	      (LCharBox.rArea.left>lpRect->right)||
+	      (LCharBox.rArea.top>lpRect->bottom)||
+		  (LCharBox.rArea.bottom<lpRect->top)) fView=FALSE; 
+ }
+*/
+ if (fView) LTextInBox(hDC,&LCharBox,NewText,TRUE,&iRows,lpLCharBox->iMaxRows);			
+ /*
+	   else 
+	{
+	 switch (LCharBox->xAllinea)
+	 {
+		case LR_LEFT:
+		case LR_RIGHT:
+		case LR_CENTER:
+						LTextInBox(hDC,LCharBox->xAllinea,NewText,&Rect,iInterLinea,TRUE);			
+						break;
+		
+		case LR_JUSTIFY:
+	 					LTextJustify(hDC,NewText,&Rect,iInterLinea,TRUE);
+						break;
+	 }
+	}
+ }
+ else
+ {
+ 	 switch (LCharBox->xAllinea)
+	 {
+		case LR_LEFT:
+		case LR_RIGHT:
+		case LR_CENTER:
+						LTextInBox(hDC,LCharBox->xAllinea,NewText,&Rect,iInterLinea,TRUE);			
+						break;
+		
+		case LR_JUSTIFY:
+	 					LTextJustify(hDC,NewText,&Rect,iInterLinea,TRUE);
+						break;
+	 }
+ }
+*/
+ SelectObject(hDC, OldFont);
+ DeleteObject(hFont);
+
+ EhFree(NewText);
+}
+
+static void xyConvert(SINT cmd,void *lpDato)
+{
+	LONG *lpLong=lpDato;
+	RECT *lpRect=lpDato;
+
+	switch (cmd)
+	{
+		case LR_INCHTODOTX:  
+			if (!*lpLong) return; 
+			*lpLong=LocInchToDotX(*lpLong); 
+			break;
+
+		case LR_INCHTODOTY:  
+			if (!*lpLong) return; 
+			*lpLong=LocInchToDotY(*lpLong); 
+			break;
+
+		case LR_DOTTOVIDEOX: 
+			if (!*lpLong) return; 
+			*lpLong=DotToVideoX(*lpLong); 
+			break;
+
+		case LR_DOTTOVIDEOY: 
+			if (!*lpLong) return; 
+			*lpLong=DotToVideoY(*lpLong); 
+			break;
+
+		case LR_DOTTOPIXELX: 
+			if (!*lpLong) return; 
+			*lpLong=DotToPixelX(*lpLong); 
+			break;
+
+		case LR_DOTTOPIXELY: 
+			if (!*lpLong) return; 
+			*lpLong=DotToPixelY(*lpLong); 
+			break;
+
+        case LR_RECTTOPIXEL: 
+			  // x:ViewPage.x=Lex->Point.x:xPageDot
+			  if (lpRect->left)  lpRect->left=DotToVideoX(lpRect->left);
+								    else
+								    lpRect->left=rVideoPrintArea.left+VideoOffset.x;
+			  if (lpRect->right) lpRect->right=DotToVideoX(lpRect->right);
+									else
+									lpRect->right=rVideoPrintArea.left+VideoOffset.x;
+			  if (lpRect->top)	lpRect->top=DotToVideoY(lpRect->top);
+									else
+									lpRect->top=rVideoPrintArea.top+VideoOffset.y;
+
+			  if (lpRect->bottom) lpRect->bottom=DotToVideoY(lpRect->bottom); 
+									 else
+									 lpRect->bottom=rVideoPrintArea.top+VideoOffset.y;
+			  break;
+	}
+
+}
+
+static void LBMPDispEx(HDC hDC,SINT PosX,SINT PosY,SINT SizeX,SINT SizeY,SINT OfsX,SINT OfsY,SINT Hdl);
+static void LMultiBox(BOOL Printer,HDC hDC,SINT iType,LRT_BOXR *Box,RECT *lpRect)
+{
+	LONG lColor;
+	LONG lRoundWidth,lRoundHeight,iPenWidth;
+	HPEN hpen, hpenOld;
+	HBRUSH hbrOld;
+	HBRUSH hbr;
+	RECT Rect;
+
+	lRoundWidth=Box->lRoundWidth; 
+	lRoundHeight=Box->lRoundHeight;
+	iPenWidth=Box->iPenWidth;
+	memcpy(&Rect,&Box->rRect,sizeof(Rect));
+	if ((lRoundWidth==-1) && (lRoundHeight==-1))
+	{
+		lRoundWidth=((Rect.right-Rect.left)/4);
+		lRoundHeight=((Rect.bottom-Rect.top)/4);
+		if (lRoundWidth<lRoundHeight)
+			lRoundHeight=lRoundWidth;
+		else if (lRoundHeight<lRoundWidth)
+			lRoundWidth=lRoundHeight;
+	}
+
+	if (!Printer)
+	{
+		xyConvert(LR_RECTTOPIXEL,&Rect);
+		xyConvert(LR_DOTTOVIDEOX,&lRoundWidth);
+		xyConvert(LR_DOTTOVIDEOY,&lRoundHeight);
+		xyConvert(LR_DOTTOPIXELX,&iPenWidth);
+		//if (iPenWidth) iPenWidth=DotToPixelX(DotToPixelX);
+		//win_infoarg("A) iPenWidth=%d",iPenWidth);
+		//win_infoarg("B) iPenWidth=%d",iPenWidth);
+	}
+
+	// Se esiste un range
+	// Controllo se il Box da fare è nel range richiesto
+	if (lpRect)
+	{
+		if ((Rect.right<lpRect->left)||
+			(Rect.left>lpRect->right)||
+			(Rect.top>lpRect->bottom)||
+			(Rect.bottom<lpRect->top)) return;
+	}
+
+
+	switch (iType)
+	{
+		case LRE_BOX:
+			//if (!Printer) xyConvert(LR_DOTTOPIXELX,&lWidth);
+			hpen = CreatePen(PS_SOLID, iPenWidth, Box->lColore); // era 1
+			hpenOld = SelectObject(hDC, hpen);
+			hbrOld = SelectObject(hDC,GetStockObject(NULL_BRUSH));
+			Rectangle (hDC,Rect.left,Rect.top,Rect.right,Rect.bottom);
+			SelectObject(hDC, hpenOld);
+			SelectObject(hDC, hbrOld);
+			DeleteObject(hpen); // Cancella la penna usata
+			break;
+
+		case LRE_BOXP: 
+			lColor=Box->lColore;
+			if (!Printer)
+			{
+				if (Rect.top==Rect.bottom) 
+					Rect.bottom++; 
+			}
+
+			hpen=CreatePen(PS_INSIDEFRAME, 0, lColor); // era 1 Creo un nuova penna
+			hpenOld=SelectObject(hDC, hpen);
+			if (!lColor)
+			{
+				hbrOld=SelectObject(hDC,GetStockObject(BLACK_BRUSH));
+				Rectangle(hDC, Rect.left, Rect.top, Rect.right, Rect.bottom);
+				SelectObject(hDC, hbrOld);
+			}
+			else
+			{
+				//CMYK(255,0,0,0);
+				//COLORREF
+				//hbr=CreateSolidBrush(CMYK(255,0,0,0));        // Creo un nuovo pennello
+
+				hbr=CreateSolidBrush(lColor);        // Creo un nuovo pennello
+				hbrOld=SelectObject(hDC, hbr);
+				Rectangle(hDC, Rect.left, Rect.top, Rect.right, Rect.bottom);
+				SelectObject(hDC, hbrOld);
+				DeleteObject(hbr);
+			}
+
+			SelectObject(hDC, hpenOld);
+			DeleteObject(hpen);
+			break;
+
+		case LRE_BOXR:  
+			hpen = CreatePen(PS_SOLID, 0, Box->lColore); // era 1
+			hpenOld = SelectObject(hDC, hpen);
+			hbrOld = SelectObject(hDC,GetStockObject(NULL_BRUSH));
+			RoundRect (hDC,Rect.left,Rect.top,Rect.right,Rect.bottom,lRoundWidth,lRoundHeight);
+			SelectObject(hDC, hpenOld);
+			SelectObject(hDC, hbrOld);
+			DeleteObject(hpen); // Cancella la penna usata
+			break;
+
+		case LRE_BOXPR: 
+			lColor=Box->lColore;
+			if (!Printer)
+			{
+				if (Rect.top==Rect.bottom) 
+					Rect.bottom++; 
+			}
+
+			hpen=CreatePen(PS_INSIDEFRAME, 0, lColor); // era 1 Creo un nuova penna
+			hpenOld=SelectObject(hDC, hpen);
+			if (!lColor)
+			{
+				hbrOld=SelectObject(hDC,GetStockObject(BLACK_BRUSH));
+				RoundRect (hDC,Rect.left,Rect.top,Rect.right,Rect.bottom,lRoundWidth,lRoundHeight);
+				SelectObject(hDC, hbrOld);
+			}
+			else
+			{
+				hbr=CreateSolidBrush(lColor);        // Creo un nuovo pennello
+				hbrOld=SelectObject(hDC, hbr);
+				RoundRect (hDC,Rect.left,Rect.top,Rect.right,Rect.bottom,lRoundWidth,lRoundHeight);
+				SelectObject(hDC, hbrOld);
+				DeleteObject(hbr);
+			}
+
+			SelectObject(hDC, hpenOld);
+			DeleteObject(hpen);
+			break;
+
+	}
+}
+
+static void LMultiLine(BOOL Printer,HDC hDC,SINT iType,LRT_LINE *Line,RECT *lpRect)
+{
+ RECT Rect;
+ HPEN hpen, hpenOld;
+ SINT OldROP,iPenWidth;
+ memcpy(&Rect,&Line->rRect,sizeof(Rect));
+ iPenWidth=Line->iPenWidth; 
+ if (!Printer) 
+ {
+	 xyConvert(LR_RECTTOPIXEL,&Rect);
+	 xyConvert(LR_DOTTOPIXELX,&iPenWidth);
+//	 win_infoarg("A) iPenWidth=%d",iPenWidth);
+//	 if (iPenWidth) iPenWidth=DotToPixelX(DotToPixelX);
+//	 win_infoarg("B) iPenWidth=%d",iPenWidth);
+ }
+
+ // Se esiste un range
+ // Controllo se il Box da fare è nel range richiesto
+ if (lpRect)
+ {
+	if ((Rect.right<lpRect->left)||
+	    (Rect.left>lpRect->right)||
+	    (Rect.top>lpRect->bottom)||
+	    (Rect.bottom<lpRect->top)) return;
+ }
+
+ switch (iType)
+ {
+	
+	case LRE_LINE:  
+
+		//Tbox(Rect.left,Rect.top,Rect.right,Rect.bottom,Box->Colore,SET); 
+		if (Line->iMode==XOR) OldROP=SetROP2(hDC,R2_XORPEN);
+
+		hpen = CreatePen(Line->iStyle, iPenWidth, Line->Colore); // era 1
+		hpenOld = SelectObject(hDC, hpen);
+		
+		MoveToEx(hDC,Rect.left,Rect.top,NULL); // Cambiare NULL
+		LineTo(hDC,Rect.right,Rect.bottom); 
+		SelectObject(hDC, hpenOld);
+		DeleteObject(hpen); // Cancella la penna usata
+		if (Line->iMode==XOR) SetROP2(hDC,OldROP);
+		break;
+ }
+}
+
+static void LBMPDispExDir(HDC hDC,SINT PosX,SINT PosY,SINT HdlSource);
+static void LBitMap(BOOL Printer,HDC hDC,SINT iType,LRT_BOX *Box,RECT *lpRect)
+{
+ SINT x,y,xDim,yDim;
+
+ x=Box->rRect.left;  y=Box->rRect.top;
+ xDim=Box->rRect.right; yDim=Box->rRect.bottom;
+ if (!Printer) 
+ {//if (x) 
+  x=DotToVideoX(x); 
+  //if (y) 
+  y=DotToVideoY(y);
+  if (xDim) xDim=DotToPixelX(xDim); 
+  if (yDim) yDim=DotToPixelY(yDim);
+ }
+
+ switch (iType)
+ {
+   case LRE_HBITMAP:  LBMPDispEx(hDC, x, y, xDim, yDim,0,0,(SINT) Box->Colore);break;
+   case LRE_HBITMAPD: LBMPDispExDir(hDC, x, y, (SINT) Box->Colore); break;
+ }
+}
+
+static void LBmpDispDirect(HDC hDC,
+						   HDC hDCSource,
+						   //HBITMAP BitMap,
+				           SINT PosX,SINT PosY,
+				           SINT Lx,SINT Ly,
+				           SINT LxNew,SINT LyNew,
+				           BOOL Ridim); // Ridimensiona
+static void LBMPDispEx(HDC hDC,
+					   SINT PosX,SINT PosY,
+					   SINT SizeX,SINT SizeY,
+					   SINT OfsX,SINT OfsY,
+					   SINT HdlSource)
+{
+// OSVERSIONINFO osvi;
+  IMGHEADER *Img;
+  WORD    a=1;
+  BITMAPINFO BmpBackup;
+  BITMAPINFOHEADER *BmpHeader;
+  BITMAPINFO *BmpInfo;
+  BYTE *Sorg;
+  SINT TileX=256;// Dimensione piastrella orizzontale (Da Fare)
+  SINT TileY=0;
+
+  LONG Lx,Ly;
+  SINT ReadPy,WritePy; 
+  SINT ReadSectY; 
+  LONG TileSizeY;
+  HWND hWndRif=NULL;
+  SINT HdlImageNew;
+  SINT xScan;
+ 
+  Img=Wmemo_lock(HdlSource);
+  BmpInfo=(BITMAPINFO *) &Img->bmiHeader;
+  BmpHeader=(BITMAPINFOHEADER *) &Img->bmiHeader;
+
+  // -------------------------------------
+  // CALCOLO LE DIMENSIONI DEL NUOVO BITMAP
+  // -------------------------------------
+ 
+  Ly=BmpHeader->biHeight;
+  Lx=BmpHeader->biWidth;
+  xScan=Img->linesize;
+
+  // Calcolo della piastrella
+  // Inversamente proporzionale : y:1024=TileY:TileX;
+  //if (Lx>TileX) {TileX=Lx; TileY=TileY*1024/TileX;}
+  
+  // Calcolo automatico delle dimensioni orizzontali
+  //  SizeY:Ly=x:Lx;
+  if ((SizeY>0)&&(SizeX==0)) SizeX=SizeY*Lx/Ly;
+  // Calcolo automatico delle dimensioni verticali
+  if ((SizeX>0)&&(SizeY==0)) SizeY=SizeX*Ly/Lx;
+  Wmemo_unlock(HdlSource);
+  if (!SizeX||!SizeY) return;
+  
+  // Creo il nuovo bitmap
+  HdlImageNew=IMGRemaker(HdlSource,SizeX,SizeY,TRUE,TRS_NONE);
+  if (HdlImageNew<1) PRG_end("LBMPDispEx():Non memory");
+  IMGTopdown(HdlImageNew);
+  Img=Wmemo_lock(HdlImageNew);
+
+  TileX=SizeX;
+ // TileY=(0x100000)/TileX; // Calcolo la dimensione del Tile
+  TileY=Ly;
+  if (TileY<3) TileY=2;
+
+  //BmpHeader=(BITMAPINFOHEADER *) &Img->bmiHeader;
+  memcpy(&BmpBackup,(BITMAPINFO *) &Img->bmiHeader,sizeof(BITMAPINFO));
+  BmpInfo=(BITMAPINFO *) &BmpBackup;
+  BmpHeader=(BITMAPINFOHEADER *) &BmpBackup;
+  Ly=BmpHeader->biHeight; if (Ly<0) Ly=-BmpHeader->biHeight;
+  Lx=BmpHeader->biWidth;
+  Sorg=(BYTE *) Img;
+  Sorg+=Img->Offset;
+ 
+  // Loop sui "tile" per copiarlo
+  WritePy=0; 
+  TileSizeY=Img->linesize*TileY;
+
+  WritePy=Ly;
+  for (ReadPy=0;;ReadPy+=TileY)   // Loop Verticale
+  {
+	ReadSectY=(Ly-ReadPy); 
+	if (ReadSectY>TileY) ReadSectY=TileY; 
+	if (ReadSectY<1) break;		  // Fine del file
+
+	BmpHeader->biHeight=ReadSectY;
+	BmpHeader->biWidth=TileX;
+    if (StretchDIBits(hDC, 
+					  PosX,PosY+WritePy-ReadSectY,
+					  TileX,ReadSectY,
+					  0,0,
+					  TileX,ReadSectY,
+					  Sorg,
+					  BmpInfo,
+					  DIB_RGB_COLORS, 
+					  SRCCOPY) == GDI_ERROR) 
+    {
+        PRG_end("LBMPDispEx():StretchDIBits Failed"); 
+    }
+
+	// E) Cancello DC e Bitmap creati
+	WritePy-=ReadSectY;
+	Sorg+=TileSizeY;
+  }
+
+  Wmemo_unlock(HdlImageNew);
+  memo_libera(HdlImageNew,"LREPIMG");
+}
+
+// Stampa diretta senza straching (DA FARE)
+// Per migliorare la stampa di loghi e senza colore
+static void LBMPDispExDir(HDC hDC,SINT PosX,SINT PosY,SINT HdlSource)
+{
+/*
+  IMGHEADER *Img;
+  WORD    a=1;
+  BITMAPINFO BmpBackup;
+  BITMAPINFOHEADER *BmpHeader;
+  BITMAPINFO *BmpInfo;
+  BYTE *Sorg;
+  SINT TileX=256;// Dimensione piastrella orizzontale (Da Fare)
+  SINT TileY=0;
+
+  LONG Lx,Ly;
+  SINT ReadPy,WritePy; 
+  SINT ReadSectY; 
+  LONG TileSizeY;
+  HWND hWndRif=NULL;
+  SINT HdlImageNew;
+  SINT xScan;
+ 
+  Img=Wmemo_lock(HdlSource);
+  BmpInfo=(BITMAPINFO *) &Img->bmiHeader;
+  BmpHeader=(BITMAPINFOHEADER *) &Img->bmiHeader;
+
+  // -------------------------------------
+  // CALCOLO LE DIMENSIONI DEL NUOVO BITMAP
+  // -------------------------------------
+ 
+  Ly=BmpHeader->biHeight;
+  Lx=BmpHeader->biWidth;
+  xScan=Img->linesize;
+
+  // Calcolo della piastrella
+  // Inversamente proporzionale : y:1024=TileY:TileX;
+  //if (Lx>TileX) {TileX=Lx; TileY=TileY*1024/TileX;}
+  
+  // Calcolo automatico delle dimensioni orizzontali
+  //  SizeY:Ly=x:Lx;
+  if ((SizeY>0)&&(SizeX==0)) SizeX=SizeY*Lx/Ly;
+  // Calcolo automatico delle dimensioni verticali
+  if ((SizeX>0)&&(SizeY==0)) SizeY=SizeX*Ly/Lx;
+
+  Wmemo_unlock(HdlSource);
+  
+  // Creo il nuovo bitmap
+  HdlImageNew=IMGRemaker(HdlSource,SizeX,SizeY,TRUE);
+  if (HdlImageNew<1) PRG_end("LBMPDispEx():Non memory");
+  IMGTopdown(HdlImageNew);
+  Img=Wmemo_lock(HdlImageNew);
+
+  TileX=SizeX;
+  TileY=(0x100000)/TileX; // Calcolo la dimenzione del Tile
+//  TileY=(0x8000)/TileX; // Calcolo la dimensione del Tile
+  if (TileY<3) TileY=2;
+
+  //BmpHeader=(BITMAPINFOHEADER *) &Img->bmiHeader;
+  memcpy(&BmpBackup,(BITMAPINFO *) &Img->bmiHeader,sizeof(BITMAPINFO));
+  BmpInfo=(BITMAPINFO *) &BmpBackup;
+  BmpHeader=(BITMAPINFOHEADER *) &BmpBackup;
+  Ly=BmpHeader->biHeight; if (Ly<0) Ly=-BmpHeader->biHeight;
+  Lx=BmpHeader->biWidth;
+  Sorg=(BYTE *) Img;
+  Sorg+=Img->Offset;
+ 
+  // Loop sui "tile" per copiarlo
+  WritePy=0; 
+  TileSizeY=Img->linesize*TileY;
+
+  WritePy=Ly;
+  for (ReadPy=0;;ReadPy+=TileY)   // Loop Verticale
+  {
+	ReadSectY=(Ly-ReadPy); 
+	if (ReadSectY>TileY) ReadSectY=TileY; 
+	if (ReadSectY<1) break;		  // Fine del file
+
+	BmpHeader->biHeight=ReadSectY;
+	BmpHeader->biWidth=TileX;
+    if (StretchDIBits(hDC, 
+					  PosX,PosY+WritePy-ReadSectY,
+					  TileX,ReadSectY,
+					  0,0,
+					  TileX,ReadSectY,
+					  Sorg,
+					  BmpInfo,
+					  DIB_RGB_COLORS, 
+					  SRCCOPY) == GDI_ERROR) 
+    {
+        PRG_end("LBMPDispEx():StretchDIBits Failed"); 
+    }
+
+	// E) Cancello DC e Bitmap creati
+	WritePy-=ReadSectY;
+	Sorg+=TileSizeY;
+  }
+
+  Wmemo_unlock(HdlImageNew);
+  memo_libera(HdlImageNew,"LREPIMG");
+*/
+}
+static void LRFillPage(BOOL fPrinter,HDC hDC,SINT nPage,RECT *lpRect)
+{
+  SINT a;
+  BYTE *ptr;
+  LRT_LINKEXTERN LRALinkExt;
+  /*
+#ifndef _CONSOLE
+  WINSCENA WScena;
+#endif
+*/
+  // Se ci fossero link esterni
+  //memset(&LRALinkExt,0,sizeof(LRT_LINKEXTERN));
+  ZeroFill(LRALinkExt);
+  LRALinkExt.hDC=hDC;
+  LRALinkExt.fPrinter=fPrinter;
+  LRALinkExt.xyConvert=xyConvert;
+/*
+#ifndef _CONSOLE
+  WinDirectDC(hDC,&WScena);
+#endif
+*/
+  //yPos=-TLayOut.iVScrollPos*TLayOut.CharY;
+  for (a=arPageIndex[nPage];a<iLRE_Elements;a++)
+  {
+	if (arElement[a]->iPage!=(nPage+1)) break;
+	 
+	 ptr=(BYTE *) arElement[a]; // Puntatore al Tag
+	 ptr+=sizeof(LRETAG);
+	 switch (arElement[a]->iType)
+	 {
+
+		case LRE_CHAR: 
+		         {
+				   LRT_CHAREX Lex;
+				   CHAR *szString;
+				 
+				   szString=ptr+sizeof(LRT_CHAR);
+				   memcpy(&Lex,ptr,sizeof(LRT_CHAR));
+				   strcpy(Lex.szFontName,lpLRInit->lpFontBodyDefault);
+				   LDispLex(fPrinter,hDC,&Lex,szString,lpRect);
+				 }
+				  break;
+
+		case LRE_CHAREX: 
+		         {
+				   CHAR *szString;
+				   szString=ptr+sizeof(LRT_CHAREX);
+				   LDispLex(fPrinter,hDC,(LRT_CHAREX *) ptr,szString,lpRect);
+				 }
+				  break;
+
+		case LRE_CHARBOX: 
+		         {
+				   CHAR *szString;
+				   szString=ptr+sizeof(LRT_CHARBOX);
+				   LDispCharInBox(fPrinter,hDC,(LRT_CHARBOX *) ptr,szString,lpRect);
+				 }
+				  break;
+
+		case LRE_BOX:
+		case LRE_BOXP:
+		case LRE_BOXR:
+		case LRE_BOXPR:
+				LMultiBox(fPrinter,hDC,arElement[a]->iType,(LRT_BOXR *) ptr,lpRect);
+				break;
+		case LRE_LINE:
+				LMultiLine(fPrinter,hDC,arElement[a]->iType,(LRT_LINE *) ptr,lpRect);
+				break;
+		case LRE_HBITMAP:
+		case LRE_HBITMAPD:
+				LBitMap(fPrinter,hDC,arElement[a]->iType,(LRT_BOX *) ptr,lpRect);
+
+				//case LRE_LINK:
+
+				//LRALinkExt.lpLtrLink=(LRT_LINK *) ptr;
+				//(*lpLRInit->PostPaint)(WS_DISPLAY,0,&LRALinkExt);
+				//break;
+
+	 }
+  }
+  /*
+#ifndef _CONSOLE
+  WinDirectDC(NULL,&WScena);
+#endif
+  */
+}
+
+
+static void LPagePrinter(SINT PageStart,SINT PageEnd,SINT NumCopie)
+{
+    //static DOCINFO  di = { sizeof (DOCINFO), "", NULL ,NULL,0} ;
+	static DOCINFO  di;
+	BOOL            bSuccess ;
+	SINT iPage;
+	SINT iColCopy,iNoiColCopy;
+
+#ifndef _CONSOLE
+	HWND hWnd=WindowNow();
+#endif
+
+/*
+	{
+	//CHAR *lpName;
+	DEVMODE *lpDevMode;
+	DEVNAMES *lpDevNames;
+	lpDevMode=GlobalLock(sys.pd.hDevMode);
+	lpDevNames=GlobalLock(sys.pd.hDevNames);
+	//win_infoarg("Controllo Colore:%s [%s]",(lpDevMode->dmColor==DMCOLOR_COLOR)?"Si":"No",lpName+lpDevNames->wDeviceOffset);
+	win_infoarg("dmICMMethod:%d(%d,%d,%d,%d)\n%d(%d,%d)\n%d\nQlt:=%d\nColor=%s",
+				lpDevMode->dmICMMethod,DMICMMETHOD_NONE,DMICMMETHOD_SYSTEM,DMICMMETHOD_DRIVER,DMICMMETHOD_DEVICE,
+				lpDevMode->dmICMIntent,DMICM_SATURATE,DMICM_CONTRAST,
+				lpDevMode->dmDitherType,
+				lpDevMode->dmPrintQuality,
+				(lpDevMode->dmColor==DMCOLOR_COLOR)?"DMCOLOR_COLOR":"DMCOLOR_MONOCHROME" 
+				);
+	 
+
+	GlobalUnlock(sys.pd.hDevMode);
+	GlobalUnlock(sys.pd.hDevNames);
+	}
+	return;
+*/
+
+#ifndef _CONSOLE
+	EnableWindow (WIN_info[sys.WinInputFocus].hWnd, FALSE) ;
+#endif
+
+    bSuccess   = TRUE;
+    bUserAbort = FALSE ;
+
+#ifndef _CONSOLE
+    hDlgPrint = CreateDialog(sys.EhWinInstance, (LPCTSTR) "PrintDlgBox", WIN_info[sys.WinInputFocus].hWnd, PrintDlgProc);
+    //SetDlgItemText (hDlgPrint, IDD_FNAME, "Stampa della pagina");//szTitleName) ;
+#endif
+
+	SetAbortProc (sys.pd.hDC, AbortProc) ;
+    //GetWindowText (hwnd, (PTSTR) di.lpszDocName, sizeof (PTSTR)) ;
+//	strcpy(di.lpszDocName,"EH:Stampa di una pagina");
+//	di.lpszDocName="EH:Stampa di una pagina";
+	ZeroFill(di);
+	di.cbSize=sizeof (DOCINFO);
+	if (lpLRInit->lpPrintName) di.lpszDocName=lpLRInit->lpPrintName; else di.lpszDocName="Ferrà srl Document Spooler";
+	{
+		//printf("[%s]",lpLRInit->lpPrintName); getch();
+	//di.lpszOutput="c:\\test.txt";
+    // a) Inizio a preparare il documento in stampa
+	if (StartDoc(sys.pd.hDC, &di) > 0)
+	{
+        // Numero di copie
+		for (iColCopy = 0 ;
+             iColCopy < ((WORD) sys.pd.Flags & PD_COLLATE ? sys.pd.nCopies : NumCopie) ;
+             iColCopy++)
+             {
+               // Loop sulle Pagine
+			   for (iPage = PageStart ; iPage <= PageEnd; iPage++)
+               {
+				   //printf("%d",sys.pd.Flags & PD_COLLATE ? NumCopie : sys.pd.nCopies); getch();
+				   // Numero di copie 
+				   for (iNoiColCopy = 0 ;
+                        iNoiColCopy < (sys.pd.Flags & PD_COLLATE ? NumCopie : sys.pd.nCopies) ;
+                        iNoiColCopy++)
+                    {
+                        // Inizio stampa della pagina
+							if (StartPage (sys.pd.hDC) <= 0)
+                            {
+								bSuccess = FALSE ;break ;
+                             }
+                         
+
+							// New 2005 / Non funziona su 98 etc...
+							// Modello di colore divero da Windows
+							// I tested although ICM_ON
+						
+							if (lpLRInit->lpszICCFilename)
+							{
+								if (!SetICMMode(sys.pd.hDC, ICM_DONE_OUTSIDE_DC)) {bSuccess = FALSE; break ;}
+								if (!SetICMProfile(sys.pd.hDC, lpLRInit->lpszICCFilename)) {bSuccess = FALSE; break ;}
+							}
+
+                         // Scrivo la pagina
+							//LRFillPage(TRUE,sys.pd.hDC,PageView,NULL);  
+							//printf("Fillpage %d -> %d",PageStart,PageEnd); getch();
+
+							LRFillPage(TRUE,sys.pd.hDC,iPage,NULL);  
+
+						 // Fine della pagina
+							if (EndPage (sys.pd.hDC) <= 0)
+                              {
+                               bSuccess = FALSE ;
+                               break ;
+                              }
+
+						  if (bUserAbort) break ;
+					} // Loop sulle copia
+
+                    
+					if (!bSuccess || bUserAbort) break ;
+			   } // Loop sulle Pagine
+
+               if (!bSuccess || bUserAbort) break ;
+			 } // Loop sulle Copie
+          }
+     else
+          bSuccess = FALSE ;
+
+     if (bSuccess) 
+	 {
+		 EndDoc(sys.pd.hDC);
+		 if (lpLRInit->funcNotify) (*lpLRInit->funcNotify)(lpLRInit,WS_CLOSE,0,NULL);
+	 }
+
+#ifndef _CONSOLE
+     if (!bUserAbort)
+	 {
+          EnableWindow (WIN_info[sys.WinInputFocus].hWnd, TRUE) ;
+          DestroyWindow (hDlgPrint) ;
+     }
+#endif
+
+	}
+#ifndef _CONSOLE
+	EnableWindow (WIN_info[sys.WinInputFocus].hWnd, TRUE) ;
+	SetFocus (hWnd);
+#endif
+}
+
+
+
+// -------------------------------------------------------------------------------
+// RICALCOLA LA DIMENSIONE DEL LAYOUT                                            |
+// -------------------------------------------------------------------------------
+
+static void LayResize(void)
+{
+ if (LayWnd!=NULL)
+ {
+  MoveWindow(LayWnd,0,yBarra,WIN_info[LREOwner].CLx,WIN_info[LREOwner].CLy-45,TRUE);
+  SetFocus(OwnerWnd);
+ }
+}
+
+// -------------------------------------------------------------------------------
+// RICALCOLA LE DIMENSIONI DELL'AREA VIRTUALE                                    |
+// -------------------------------------------------------------------------------
+
+static void LayVPResize(void)
+{
+ if (LayWnd!=NULL)
+ {
+ // MoveWindow(LayWnd,0,45,WIN_info[LREOwner].lx,WIN_info[LREOwner].ly-45,TRUE);
+  GetClientRect(LayWnd,&LayClient);
+  
+  // Area reale Client
+  // 20:xPage:x:xClient
+  TLayOut.AreaX=LayClient.right-LayClient.left+1;
+  xBorder=20*TLayOut.AreaX/lpLRInit->sPaper.cx; // 20 Dot
+  if (TLayOut.AreaX<1) TLayOut.AreaX=1;
+  
+  TLayOut.AreaY=(LayClient.bottom-LayClient.top+1); 
+  yBorder=20*TLayOut.AreaY/lpLRInit->sPaper.cy; // 20 Dot
+  if (TLayOut.AreaY<1) TLayOut.AreaY=1;
+
+  //xClient-=(xBorder<<1); yClient-=(yBorder<<1);
+  TLayOut.AreaX-=(xBorder<<1);
+  TLayOut.AreaY-=(yBorder<<1);
+
+  switch (iZoom)
+  {
+	case 0: // Pagina Intera
+
+	// Calcolo della dimensione della pagina
+	// Controllo se sono in PORTRAIT o in LANDSCAPE
+	switch (LayOrientation)
+	{
+		  case DMORIENT_PORTRAIT:
+			  sVideoPage.cy=TLayOut.AreaY;
+              // xPage:yPage=x:Vly;
+			  sVideoPage.cx=lpLRInit->sPaper.cx*sVideoPage.cy/lpLRInit->sPaper.cy;
+			  break;
+              // VLx:xPage=y:yPage			       
+			  for (;;)
+			  {
+			   if (sVideoPage.cy<20) {sVideoPage.cy=-1; break;}
+			   sVideoPage.cx=lpLRInit->sPaper.cx*sVideoPage.cy/lpLRInit->sPaper.cy;
+			   if (sVideoPage.cx>(SINT) TLayOut.AreaX) sVideoPage.cy-=sVideoPage.cy/10; else break;
+			  }
+			  break;
+		  
+		  case DMORIENT_LANDSCAPE:
+			  sVideoPage.cx=TLayOut.AreaX;
+              // VLx:xPage=y:yPage			       
+			  for (;;)
+			  {
+			   if (sVideoPage.cx<20) {sVideoPage.cx=-1; break;}
+			   sVideoPage.cy=lpLRInit->sPaper.cy*sVideoPage.cx/lpLRInit->sPaper.cx;
+			   if (sVideoPage.cy>(SINT) TLayOut.AreaY) sVideoPage.cx-=sVideoPage.cx/10; else break;
+			  }
+			  break;
+		  default: PRG_end("???");
+	}		
+	break;
+	
+	case 1: // Larghezza Pagina
+
+			sVideoPage.cx=TLayOut.AreaX-xBorder;
+			sVideoPage.cy=lpLRInit->sPaper.cy*sVideoPage.cx/lpLRInit->sPaper.cx;
+			break;
+
+	case 2: // 50%
+			sVideoPage.cx=lpLRInit->sPaper.cx/10;
+			sVideoPage.cy=lpLRInit->sPaper.cy*sVideoPage.cx/lpLRInit->sPaper.cx;
+			break;
+	case 3: // 50%
+			sVideoPage.cx=lpLRInit->sPaper.cx/4;
+			sVideoPage.cy=lpLRInit->sPaper.cy*sVideoPage.cx/lpLRInit->sPaper.cx;
+			break;
+	case 4: // 50%
+			sVideoPage.cx=lpLRInit->sPaper.cx>>1;
+			sVideoPage.cy=lpLRInit->sPaper.cy*sVideoPage.cx/lpLRInit->sPaper.cx;
+			break;
+	case 5: // 50%
+			sVideoPage.cx=lpLRInit->sPaper.cx;
+			sVideoPage.cy=lpLRInit->sPaper.cy*sVideoPage.cx/lpLRInit->sPaper.cx;
+			break;
+  }
+
+  /*
+					"10%",
+					"25%",
+					"50%",
+					"100%",
+					"200%",
+					"400%",
+*/
+
+  //if (hFontBase!=NULL) DeleteObject(hFontBase);
+  xPos=xBorder;//((LayClient.right-LayClient.left)-sVideoPage.cx)>>1;
+  yPos=yBorder;
+  //yPos=((LayClient.bottom-LayClient.top)-sVideoPage.cy)>>1;
+  
+  // Calcolo l'area di stampa
+  rVideoPrintArea.left=xPos+5; rVideoPrintArea.top=yPos+5;
+  rVideoPrintArea.right=xPos+sVideoPage.cx-5;
+  rVideoPrintArea.bottom=yPos+sVideoPage.cy-5;
+  sVideoPrintSize.cx=rVideoPrintArea.right-rVideoPrintArea.left+1;
+  sVideoPrintSize.cy=rVideoPrintArea.bottom-rVideoPrintArea.top+1;
+ }
+}
+
+
+static void * LocalPaint(SINT cmd,LONG info,void *ptr)
+{
+ PAINTSTRUCT *ps;
+ switch (cmd)
+ {
+  case WS_DISPLAY:
+	ps=(PAINTSTRUCT *) ptr;
+//	box3d(0,50,WIN_info[sys.WinWriteFocus].lx,50,2);
+	break;
+
+  case WM_SIZE:
+	//if (Obj!=NULL) CalcolaLayout(TE,Obj,ON);
+
+	LayResize();
+	
+	break;
+  
+  case WM_EXITSIZEMOVE:
+	 ////boxp(0,50,WIN_info[sys.WinWriteFocus].lx,80,3,SET);
+     //LayVPResize();
+     //InvalidateRect(LayWnd,NULL,TRUE);
+	 LayVPResize();
+	 InvalidateRect(LayWnd,NULL,TRUE);
+	 break;
+
+  case WS_LINK: // Libero
+	   break;
+ }
+return NULL;
+}
+
+
+#ifndef _CONSOLE			
+static void RangeAdjust(HWND hWnd);
+static BOOL LREPreview(CHAR *lpParam)
+{
+//  FILE *pfr;
+//  CHAR *Buffer;
+  CHAR *p;
+
+  WNDCLASSEX wc;
+  DEVMODE *lLREvMode;   
+//  SINT HdlFile;
+//  SINT a,b,LPage;
+  CHAR Buf[30];
+  CHAR szComando[21];
+  SINT iNumCopie=0;
+
+  CHAR *ListView[]={"Pagina",
+					"Larghezza",
+					"10%",
+					"25%",
+					"50%",
+					"100%",
+//					"200%",
+//					"400%",
+					NULL};
+
+  struct OBJ obj[]={
+// TipObj    Nome    Sts Lck   x   y CL1 CL2 TESTO
+  {O_KEYDIM,"-"      ,OFF,ON , 31, 26, 30, 21,"-"},
+  {O_KEYDIM,"+"      ,OFF,ON ,  2, 26, 30, 21,"+"},
+  {O_KEYDIM,"FIRST"  ,OFF,ON ,  2, 47, 75, 19,"La prima"},
+  {O_KEYDIM,"LAST"   ,OFF,ON , 76, 47, 76, 19,"L'ultima"},
+  {O_KEYDIM,"ESC"    ,OFF,ON ,720, 29, 74, 19,"Esci"},
+  {O_KEYDIM,"PAGE"   ,OFF,ON ,153, 47,145, 19,"Stampa la Pagina"},
+  {O_KEYDIM,"ALL"    ,OFF,ON ,153, 27,145, 20,"Stampa Tutto"},
+  {OW_LIST ,"ZOOM"   ,OFF,ON ,302, 26,  0, 10,"101","",0,ListView},
+  {O_KEYDIM,"DP12"   ,OFF,ON ,383, 48, 22, 19,"+"},
+  {O_KEYDIM,"DP13"   ,OFF,ON ,404, 48, 22, 19,"-"},
+  {STOP}
+  };
+
+  OBJS Objs[]={
+   {"#4"     ,OS_TEXT ,305, 49,  0, -1,ON,SET,"SMALL F",3,"N. copie"},
+   {NULL   ,STOP}};
+
+
+  AUTOMOVE am[]={
+  //   Type     Name    Vertice Top/Left             Vertice Bottom/Right
+	{AMT_OBJ ,"ESC"   ,AMA_RIGHT ,  0,AMA_TOP,  0,AMP_FIX   ,0,AMP_FIX,0},
+	{AMT_STOP}};
+
+  struct IPT ipt[]={
+  { 1, 1,ALFA,RIGA, 67, 30, 82, 15,  0, 15,  0,  1},
+  { 1, 1,NUME,RIGA,352, 51, 28,  3,  0, 15,  0,  0,"No","No"},
+  { 0, 0,STOP}
+  };
+
+//  Header di attivazione
+  //lpt_control();
+  /*
+  xPage = GetDeviceCaps (sys.pd.hDC, HORZRES) ;
+  yPage = GetDeviceCaps (sys.pd.hDC, VERTRES) ;
+*/
+  iPageView=0;
+  sVideoPage.cx=-1;
+  sVideoPage.cy=-1;
+  
+  memset(&TLayOut,0,sizeof(TLayOut));
+  
+  LREFileLoad();
+
+  if (*lpParam)
+	{
+		strcpy (Buf,lpParam);
+		p=strchr (Buf,'|');
+		if (p!=NULL) // Se passo una stringa tipo "VIEW|2"
+		{
+			*p=0;
+			strcpy (szComando,Buf);
+			iNumCopie=atoi (p+1);
+		}
+		else
+		{
+			if (atoi (lpParam)>0) // Se passo una stringa tipo "2"
+			{
+				*szComando=0;
+				iNumCopie=atoi (lpParam);
+			}
+			else // Se passo una stringa tipo "VIEW" o ""
+			{
+				strcpy (szComando,Buf);
+				iNumCopie=1;
+			}
+		}
+	}
+
+	if (!*szComando) // Stampo tutto
+	{
+		mouse_graph(0,0,"CLEX"); mouse_inp();
+		LPagePrinter(0,lpLRInit->iPageCount-1,iNumCopie);
+		MouseCursorDefault();
+		goto FINE;
+	}
+  
+    win_openEx(EHWP_SCREENCENTER,20,"Power Printer Console",800,500,-1,OFF,0,WS_EHMOVEHIDE,FALSE,LocalPaint);
+ 
+  xy_rel(0,-24);
+  LREOwner=sys.WinInputFocus;
+  OwnerWnd=WindowNow();//WIN_info[LREOwner].hWnd;
+  lLREvMode=GlobalLock(sys.pd.hDevMode);
+
+ // --------------------------------------------------
+ // In creazione della Prima Finestra                |
+ // --------------------------------------------------
+  wc.cbSize        = sizeof(wc);
+  wc.style         = CS_NOCLOSE;
+  wc.lpfnWndProc   = LayProcedure;
+  wc.cbClsExtra    = 0;
+  wc.cbWndExtra    = 0;
+  wc.hInstance     = sys.EhWinInstance;
+  wc.hIcon         = LoadIcon(NULL,IDI_APPLICATION);
+  wc.hCursor       = NULL;//LoadCursor(NULL,IDC_ARROW);
+  wc.hbrBackground = (HBRUSH) COLOR_WINDOW;//(HBRUSH) GetStockObject(WHITE_BRUSH);
+  wc.lpszMenuName  = NULL;///LoadMenu;//szAppName;
+  wc.lpszClassName = "EHPrintConsole";
+  wc.hIconSm       = NULL;//LoadIcon(NULL,IDI_APPLICATION);
+  RegisterClassEx(&wc);
+ 					 
+  LayWnd=CreateWindow("EHPrintConsole", 
+					  "",
+                      WS_BORDER|WS_CHILD|WS_VISIBLE|WS_VSCROLL,
+					  0,0,0,0,
+					  WIN_info[LREOwner].hWnd, 
+					  (HMENU) NULL,//100,// Menu
+					  sys.EhWinInstance, 
+					  NULL);
+
+  LayOrientation=lLREvMode->dmOrientation;
+  LayResize();
+  LayVPResize();
+
+  //  Carico OBJ & variazioni sui Font
+  obj_open(obj); objs_open(Objs);
+
+  obj_font("+","COURIER E",0);
+  obj_font("-","COURIER E",0);
+	obj_font("DP12","COURIER E",0);
+	obj_font("DP13","COURIER E",0);
+  obj_vedi();
+
+//  Carico IPT & font
+
+  ipt_font("VGASYS",0);
+  ipt_open(ipt);
+  ipt_fontnum(0,"SMALL F",3);
+  ipt_fontnum(1,"SMALL F",3);
+  ipt_reset(); ipt_vedi();
+
+  obj_AutoMoveAssign(am);
+  iZoom=obj_listget("ZOOM");
+
+  ShowWindow(WindowNow(),SW_MAXIMIZE);
+  MouseCursorDefault();
+
+  // Loop di controllo EH
+  while (TRUE)
+  {
+   
+   sprintf(Buf,"%d/%d",iPageView+1,lpLRInit->iPageCount);
+  
+   ipt_writevedi(0,Buf,0);
+
+   iZoom=obj_listget("ZOOM");
+   input_wait();
+   
+   if (obj_press("ZOOM")) 
+   {  iZoom=obj_listget("ZOOM");
+	  TLayOut.iVScrollPos=0;
+	  TLayOut.iHScrollPos=0;
+      LayVPResize();
+	  RangeAdjust(LayWnd);
+	  InvalidateRect(LayWnd,NULL,TRUE);
+   }
+
+   if (key_press(ESC)||obj_press("ESCOFF")) break;
+   
+   if (obj_press("+ON")||key_press2(_PGDN)) 
+   {iPageView++; if (iPageView>(lpLRInit->iPageCount-1)) {iPageView=lpLRInit->iPageCount-1; continue;}
+    InvalidateRect(LayWnd,NULL,TRUE);
+   }
+
+   if (obj_press("-ON")||key_press2(_PGUP)) 
+   {iPageView--; if (iPageView<0) {iPageView=0; continue;}
+    InvalidateRect(LayWnd,NULL,TRUE);
+   }
+
+   if (obj_press("FIRSTOFF")) {iPageView=0; InvalidateRect(LayWnd,NULL,TRUE);}
+   if (obj_press("LASTOFF"))  {iPageView=lpLRInit->iPageCount-1; InvalidateRect(LayWnd,NULL,TRUE);}
+
+   if (key_press2(_FUP))  SendMessage(LayWnd,WM_VSCROLL,SB_LINEUP,0);
+   if (key_press2(_FDN))  SendMessage(LayWnd,WM_VSCROLL,SB_LINEDOWN,0);
+   if (key_press2(_FDX))  SendMessage(LayWnd,WM_HSCROLL,SB_LINEDOWN,0);
+   if (key_press2(_FSX))  SendMessage(LayWnd,WM_HSCROLL,SB_LINEUP,0);
+   
+   if (obj_press("PAGEOFF"))
+   {
+      LPagePrinter(iPageView,iPageView,iNumCopie);
+   }
+
+   if (obj_press("ALLOFF"))
+   {
+	   mouse_graph(0,0,"CLEX"); mouse_inp();
+	   LPagePrinter(0,lpLRInit->iPageCount-1,iNumCopie);
+	   MouseCursorDefault();
+   }
+  };
+  
+  DestroyWindow(LayWnd);
+  LayWnd=NULL;
+FINE:
+//  Wmemo_unlock(HdlFile);
+  // Incredibile non liberavo il file temporaneo .... 
+  //memo_libera(HdlFile,"LRE");
+//  EhFree(LREArray);
+  //EhFree(PageLoc);
+  LREFileFreeResource(TRUE);
+
+  if (hFontBase!=NULL) DeleteObject(hFontBase);
+#ifndef _CONSOLE			
+  if (*szComando) win_close();
+#endif
+  GlobalUnlock(sys.pd.hDevMode);  
+  return 0;
+}
+
+// -------------------------------------------------------------
+// RangeAdjust                                                 |
+//                                                             |
+// -------------------------------------------------------------
+static void RangeAdjust(HWND hWnd)
+{
+  SCROLLINFO ScrollInfo;
+  SINT yArea;
+  SINT xArea;
+  GetClientRect(LayWnd,&LayClient);
+  
+  // VERTICALE
+  TLayOut.AreaY=(LayClient.bottom-LayClient.top+1);  // =NumCam
+  yArea=sVideoPage.cy-TLayOut.AreaY;
+// sVideoPage.cy= 
+  if (yArea<=0)
+  {
+   TLayOut.iVScrollMax=0;
+  }
+  else
+  {
+   TLayOut.LineVideoY=40;//(TLayOut.AreaY/TLayOut.CharY)+1;
+   TLayOut.CharY=(yArea/TLayOut.LineVideoY)+1;
+   TLayOut.iVScrollMax=max(0,TLayOut.LineVideoY+10);
+   TLayOut.iVScrollPos=min(TLayOut.iVScrollPos,TLayOut.iVScrollMax);
+  }
+
+   ScrollInfo.cbSize=sizeof(ScrollInfo);
+   ScrollInfo.fMask=SIF_ALL;
+   ScrollInfo.nPage=0;//TLayOut.Lines/((TLayOut.AreaY/TLayOut.CharY));
+   ScrollInfo.nPos=TLayOut.iVScrollPos;
+   ScrollInfo.nMin=0;
+   ScrollInfo.nMax=TLayOut.iVScrollMax;
+   SetScrollInfo(hWnd,SB_VERT,&ScrollInfo,TRUE);
+
+   // ORIZZONTALE
+
+   TLayOut.AreaX=LayClient.right-LayClient.left+1;
+   xArea=sVideoPage.cx-TLayOut.AreaX;
+
+   if (xArea<=0)
+   {
+    TLayOut.iHScrollMax=0;
+   }
+   else
+   {
+    TLayOut.LineVideoX=40;//(TLayOut.AreaY/TLayOut.CharY)+1;
+    TLayOut.CharX=(xArea/TLayOut.LineVideoX)+1;
+    TLayOut.iHScrollMax=max(0,TLayOut.LineVideoX+10);
+    TLayOut.iHScrollPos=min(TLayOut.iHScrollPos,TLayOut.iHScrollMax);
+   }
+
+  ScrollInfo.cbSize=sizeof(ScrollInfo);
+  ScrollInfo.fMask=SIF_ALL;
+  ScrollInfo.nPage=0;//TLayOut.Lines/((TLayOut.AreaY/TLayOut.CharY));
+  ScrollInfo.nPos=TLayOut.iHScrollPos;
+  ScrollInfo.nMin=0;
+  ScrollInfo.nMax=TLayOut.iHScrollMax;
+  SetScrollInfo(hWnd,SB_HORZ,&ScrollInfo,TRUE);
+}
+
+static void LTbox(HDC hdc,SINT x,SINT y,SINT x2,SINT y2,LONG Color)
+{
+	//SINT OldCol=ModeColor(TRUE);
+    dcLineEx(hdc,x,y,x2,y,Color,SET,PS_DOT,0);
+    dcLineEx(hdc,x,y2,x2,y2,Color,SET,PS_DOT,0);
+    dcLineEx(hdc,x,y,x,y2,Color,SET,PS_DOT,0);
+    dcLineEx(hdc,x2,y,x2,y2,Color,SET,PS_DOT,0);
+	//ModeColor(OldCol);
+}
+
+static LRESULT CALLBACK LayProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam)
+{
+  HDC hdc;
+  PAINTSTRUCT ps;
+  RECT Rect;
+  //WINSCENA Scena;
+  SINT iVScrollInc;
+  SINT iHScrollInc;
+
+  static LCount=0;
+  static SINT LastPosx;
+  static SINT LastPosy;
+  static BOOL BarActive=FALSE;
+
+  switch (message)
+  {
+     // Prima chiamata
+	 case WM_CREATE:  break;
+
+     case WM_SIZE:
+	//if (info==SIZE_MAXSHOW) {win_info("POI"); }
+	//if ((info==SIZE_MAXIMIZED)||(info==SIZE_RESTORED)) 
+	//{
+		  LayVPResize();
+	 //InvalidateRect(LayWnd,NULL,TRUE);
+	//}
+		  //_d_("%d,%d  ",rVideoPrintArea.bottom,rVideoPrintArea.right);
+		  RangeAdjust(hWnd);
+		  InvalidateRect(LayWnd,NULL,TRUE);
+		  break;
+
+	 case WM_MOUSEMOVE: 
+		  GetWindowRect(hWnd,&Rect);
+		  WinMouse(LOWORD(lParam),yBarra+HIWORD(lParam),0xFFFF);
+		  break;
+/*
+#ifdef WM_MOUSEWHEEL
+	// Intercetto il mouse Wheel
+	case WM_MOUSEWHEEL:
+			{
+			 WORD fwKeys = GET_KEYSTATE_WPARAM(wParam);
+			 short zDelta = GET_WHEEL_DELTA_WPARAM(wParam)/120;;
+			// if (zDelta>1) dispx("%d",zDelta);
+			 //if (zDelta<0) MouseWheelManager(WS_ADD,IN_MW_DOWN);
+			 //if (zDelta>0) MouseWheelManager(WS_ADD,IN_MW_UP);
+			 dispx("QUI");
+			}
+			break;
+#endif
+			*/
+
+	 case WM_LBUTTONDOWN:
+	 case WM_RBUTTONDOWN:
+	 case WM_LBUTTONUP:
+	 case WM_RBUTTONUP:
+	 case WM_LBUTTONDBLCLK:
+         if (sys.WinInputFocus<0) break;
+         WinMouseAction(WIN_info[sys.WinInputFocus].hWnd,message,wParam,lParam);
+		 break;
+//         WinMouseAction(hWnd,message,wParam,lParam);
+//		 break;
+
+	 case WM_NCHITTEST:
+		  break;
+
+	// ----------------------------------------------- 
+	// Disegno la Pagina                             |
+    // ----------------------------------------------- 
+
+	 case WM_PAINT:
+			hdc=BeginPaint(hWnd,&ps);
+			VideoOffset.x=-TLayOut.iHScrollPos*TLayOut.CharX;
+			VideoOffset.y=-TLayOut.iVScrollPos*TLayOut.CharY;
+
+			if (arPageIndex!=NULL)
+			{
+				//dcBoxp(HDC hDC,SINT x1,SINT y1,SINT x2,SINT y2,LONG col);
+			 dcBoxp(hdc,
+				  xPos+VideoOffset.x,yPos+VideoOffset.y,
+				  xPos+VideoOffset.x+sVideoPage.cx,
+				  yPos+VideoOffset.y+sVideoPage.cy,RGB(255,255,255));
+			 
+			 dcBox(hdc,
+				   RectFill(&Rect,xPos+VideoOffset.x,yPos+VideoOffset.y,xPos+VideoOffset.x+sVideoPage.cx,yPos+VideoOffset.y+sVideoPage.cy),
+				   0,0);
+
+			 // Area stampabile
+			 LTbox(	hdc,
+					rVideoPrintArea.left+VideoOffset.x,
+					rVideoPrintArea.top+VideoOffset.y,
+					rVideoPrintArea.right+VideoOffset.x,
+					rVideoPrintArea.bottom+VideoOffset.y,ColorPal[2]);
+            
+			 // Margine superiore
+			 dcLineEx(hdc,
+					xPos+VideoOffset.x,
+					DotToVideoY(lpLRInit->rPage.top),
+					xPos+VideoOffset.x+sVideoPage.cx,
+					DotToVideoY(lpLRInit->rPage.top),
+					7,SET,PS_DOT,0);
+
+			 dcLineEx(hdc,
+					xPos+VideoOffset.x,
+					DotToVideoY(lpLRInit->rPage.bottom),
+					xPos+VideoOffset.x+sVideoPage.cx,
+					DotToVideoY(lpLRInit->rPage.bottom),
+					7,SET,PS_DOT,0);
+
+			 dcLineEx(hdc,
+					DotToVideoX(lpLRInit->rPage.left),
+					yPos+VideoOffset.y,
+					DotToVideoX(lpLRInit->rPage.left),
+					yPos+VideoOffset.y+sVideoPage.cy,
+					7,SET,PS_DOT,0);
+
+			 dcLineEx(hdc,
+					DotToVideoX(lpLRInit->rPage.right),
+					yPos+VideoOffset.y,
+					DotToVideoX(lpLRInit->rPage.right),
+					yPos+VideoOffset.y+sVideoPage.cy,
+					7,SET,PS_DOT,0);
+			 LRFillPage(FALSE,hdc,iPageView,&ps.rcPaint);
+			}
+			EndPaint(hWnd,&ps);
+			return 0;
+
+	 // Ultimaa Chiamata
+	 case WM_DESTROY: break;
+	 case WM_COMMAND: break;
+			
+
+
+	 // --------------------------------------------------------------------------------
+     // Controllo Scorrimento VERTICALE                                                |
+     // --------------------------------------------------------------------------------
+     case WM_VSCROLL:
+
+		 iVScrollInc=0;
+		 switch (LOWORD(wParam))
+		   {
+			case SB_TOP: 
+			   iVScrollInc=-iVScrollInc;
+			   break;
+		    
+			case SB_BOTTOM: 
+			   iVScrollInc=TLayOut.Lines-iVScrollInc;
+			   break;
+
+			case SB_LINEUP: 
+			   iVScrollInc=-1;
+			   break;
+			
+			case SB_LINEDOWN: 
+			   iVScrollInc=1;
+			   break;
+
+            case SB_PAGEUP: 
+			   iVScrollInc=min(-1,-TLayOut.AreaY/TLayOut.CharY);
+			   break;
+			
+			case SB_PAGEDOWN: 
+			   iVScrollInc=max(1,TLayOut.AreaY/TLayOut.CharY);
+			   break;
+
+			case SB_THUMBTRACK: 
+			case SB_THUMBPOSITION:
+			  iVScrollInc=HIWORD(wParam)-TLayOut.iVScrollPos;
+			  break;
+			
+			//default: break;
+		   }
+
+		    iVScrollInc=max(-TLayOut.iVScrollPos,
+			               min(iVScrollInc,TLayOut.iVScrollMax-TLayOut.iVScrollPos));
+		   if (iVScrollInc!=0)
+		   {
+			ScrollWindow(hWnd,0,-TLayOut.CharY*iVScrollInc,NULL,NULL);	
+			TLayOut.iVScrollPos+=iVScrollInc;
+			SetScrollPos(hWnd,SB_VERT,TLayOut.iVScrollPos,TRUE);
+			UpdateWindow(hWnd);
+		   }
+           break;
+
+	 // --------------------------------------------------------------------------------
+     // Controllo Scorrimento VERTICALE                                                |
+     // --------------------------------------------------------------------------------
+     case WM_HSCROLL:
+
+		 iHScrollInc=0;
+		 switch (LOWORD(wParam))
+		   {
+			case SB_TOP: 
+			   iHScrollInc=-iHScrollInc;
+			   break;
+		    
+			case SB_BOTTOM: 
+			   iHScrollInc=TLayOut.Lines-iHScrollInc;
+			   break;
+
+			case SB_LINEUP: 
+			   iHScrollInc=-1;
+			   break;
+			
+			case SB_LINEDOWN: 
+			   iHScrollInc=1;
+			   break;
+
+            case SB_PAGEUP: 
+			   iHScrollInc=min(-1,-TLayOut.AreaX/TLayOut.CharX);
+			   break;
+			
+			case SB_PAGEDOWN: 
+			   iHScrollInc=max(1,TLayOut.AreaX/TLayOut.CharX);
+			   break;
+
+			case SB_THUMBTRACK: 
+			case SB_THUMBPOSITION:
+			  iHScrollInc=HIWORD(wParam)-TLayOut.iHScrollPos;
+			  break;
+			
+			//default: break;
+		   }
+
+		    iHScrollInc=max(-TLayOut.iHScrollPos,
+			               min(iHScrollInc,TLayOut.iHScrollMax-TLayOut.iHScrollPos));
+		   if (iHScrollInc!=0)
+		   {
+			//ScrollWindow(hWnd,0,-TLayOut.CharX*iHScrollInc,NULL,NULL);	
+			ScrollWindow(hWnd,-TLayOut.CharX*iHScrollInc,0,NULL,NULL);
+			TLayOut.iHScrollPos+=iHScrollInc;
+			SetScrollPos(hWnd,SB_HORZ,TLayOut.iHScrollPos,TRUE);
+			UpdateWindow(hWnd);
+		   }
+           break;
+
+
+  }  // switch message
+
+  return(DefWindowProc(hWnd, message, wParam, lParam));
+// return(0L);
+}  // end of WndProc()
+#endif // _CONSOLE
+
+static BOOL LREPrintDirect(CHAR *lpParam)
+{
+  CHAR *p;
+
+//  WNDCLASSEX wc;
+//  DEVMODE *lLREvMode;   
+//  SINT HdlFile;
+//  SINT a,b,LPage;
+  CHAR Buf[30];
+  CHAR szComando[21];
+  SINT iNumCopie=0;
+
+  iPageView=0;
+  sVideoPage.cx=-1;
+  sVideoPage.cy=-1;
+  
+  memset(&TLayOut,0,sizeof(TLayOut));
+ /* 
+  HdlFile=file_load(szTempFile,RAM_AUTO); if (HdlFile<0) PRG_end("LRE:Non memory");
+  lpData=Wmemo_lock(HdlFile);
+
+  for(a=0,p=lpData;;) {a++; p=LREGetNext(p); if (p==NULL) break;}
+  iLRE_Elements=a;
+  
+  LREArray=EhAlloc(sizeof (LRETAG *)*iLRE_Elements);
+  PageLoc=EhAlloc(sizeof(SINT)*(lpLRInit->iPageCount+1));
+  memset(PageLoc,0,sizeof(SINT)*(lpLRInit->iPageCount+1));
+  LPage=-1; b=0;
+  for(a=0,p=lpData;a<iLRE_Elements;a++) 
+  {arElement[a]=(LRETAG *) p; 
+   if (arElement[a]->iPage!=LPage) {PageLoc[b]=a; LPage=arElement[a]->iPage; b++;}
+   p=LREGetNext(p); 
+   if (p==NULL) break;
+  }
+*/
+  LREFileLoad();
+
+  if (*lpParam)
+  {
+	strcpy(Buf,lpParam);
+	p=strchr(Buf,'|');
+	if (p!=NULL) // Se passo una stringa tipo "VIEW|2"
+	{
+		*p=0;
+		strcpy (szComando,Buf);
+		iNumCopie=atoi (p+1);
+	}
+	else
+	{
+		if (atoi(lpParam)>0) // Se passo una stringa tipo "2"
+		{
+			*szComando=0;
+			iNumCopie=atoi(lpParam);
+		}
+		else // Se passo una stringa tipo "VIEW" o ""
+		{
+			strcpy (szComando,Buf);
+			iNumCopie=1;
+		}
+	}
+  }
+
+  // sys.pd.nCopies=iNumCopie;
+  //printf("[%d]",iNumCopie); getch();
+  LPagePrinter(0,lpLRInit->iPageCount-1,iNumCopie);
+/*
+  Wmemo_unlock(HdlFile);
+  // Incredibile non liberavo il file temporaneo .... 
+  memo_libera(HdlFile,"LRE"); remove(szTempFile);
+  
+  EhFree(LREArray);
+  EhFree(PageLoc);
+  */
+  LREFileFreeResource(TRUE);
+
+  if (hFontBase!=NULL) DeleteObject(hFontBase);
+  GlobalUnlock(sys.pd.hDevMode);  
+  return 0;
+}
+  
+
+
+static BYTE *LREGetNext(BYTE *ptr)
+{
+  BYTE *pt=ptr; 
+  LRETAG *Lre=(LRETAG *) pt;
+  if (pt==NULL) PRG_end("LRE:Null");
+  if (Lre->iType==LRE_ENDFILE) return NULL;
+  //pt+=sizeof(LRETAG); pt+=Lre->LenPostData;
+  pt+=sizeof(LRETAG)+Lre->iLenTag;
+  return pt;
+}
+ 
+void LRBoxRound(SINT x1,SINT y1,SINT x2,SINT y2,SINT Color,SINT lRoundWidth,SINT lRoundHeight,SINT iPenWidth)
+{
+    LRT_BOXR LRTBox;
+	
+	ZeroFill(LRTBox);
+	LRTBox.rRect.left=x1;
+	LRTBox.rRect.right=x2;
+	LRTBox.rRect.top=y1;
+	LRTBox.rRect.bottom=y2;
+	LRTBox.lColore=Color;
+	LRTBox.lRoundHeight=lRoundHeight;
+	LRTBox.lRoundWidth=lRoundWidth;
+	LRTBox.iPenWidth=iPenWidth;
+	LREAddItem(LRE_BOXR,&LRTBox,sizeof(LRT_BOXR),0,0);
+}
+
+void LRBoxpRound(SINT x1,SINT y1,SINT x2,SINT y2,SINT Color,SINT lRoundWidth,SINT lRoundHeight,SINT iPenWidth)
+{
+    LRT_BOXR LRTBox;
+	
+	ZeroFill(LRTBox);
+	LRTBox.rRect.left=x1;
+	LRTBox.rRect.right=x2;
+	LRTBox.rRect.top=y1;
+	LRTBox.rRect.bottom=y2;
+	LRTBox.lColore=Color;
+	LRTBox.lRoundHeight=lRoundHeight;
+	LRTBox.lRoundWidth=lRoundWidth;
+	LRTBox.iPenWidth=iPenWidth;
+	LREAddItem(LRE_BOXPR,&LRTBox,sizeof(LRT_BOXR),0,0);
+}
+
+void LRBox(SINT x1,SINT y1,SINT x2,SINT y2,SINT Color,SINT iWidth)
+{
+    LRT_BOXR LRTBox;
+	
+	ZeroFill(LRTBox);
+	LRTBox.rRect.left=x1;
+	LRTBox.rRect.right=x2;
+	LRTBox.rRect.top=y1;
+	LRTBox.rRect.bottom=y2;
+	LRTBox.lColore=Color;
+	LRTBox.iPenWidth=iWidth;
+	LREAddItem(LRE_BOX,&LRTBox,sizeof(LRT_BOXR),0,0);
+}
+
+void LRBoxp(SINT x1,SINT y1,SINT x2,SINT y2,SINT Color)
+{
+    LRT_BOXR LRTBox;
+	
+	ZeroFill(LRTBox);
+	LRTBox.rRect.left=x1;
+	LRTBox.rRect.right=x2;
+	LRTBox.rRect.top=y1;
+	LRTBox.rRect.bottom=y2;
+	LRTBox.lColore=Color;
+	LREAddItem(LRE_BOXP,&LRTBox,sizeof(LRT_BOXR),0,0);
+}
+
+void LRLine(SINT x1,SINT y1,SINT x2,SINT y2,SINT Color,SINT iPenWidth,SINT iStyle,SINT iMode)
+{
+    LRT_LINE LRTLine;
+
+	ZeroFill(LRTLine);
+	LRTLine.rRect.left=x1;
+	LRTLine.rRect.right=x2;
+	LRTLine.rRect.top=y1;
+	LRTLine.rRect.bottom=y2;
+	LRTLine.Colore=Color;
+	LRTLine.iPenWidth=iPenWidth; //win_infoarg("%d",iPenWidth);
+	LRTLine.iStyle=iStyle;
+	LRTLine.iMode=iMode;
+	LREAddItem(LRE_LINE,&LRTLine,sizeof(LRTLine),0,0);
+}
+
+void LRDispf(SINT px,SINT py,SINT Color,SINT iStyles,SINT xAllinea,CHAR *lpFont,SINT yChar,CHAR *lpString)
+{
+   LRT_CHAREX LRTCharEx;
+
+   if (!*lpString) return;
+   memset(&LRTCharEx,0,sizeof(LRTCharEx));
+   LRTCharEx.Point.x=px;
+   LRTCharEx.Point.y=py;
+   LRTCharEx.xAllinea=xAllinea;
+   LRTCharEx.yChar=yChar;
+   LRTCharEx.fFix=FALSE;
+   LRTCharEx.iStyles=iStyles;
+   /*
+   LRTCharEx.fBold=(iStyles&STYLE_BOLD)?1:0;//lpLRInit->fBold;//sys.fFontBold;
+   LRTCharEx.fItalic=(iStyles&STYLE_ITALIC)?1:0;//lpLRInit->fItalic;//sys.fFontItalic;
+   LRTCharEx.fUnderLine=(iStyles&STYLE_UNDERLINE)?1:0;//lpLRInit->fUnderLine;//sys.fFontItalic;
+   */
+   LRTCharEx.lColore=Color;
+   strcpy(LRTCharEx.szFontName,lpFont);
+   LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),lpString,0);
+}
+
+void LRDispLine(SINT px,SINT py,SINT Color,SINT iStyles,SINT xAllinea,CHAR *lpFont,SINT yChar,CHAR *lpString)
+{
+   LRT_CHAREX LRTCharEx;
+
+   if (!*lpString) return;
+   memset(&LRTCharEx,0,sizeof(LRTCharEx));
+   LRTCharEx.Point.x=px;//lpLRInit->rPage.left+px;
+   LRTCharEx.Point.y=lpLRInit->yBodyTop+1+(lpLRInit->iVirtualLineCount*lpLRInit->iRowPadded)+py;
+   LRTCharEx.xAllinea=xAllinea;
+   if (yChar>0) LRTCharEx.yChar=yChar; else LRTCharEx.yChar=lpLRInit->iRowHeight;
+   LRTCharEx.fFix=FALSE;
+   LRTCharEx.iStyles=iStyles;
+//   LRTCharEx.fBold=lpLRInit->fBold;//sys.fFontBold;
+  // LRTCharEx.fItalic=lpLRInit->fItalic;//sys.fFontItalic;
+/*
+   LRTCharEx.fBold=(iStyles&STYLE_BOLD)?1:0;//lpLRInit->fBold;//sys.fFontBold;
+   LRTCharEx.fItalic=(iStyles&STYLE_ITALIC)?1:0;//lpLRInit->fItalic;//sys.fFontItalic;
+   LRTCharEx.fUnderLine=(iStyles&STYLE_UNDERLINE)?1:0;//lpLRInit->fUnderLine;//sys.fFontItalic;
+  */ 
+   if (Color!=-1) LRTCharEx.lColore=Color; else LRTCharEx.lColore=lpLRInit->lGColor;
+   if (lpFont) strcpy(LRTCharEx.szFontName,lpFont); else strcpy(LRTCharEx.szFontName,lpLRInit->lpFontBodyDefault);
+   LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),lpString,0);
+}
+
+void LRHBitmap(SINT x1,SINT y1,SINT x2,SINT y2,SINT Hdl)
+{
+    LRT_BOX LRTBox;
+	
+	memset(&LRTBox,0,sizeof(LRTBox));
+	LRTBox.rRect.left=x1;
+	LRTBox.rRect.right=x2;
+	LRTBox.rRect.top=y1;
+	LRTBox.rRect.bottom=y2;
+	LRTBox.Colore=Hdl;
+	LREAddItem(LRE_HBITMAP,&LRTBox,sizeof(LRTBox),0,0);
+}
+
+void LRHBitmapDir(SINT x1,SINT y1,SINT Hdl)
+{
+    LRT_BOX LRTBox;
+	
+	memset(&LRTBox,0,sizeof(LRTBox));
+	LRTBox.rRect.left=x1;
+	LRTBox.rRect.top=y1;
+	LRTBox.Colore=Hdl;
+	LREAddItem(LRE_HBITMAPD,&LRTBox,sizeof(LRTBox),0,0);
+}
+
+//SINT LRGetJustAlt(RECT rArea,CHAR *lpFont,SINT yChar,SINT iInterLinea,CHAR *lpString)
+SINT LRGetDispInBoxAlt(LRT_CHARBOX *LCharBox,CHAR *lpString,SINT *lpiRows)
+{
+	HFONT hFont,OldFont; 
+	SINT  xChar;
+	CHAR *NewText;
+	SINT y;
+	HDC hdc;
+	xChar=0;
+	if (LCharBox->yChar<1) return 0;
+
+	//hdc=GetDC(NULL);
+	hdc=sys.pd.hDC;
+	NewText=EhAlloc(strlen(lpString)+1);
+	if (sys.OemTranslate) OemToChar(lpString,NewText); else strcpy(NewText,lpString);
+
+	hFont=CreateFont(LCharBox->yChar, // Altezza del carattere
+					 xChar, // Larghezza del carattere (0=Default)
+					 0, // Angolo di rotazione x 10
+					 0, //  Angolo di orientamento bo ???
+					 /*
+					 lpLRInit->bBold ? FW_BOLD : 0, // Spessore del carattere (MACRO Ex: FW_BOLD)
+					 lpLRInit->bItalic, // Flag Italico    ON/OFF
+					 lpLRInit->bUnderLine, // Flag UnderLine  ON/OFF
+					 */
+					 (LCharBox->iStyles&STYLE_BOLD)?FW_BOLD:0,//lpLRInit->fBold;//sys.fFontBold;
+					 (LCharBox->iStyles&STYLE_ITALIC)?1:0,//lpLRInit->fItalic;//sys.fFontItalic;
+					 (LCharBox->iStyles&STYLE_UNDERLINE)?1:0,//lpLRInit->fUnderLine;//sys.fFontItalic;					 
+					 0, // Flag StrikeOut  ON/OFF
+					 DEFAULT_CHARSET, // Tipo di codepage vedi CreateFont (0=Ansi)
+	//				   FERRA_OUTPRECISION, // Output precision
+					 OUT_DEFAULT_PRECIS, // Output precision
+					 0, // Clipping Precision
+					 DEFAULT_QUALITY,//PROOF_QUALITY, // Qualità di stampa (DEFAULT,DRAFT ecc...)
+					 DEFAULT_PITCH,//FIXED_PITCH, // Pitch & Family (???)
+					 //0,
+					 //"Arial"); // Nome del font
+					 LCharBox->szFontName); // Nome del font "Courier New"
+
+	OldFont=SelectObject(hdc, hFont);
+	SetBkMode(hdc,TRANSPARENT); 
+	SetMapMode(hdc, MM_TEXT);
+	SetTextCharacterExtra(hdc,LCharBox->iExtraCharSpace);
+
+	//y=LTextJustify(hdc,lpString,&rArea,iInterLinea,FALSE);
+	y=LTextInBox(hdc,LCharBox,lpString,FALSE,lpiRows,LCharBox->iMaxRows);
+	SelectObject(hdc, OldFont);
+	DeleteObject(hFont);
+
+	EhFree(NewText);
+	//ReleaseDC(NULL,hdc);
+	//if (*lpiRows>2) win_infoarg("[%s] y=%d %d",lpString,y,*lpiRows);
+	return y;
+}
+
+void LRDispInBox(RECT rArea,SINT Color,SINT iStyles,SINT iAlign,CHAR *lpFont,SINT yChar,SINT iInterLinea,CHAR *lpString,BOOL bJustifyLast)
+{
+   LRT_CHARBOX LCharBox;
+
+   if (!*lpString) return;
+   ZeroFill(LCharBox);
+   memcpy(&LCharBox.rArea,&rArea,sizeof(RECT));
+
+   LCharBox.yChar=yChar;
+   LCharBox.yInterlinea=iInterLinea;
+   LCharBox.fFix=FALSE;
+   LCharBox.iStyles=iStyles;
+   /*
+   LCharBox.fBold=lpLRInit->fBold;//sys.fFontBold;
+   LCharBox.fItalic=lpLRInit->fItalic;//sys.fFontItalic;
+   */
+
+   LCharBox.lColore=Color;
+   LCharBox.xAllinea=iAlign;
+   LCharBox.bJustifyLast=bJustifyLast;
+   strcpy(LCharBox.szFontName,lpFont);
+   LREAddItem(LRE_CHARBOX,&LCharBox,sizeof(LCharBox),lpString,0);
+}
+
+SINT LRDispInBoxEx(RECT rArea,SINT Color,SINT iStyles,SINT iAlign,CHAR *lpFont,SINT yChar,SINT iInterLinea,CHAR *lpString,BOOL bJustifyLast,SINT iExtraCharSpace,SINT iMaxRows,SINT *lpiRows)
+{
+   LRT_CHARBOX LCharBox;
+
+   if (!*lpString) return 0;
+   ZeroFill(LCharBox);
+   memcpy(&LCharBox.rArea,&rArea,sizeof(RECT));
+
+   LCharBox.yChar=yChar;
+   LCharBox.yInterlinea=iInterLinea;
+   LCharBox.fFix=FALSE;
+   LCharBox.bJustifyLast=bJustifyLast;
+   LCharBox.iStyles=iStyles;
+/*
+   LCharBox.fBold=lpLRInit->fBold;//sys.fFontBold;
+   LCharBox.fItalic=lpLRInit->fItalic;//sys.fFontItalic;
+   */
+   LCharBox.lColore=Color;
+   LCharBox.xAllinea=iAlign;
+   LCharBox.iExtraCharSpace=iExtraCharSpace; // New 2004
+   LCharBox.iMaxRows=iMaxRows;
+   strcpy(LCharBox.szFontName,lpFont);
+   LREAddItem(LRE_CHARBOX,&LCharBox,sizeof(LCharBox),lpString,0);
+   return LRGetDispInBoxAlt(&LCharBox,lpString,lpiRows);
+
+}
+
+void LRDispRiemp(RECT rArea,SINT Color,SINT iStyles,CHAR *lpFont,SINT yChar,CHAR *lpString,CHAR Riemp)
+{
+	HFONT hFont,OldFont; 
+	SINT  xChar=0;
+	CHAR *NewText;
+	CHAR szServ[1024];
+	RECT Rect;
+	HDC hdc;
+
+	SIZE size ;
+	LRT_CHAREX LRTCharEx;
+
+	memcpy(&Rect,&rArea,sizeof(RECT));
+	if (yChar<1) return;
+
+	hdc=GetDC(NULL);
+	NewText=EhAlloc(strlen(lpString)+1);
+	if (sys.OemTranslate) OemToChar(lpString,NewText); else strcpy(NewText,lpString);
+
+	hFont=CreateFont(yChar, // Altezza del carattere
+					 xChar, // Larghezza del carattere (0=Default)
+					 0, // Angolo di rotazione x 10
+					 0, //  Angolo di orientamento bo ???
+/*
+					 lpLRInit->fBold ? FW_BOLD : 0, // Spessore del carattere (MACRO Ex: FW_BOLD)
+					 lpLRInit->fItalic, // Flag Italico    ON/OFF
+					 lpLRInit->fUnderLine, // Flag UnderLine  ON/OFF
+*/
+					  (iStyles&STYLE_BOLD)?FW_BOLD:0,//lpLRInit->fBold;//sys.fFontBold;
+					  (iStyles&STYLE_ITALIC)?1:0,//lpLRInit->fItalic;//sys.fFontItalic;
+					  (iStyles&STYLE_UNDERLINE)?1:0,//lpLRInit->fUnderLine;//sys.fFontItalic;					 
+
+					 0, // Flag StrikeOut  ON/OFF
+					 DEFAULT_CHARSET, // Tipo di codepage vedi CreateFont (0=Ansi)
+	//				   FERRA_OUTPRECISION, // Output precision
+					 OUT_DEFAULT_PRECIS, // Output precision
+					 0, // Clipping Precision
+					 DEFAULT_QUALITY,//PROOF_QUALITY, // Qualità di stampa (DEFAULT,DRAFT ecc...)
+					 DEFAULT_PITCH,//FIXED_PITCH, // Pitch & Family (???)
+					 //0,
+					 //"Arial"); // Nome del font
+					 lpFont); // Nome del font "Courier New"
+
+	OldFont=SelectObject(hdc, hFont);
+	SetBkMode(hdc,TRANSPARENT); 
+	SetMapMode(hdc, MM_TEXT);
+    SetTextCharacterExtra(hdc,0);
+
+	sprintf (szServ,"%s %c",lpString,Riemp);
+	do
+	{
+		GetTextExtentPoint32(hdc,szServ,strlen (szServ),&size) ;
+		sprintf (szServ,"%s%c",szServ,Riemp);
+
+	} while ((SINT) size.cx < (rArea.right - rArea.left)) ;
+
+	szServ[strlen (szServ)-1]=0;
+
+	SelectObject(hdc, OldFont);
+	DeleteObject(hFont);
+
+	EhFree(NewText);
+	ReleaseDC(NULL,hdc);
+
+	memset(&LRTCharEx,0,sizeof(LRTCharEx));
+	LRTCharEx.Point.x=rArea.left;
+	LRTCharEx.Point.y=rArea.top;
+	LRTCharEx.xAllinea=LR_LEFT;
+	LRTCharEx.yChar=yChar;
+	LRTCharEx.fFix=FALSE;
+	LRTCharEx.iStyles=iStyles;
+//	LRTCharEx.fBold=lpLRInit->fBold;//sys.fFontBold;
+//	LRTCharEx.fItalic=lpLRInit->fItalic;//sys.fFontItalic;
+	LRTCharEx.lColore=Color;
+	strcpy(LRTCharEx.szFontName,lpFont);
+	LREAddItem(LRE_CHAREX,&LRTCharEx,sizeof(LRTCharEx),szServ,0);
+	return;
+}
+
+//
+// LRELoadFile()
+//
+static void LREFileLoad(void)
+{
+  BYTE *p,*pData;
+  SINT iLastPage,iLine,iPage;
+  
+  // --------------------------------------------------------------------
+  // Creo array dei puntatori alle pagine del file caricato in memoria
+  // --------------------------------------------------------------------
+  hdlFileTemp=file_load(szTempFile,RAM_AUTO); if (hdlFileTemp<0) PRG_end("LRE:Non memory");
+  pData=Wmemo_lock(hdlFileTemp);
+
+  // Control gli elementi
+  iLRE_Elements=0; p=pData; do {iLRE_Elements++;} while (p=LREGetNext(p));
+//  for(iLRE_Elements=0,p=lpData;;) {iLRE_Elements++; p=LREGetNext(p); if (p==NULL) break;}
+//  iLRE_Elements=a;
+
+  arElement=EhAllocZero(sizeof (LRETAG *)*iLRE_Elements);
+  arPageIndex=EhAllocZero(sizeof(SINT)*(lpLRInit->iPageCount+1));
+
+  //
+  // Trovo il primo Tag di ogni pagina
+  //
+  iLastPage=-1; iLine=0; iPage=0;
+  p=pData; 
+  do
+  {
+	arElement[iLine]=(LRETAG *) p;
+	if (arElement[iLine]->iPage!=iLastPage) 
+	{
+		arPageIndex[iPage]=iLine; 
+		iLastPage=arElement[iLine]->iPage; 
+		iPage++;
+	}
+	iLine++;
+  } while (p=LREGetNext(p));
+}
+
+	/*  
+  for(a=0,p=lpData;a<iLRE_Elements;a++) 
+  {
+	  arElement[a]=(LRETAG *) p; 
+   //win_infoarg("LRE %d) Page=%d Type=%d",a,arElement[a]->iPage,arElement[a]->iType);
+   if (arElement[a]->iPage!=LPage) 
+   {PageLoc[b]=a; 
+    LPage=arElement[a]->iPage; 
+	b++;
+   }
+   p=LREGetNext(p); 
+   if (p==NULL) break;
+  }
+  */
+
+static void LREFileFreeResource(BOOL bDeleteFile)
+{
+  memo_libera(hdlFileTemp,"LRE"); hdlFileTemp=0;
+  EhFree(arElement); arElement=NULL;
+  EhFree(arPageIndex); arPageIndex=NULL;
+  if (bDeleteFile) remove(szTempFile);
+}
+
+
+//
+// LRETagReplace() New 2007 quasi 2008
+// Sostituisce nelle scritte dei tag
+// @#PAGE#@ numero di pagina
+// @#TOTPAGE#@ numero totale di pagina
+//
+// 
+BYTE *LREStrReplace(LRETAG *pElement,BYTE *pString)
+{
+	BYTE *lpNewString=EhAlloc(strlen(pString)*2);
+	BYTE szServ[80];
+	strcpy(lpNewString,pString);
+
+	sprintf(szServ,"%d",pElement->iPage);
+	while (StrReplace(lpNewString,"@#PAGE#@",szServ));
+
+	sprintf(szServ,"%d",lpLRInit->iPageCount);
+	while (StrReplace(lpNewString,"@#TOTPAGE#@",szServ));
+	return lpNewString;
+}
+
+static void LRETagReplace(void)
+{
+	LRETAG *pElement;
+	CHAR *pString;
+	BYTE *ptr,*pNewString;
+	SINT a;
+
+	//return;
+
+	LREFileLoad();
+
+	//
+	// Riscrivo il file
+	//
+	chTempFile=fopen(szTempFile,"wb");
+	for (a=0;a<iLRE_Elements;a++)
+	{
+		// Element = LRETAG+<TAG TYPE>+<DATI>
+		pElement=arElement[a]; ptr=(BYTE *) pElement+sizeof(LRETAG);
+		switch (arElement[a]->iType)
+		{
+			case LRE_CHAR: 
+					pString=ptr+sizeof(LRT_CHAR);
+					pNewString=LREStrReplace(pElement,pString);
+					//pElement->iLenDynamics=strlen(pNewString)+1;
+					pElement->iLenTag=sizeof(LRT_CHAR)+strlen(pNewString)+1;
+					f_put(chTempFile,NOSEEK,pElement,sizeof(LRETAG)+sizeof(LRT_CHAR));
+					f_put(chTempFile,NOSEEK,pNewString,strlen(pNewString)+1);
+					EhFree(pNewString);
+				    break;
+
+			case LRE_CHAREX: 
+					pString=ptr+sizeof(LRT_CHAREX);
+					pNewString=LREStrReplace(pElement,pString);
+					pElement->iLenTag=sizeof(LRT_CHAREX)+strlen(pNewString)+1;
+					f_put(chTempFile,NOSEEK,pElement,sizeof(LRETAG)+sizeof(LRT_CHAREX));
+					f_put(chTempFile,NOSEEK,pNewString,strlen(pNewString)+1);
+					EhFree(pNewString);
+				    break;
+
+			case LRE_CHARBOX: 
+					pString=ptr+sizeof(LRT_CHARBOX);
+					pNewString=LREStrReplace(pElement,pString);
+					pElement->iLenTag=sizeof(LRT_CHARBOX)+strlen(pNewString)+1;
+					f_put(chTempFile,NOSEEK,pElement,sizeof(LRETAG)+sizeof(LRT_CHARBOX));
+					f_put(chTempFile,NOSEEK,pNewString,strlen(pNewString)+1);
+					EhFree(pNewString);
+				    break;
+
+			default: // Gli altri tipi li trascrivo senza modifica
+					f_put(chTempFile,NOSEEK,pElement,sizeof(LRETAG)+pElement->iLenTag);
+					break;
+		}
+	}
+	LREAddItem(LRE_ENDFILE,NULL,0,NULL,0);
+	fclose(chTempFile); chTempFile=NULL;
+	LREFileFreeResource(FALSE);
+	
+	/*
+
+	LREArray=EhAlloc(sizeof (LRETAG *)*iElement);
+	PageLoc=EhAlloc(sizeof(SINT)*(lpLRInit->iPageCount+1));
+	memset(PageLoc,0,sizeof(SINT)*(lpLRInit->iPageCount+1));
+	LPage=-1; b=0;
+	for(a=0,p=lpData;a<iLRE_Elements;a++) 
+	{arElement[a]=(LRETAG *) p; 
+	//win_infoarg("LRE %d) Page=%d Type=%d",a,arElement[a]->iPage,arElement[a]->iType);
+	if (arElement[a]->iPage!=LPage) 
+	{PageLoc[b]=a; 
+	LPage=arElement[a]->iPage; 
+	b++;
+	}
+	p=LREGetNext(p); 
+	if (p==NULL) break;
+	}
+*/
+
+}
+static SINT LRToStyles(LRINIT *lpLRInit)
+{
+	SINT iStyles=0;
+	iStyles|=lpLRInit->bBold?STYLE_BOLD:0;
+	iStyles|=lpLRInit->bItalic?STYLE_ITALIC:0;
+	iStyles|=lpLRInit->bUnderLine?STYLE_UNDERLINE:0;
+	return iStyles;
+}

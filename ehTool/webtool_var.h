@@ -1,0 +1,2 @@
+HINTERNET hOpen=NULL;
+CHAR LastServer[MAXPATH];
