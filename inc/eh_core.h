@@ -1904,7 +1904,8 @@ typedef struct {
 	INT		iSizeVoice;
 
 	BOOL	fWebFolder;		// T/F se agganciato ad un WebFolder
-	BOOL	fWebAutoScan;		// T/F se deve autoscansire il sito in apertura
+	BOOL	bWebAutoScan;		// T/F se deve autoscansire il sito in apertura
+	CHAR *	pszDoPurge;		// Elenco dei lingua/Dominio per effettuare la pulizia della cache
 
 	INT		iCS_Source;		// CharType del "codice" presi dal sorgente (default ANSI LATIN1/CHAR)
 	INT		iCS_Dictionary;	// CharType dei termini tradotti (default UTF-8/CHAR)

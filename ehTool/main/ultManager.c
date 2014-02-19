@@ -487,7 +487,10 @@ BOOL ultOpenEx(	EH_ULT *	psUlt,
 
 			// webfolder e webautoscan
 			if (!strcmp(pszBuffer,"@webfolder")) {psUlt->fWebFolder=atoi(p); continue;}
-			if (!strcmp(pszBuffer,"@webautoscan")) {psUlt->fWebAutoScan=atoi(p); continue;}
+			if (!strcmp(pszBuffer,"@webautoscan")) {psUlt->bWebAutoScan=atoi(p); continue;}
+			if (!strcmp(pszBuffer,"@dopurge")) {
+				psUlt->pszDoPurge=strDup(p); continue;
+			}
 
 			if (!strCaseCmp(pszBuffer,"@version")) 
 			{	
@@ -628,6 +631,7 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 		"@dictionaries @#DICTS#@\n"
 		"@lang_native @#LANGN#@\n"
 		"@trans_alt @#TRANSALT#@\n"
+//		"@dopurge @#DOPURGE#@\n"
 		"@realcode @#REALCODE#@\n";
 
 	// if (lpFileName) lpFile=lpFileName; else 
@@ -658,6 +662,7 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 	strReplace(Buffer2,"@#ENCODE_HTML#@",ultCodeToText(psUlt,2,psUlt->iEncodeHtml));
 	strReplace(Buffer2,"@#ENCODE_FILE_SOURCE#@",strEver(psUlt->pszEncodingFilesSource));
 	strReplace(Buffer2,"@#REALCODE#@",psUlt->fRealCode?"1":"0");
+	
 
 	_ultTypeRecovery(psUlt);
 
@@ -678,8 +683,9 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 
 	fprintf(pfr,"@lastid %d\n",psUlt->dwLastId);
 	fprintf(pfr,"@webfolder %d\n",psUlt->fWebFolder);
-	fprintf(pfr,"@webautoscan %d\n",psUlt->fWebAutoScan);
+	fprintf(pfr,"@webautoscan %d\n",psUlt->bWebAutoScan);
 	fprintf(pfr,"@dictionaryword %d\n",psUlt->dmiDict.Num);
+	if (!strEmpty(psUlt->pszDoPurge)) fprintf(pfr,"@dopurge %s\n",psUlt->pszDoPurge);
 	fprintf(pfr,"@dictionarystart\n");
 
 	/*
@@ -776,7 +782,7 @@ void ultClose(EH_ULT * psUlt)
 	   DMIClose(&psUlt->dmiDict,"*UltInfo");
 	}
 	
-	ehFreePtrs(4,&psUlt->arLangReady,&psUlt->lpVoiceShare,&psUlt->pszEncodingFilesSource,&psUlt->arEFS);
+	ehFreePtrs(5,&psUlt->arLangReady,&psUlt->lpVoiceShare,&psUlt->pszEncodingFilesSource,&psUlt->arEFS,&psUlt->pszDoPurge);
 	memset(psUlt,0,sizeof(EH_ULT));
 }
 
