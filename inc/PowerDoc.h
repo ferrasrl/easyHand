@@ -74,7 +74,10 @@ typedef struct {
 	PWD_VAL		umCharWidth;
 	EH_TSTYLE	enStyles;
 	BOOL		bFixWidth;
-	HFONT		hFont;
+	DWORD		dwWeight;
+	DWORD		dwItalic;
+	HFONT		hFont;			// Handle windows
+	void	*	pVoid;			// Valore esterno (usato per pdf)
 
 } PWD_FONT;
 
@@ -115,7 +118,8 @@ typedef struct {
 	PWD_TE		enType;			 // PDT_?
 	INT			iPage;			 // Pagina di apparteneza
 	PWD_RECT	rumObj;			 // Posizione dell'oggetto (in centesimi di millimetro)
-	INT			iLenItem;		 // Lunghezza complessiva del item
+	INT			iLenItem;		 // Lunghezza complessiva del item > Compreso struttura successiva psObj + dati extra
+//	BYTE		psObj[1];
 
 } PWD_ITEM;
 
@@ -124,7 +128,6 @@ typedef struct {
 	HDC			hDC;
 	RECT		recObj;
 	PWD_ITEM *	psItem;
-	void	*	pObj;
 
 //	void (*xyConvert)(INT cmd,void *);
 } PWD_DRAW;
@@ -190,21 +193,29 @@ typedef enum {
 	PUM_CM,
 	PUM_INCH,
 	PUM_PT,		// 1/72
+	PUM_DTX,	// Dot fisici X (Reali sempre associati alla risoluzione del documento/device)
+	PUM_DTY,	// Dot fisici Y (Reali sempre associati alla risoluzione del documento/device)
+	PUM_DTXD,	// Dot fisici X (dinamico in base all'hDC)
+	PUM_DTYD	// Dot fisici Y (dinamico in base all'hDC)
+	/*
 
+	PUM_PHX=100,	// Trasforma UM > in Dot fisici "X" 
+	PUM_PHY,		// Trasforma UM > in Dot fisici "Y"
 	PUM_PHX=100,	// Trasforma UM > in Dot fisici "X" (dinamico in base all'hDC)
 	PUM_PHY,		// Trasforma UM > in Dot fisici "Y"
-	PUM_PHX_REAL,	// Trasforma UM > in Dot fisici "X" (Reali sempre associati alla risoluzione del documento)
-	PUM_PHY_REAL,	// Trasforma UM > in Dot fisici "Y"
+	PUM_UM_TO_PHX,	// Trasforma UM > in Dot fisici "X" (Reali sempre associati alla risoluzione del documento)
+	PUM_UM_TO_PHY,	// Trasforma UM > in Dot fisici "Y"
 
 	PUM_UM_INCH=200,// Da UM > a Inch
-	PUM_UM_PHX=201, // Trasforma i Dot Fisici "X" > in UM
-	PUM_UM_PHY=202,	// Trasforma i Dot Fisici "Y" > in UM
-
-	PUM_UM_PT
+	PUM_PHX_TO_UM=201, // Trasforma i Dot Fisici "X" > in UM
+	PUM_PHY_TO_UM=202	// Trasforma i Dot Fisici "Y" > in UM
+*/
+//	PUM_UM_PT
 
 } PWD_UM;
 
-double pwdUm(PWD_UM enUm,double dValore);
+double pwdUm(PWD_UM enUm,double dValore); // Ritorna un valore, espresso in diverse unirà di misura, nella misura corrente
+double pwdUmTo(double dValore,PWD_UM enUmTo); // Converte un valore nell'attuale Um, in una misura scelta
 
 
 typedef struct {
@@ -249,8 +260,8 @@ typedef struct {
 	DEVMODE	*	pDevMode;
 
 	SIZE		sizDotPerInch;
-	PWD_SIZE	sumPage;        // Larghezza ed altezza della pagina in scrittura (in Dot Real)
-	PWD_RECT	rumPage;        // Posizione e dimensione della pagina senza margini (in Dot Real)
+	PWD_SIZE	sumPage;        // Larghezza ed altezza della pagina in scrittura (in Um)
+	PWD_RECT	rumPage;        // Posizione e dimensione della pagina senza margini (in Um)
 	PWD_SIZE	sumPhysicalPage;
 	PWD_SIZE	sumPaper;       // Larghezza possibile (x e y) della pagina
 
@@ -328,8 +339,11 @@ typedef struct {
 	//void * (*funcNotify)(void *, INT cmd, LONG info,CHAR *str); //  funzione esterna di notifica
 	LONG		lParam; // Per uso esterno
 	BOOL		bPageInProgress; // T/F se la pagina è corso di completamento
-	_DMI		dmiFont;
 	CHAR *		pszTempFolder;	// NULL = Usa il folder di sistema, altrimenti quello indicato
+
+	_DMI		dmiFont;		// Font usati
+	PWD_FONT *	arsFont;		// Puntatore alla memoria
+	EH_LST		lstFontRes;		// Font allocato provvisoriamente
 
 #ifdef EH_PDF
 	BOOL		bPdf;			// T/F se faccio il PDF diretto
@@ -337,6 +351,8 @@ typedef struct {
 	BOOL		bPdfChooseFile;	// T/F se deve scegliere il file di output
 	CHAR *		pszPdfEncode;	// NULL = ISO8859-1
 	CHAR *		pszPdfFileName;	// NULL = Chiedo il nome	
+	CHAR		szWinDir[MAX_PATH];	// Directory di windows (serve per i fonts)
+	EH_LST		lstPdfReport;
 #endif
 
 } EH_PWD; // Easyhand PowerDoc
@@ -416,8 +432,9 @@ typedef struct {
 	INT			iMaxRows;
 	BOOL		bJustifyLast; // T/F se deve giustificare anche l'ultima linea
 	BOOL		bBaseLine;		// y è la baseline
-
-	INT			idxFont;
+	
+	INT			idxFont;	// Indice del font usato in _sPower.dmiFont
+	
 
 } PDO_TEXT;
 
@@ -435,13 +452,45 @@ typedef struct {
 } PDO_IMAGE;
 
 
+typedef enum {
+
+	PHT_UNKNOW,
+	PHT_MOVETO,
+	PHT_LINETO,
+	PHT_POLYBEZIERTO,
+	PHT_CLOSEFIGURE // Chiudo la figura
+
+} EN_PHT;
+
+
 typedef struct {
 
-  INT		iBrushStyle;	// 
-  PWD_PB	sPenBrush;
-  EH_LST	lstPath;
+	EN_PHT	enType;
+	DWORD	dwSizeData;
+	void *	psData;
 
+} PWD_PTHE;
+
+typedef struct {
+
+	INT			iBrushStyle;	// 
+	PWD_PB		sPenBrush;
+	INT			iElements;		// Numero di punti del percorso
+	DWORD		dwElements;		// Dimensioni in byte degli elementi
+	PWD_PTHE *	psEle;			// Puntatore al primo elemento
+	
 } PDO_PATH;
+
+
+typedef struct {
+
+	CHAR	szName[128];
+	CHAR	szFileName[500];
+	BOOL	bAddInFile;
+
+} PWD_FONT_RES;
+
+
 
 //
 // API per la scrittura del documento
@@ -458,12 +507,14 @@ PWD_COLOR	pwdRGB(PWD_VAL dRed,PWD_VAL dGreen,PWD_VAL dBlue,PWD_VAL dAlpha);
 PWD_COLOR	pwdCMYK(PWD_VAL dCyan,PWD_VAL dMag,PWD_VAL dYel,PWD_VAL dKey,PWD_VAL dAlpha);
 #define		pwdGray(a) pwdCMYK(0,0,0,a,1.0)
 
-#define		PDC_BLACK pwdCMYK(0,0,0,1,1)
-#define		PDC_RED	  pwdCMYK(0,.99,1,0,1)
-#define		PDC_YELLOW	  pwdCMYK(0,0,1,0,1)
-#define		PDC_BLUE  pwdCMYK(0.72,.54,0,.45,1)
-#define		PDC_WHITE pwdCMYK(0,0,0,0,1)
-#define		PDC_TRASP pwdCMYK(0,0,0,0,0)
+#define		PDC_BLACK	pwdCMYK(0,0,0,1,1)
+#define		PDC_RED		pwdCMYK(0,.99,1,0,1)
+#define		PDC_YELLOW	pwdCMYK(0,0,1,0,1)
+#define		PDC_BLUE	pwdCMYK(0.72,.54,0,.45,1)
+#define		PDC_WHITE	pwdCMYK(0,0,0,0,1)
+#define		PDC_TRASP	pwdCMYK(0,0,0,0,0)
+
+BOOL		pwdFontAdd(CHAR * pszNameFont, UTF8 * pszFileName,BOOL bAddToDoc);
 
 void		pwdLine(PWD_RECT *prumRect,PWD_COLOR colPen,PWD_VAL iWidth,INT iStyle);
 void		pwdRect(PWD_RECT *prumRect,PWD_COLOR colPen,PWD_COLOR colSolidBrush,PWD_VAL iWidth);
@@ -493,30 +544,15 @@ void		pwdSetEx(INT iCol,void * pValue,PWD_COLOR colText,PWD_COLOR colBack,EH_TST
 #define 	pwdRowBegin()	PowerDoc(WS_LINK,0,NULL)
 #define		pwdRowEnd()		PowerDoc(WS_INSERT,0,NULL) 
 
-void		pwdMetaFile(PWD_POINT *	ppumPos,
-						PWD_SIZE*	psumSize,
-						PWD_ALIGN	enAlign,
-						BOOL		bBestInFit,	// T/F se deve calcolare la maggiore dimensione possibile
-						UTF8 *		pszFileName); // 12/2013-02/2014
+void		pwdMetaFile(PWD_POINT *	ppumPos,		// Posiziono il meta // 2013/2014
+						PWD_SIZE  *	psumSize,		// Indico dimensioni orizzontali
+						PWD_ALIGN	enAlign,		// Posizionamento
+						UTF8 *		pszFileNameUtf,
+						BOOL		bBestInFit,		// T/F se deve calcolare la maggiore dimensione possibile
+						BOOL		bOnlyCalc,		// T/F Solo calcolo del posizionamento, usato per predeterminare l'occupazione e la dimenzione
+						PWD_RECT  *	precMeta);		// Ritorna l'area occupata (se richiesto)
+						
 
-typedef enum {
-
-	PHT_UNKNOW,
-	PHT_MOVETO,
-	PHT_LINETO,
-	PHT_POLYBEZIERTO,
-	PHT_CLOSEFIGURE // Chiudo la figura
-
-} EN_PHT;
-
-
-typedef struct {
-
-	EN_PHT	enType;
-	DWORD	dwSizeData;
-	void *	psData;
-
-} PWD_PTHE;
 
 //void pwdBitmap(PWD_VAL px,PWD_VAL py,PWD_SIZE *psumRect,INT iBitsPixel,HDC hdc,HBITMAP hBitmap,BOOL bDupBitmap); // new 2010
 

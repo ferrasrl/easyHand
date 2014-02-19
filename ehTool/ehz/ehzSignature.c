@@ -38,17 +38,6 @@ static void			_signReset(	EHZ_SIGNATURE * psSign,
 
 LRESULT CALLBACK	_signProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
 static void			_areaControl(RECT *lprArea,SIZE *lpSize,RECT *lpsLimite);
-/*
-static void			_penWrite(	EHZ_SIGNATURE * psSign,
-								INT x,INT y,
-								INT iPenSize,
-								INT iPenColor,
-								INT iPenAlpha,
-								BOOL fAdd, // Aggiunge le informazioni al DMI
-								S_SIGNAREA *lps,
-								S_SIGNPEN * pSign,
-								HWND hWnd);
-*/
 static void			_addPoint(	EHZ_SIGNATURE * psSign,S_SIGNPOINT * psPoint);
 static void			_penWrite(	EHZ_SIGNATURE * psSign,
 								EN_PTTY enType,
@@ -66,6 +55,7 @@ static void		_this_setFont(void *this,CHAR * pszText);
 static BOOL		_this_writeSign(void * this, CHAR * pszFileName);
 static BOOL		_this_readSign(void * this, CHAR * pszFileName);
 static BOOL		_this_writeImage(void * this, CHAR * pszFileName, EN_FILE_TYPE, INT cx,INT cy);
+static void		_this_getSignRect(void * this,RECT * psRect);
 
 
 static struct {
@@ -134,16 +124,12 @@ void * ehzSignature(EH_OBJPARAMS)
 			psSign->enBaseLineStyle=PS_DASH;
 			psSign->pszBaseLineText="Firmare qui";
 			psSign->dScale=1;
-//			psSign->ptOfs.y=-150;
-//			psSign->ptOfs.x=-200;
-	
-
-
 
 			// Like C++ ;-)
 			psSign->reset=_this_reset;
 			psSign->refresh=_this_refresh;
 			psSign->setFont=_this_setFont;
+			psSign->getSignRect=_this_getSignRect;
 			psSign->readSign=_this_readSign;
 			psSign->writeSign=_this_writeSign;
 			psSign->writeImage=_this_writeImage;
@@ -1077,7 +1063,6 @@ static void _this_getSignRect(void * this,RECT * psRect) {
 			if (psPoint->pt.x>rcSign.right) rcSign.right=psPoint->pt.x;
 			if (psPoint->pt.y<rcSign.top) rcSign.top=psPoint->pt.y;
 			if (psPoint->pt.y>rcSign.bottom) rcSign.bottom=psPoint->pt.y;
-		
 		
 		}
 	}

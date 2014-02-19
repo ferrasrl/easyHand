@@ -95,6 +95,8 @@ typedef struct {
 	void		(*reset)(void *);
 	void		(*refresh)(void *);
 	void		(*setFont)(void *,CHAR *);
+	void		(*getSignRect)(void *,RECT * precSign);
+
 	void		(*readSign)(void *,CHAR *);
 	BOOL		(*writeSign)(void *,CHAR *);
 	BOOL		(*writeImage)(void * this, CHAR * pszFileName, EN_FILE_TYPE enType, INT cx,INT cy);

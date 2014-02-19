@@ -13,7 +13,7 @@
 
 //#define ID_LISTVIEW 25000
 
-static LRESULT TreeViewNotify(HWND hWnd, LPARAM lParam,SINT iLVIndex,LPNMHDR  pnmh);
+static LRESULT TreeViewNotify(HWND hWnd, LPARAM lParam,INT iLVIndex,LPNMHDR  pnmh);
 static BOOL InsertListViewItems(HWND hwndListView);
 static HWND CreateTreeView(HINSTANCE hInstance, HWND hwndParent);
 static void ResizeListView(HWND, EH_DISPEXT *psExt);
@@ -29,9 +29,9 @@ static BOOL fReset=TRUE;
 #define TV_FINDHWND 1
 
 
-static SINT TVFind(SINT iCosa,void *ptr)
+static INT TVFind(INT iCosa,void *ptr)
 {
-	SINT a;
+	INT a;
 	for (a=0;a<TVMAX;a++)
 	{
 		switch (iCosa)
@@ -45,9 +45,9 @@ static SINT TVFind(SINT iCosa,void *ptr)
 	return -1;
 }
 
-static SINT LVAlloc(struct OBJ *obj)
+static INT LVAlloc(struct OBJ *obj)
 {
-	SINT a;
+	INT a;
 	for (a=0;a<TVMAX;a++)
 	{
 	  if (TVList[a].lpObj==NULL)
@@ -78,12 +78,12 @@ static void EhTreeInizialize(void)
 	}
 }
 
-void * ehzTreeView(struct OBJ *objCalled,SINT cmd,LONG info,void *ptr)
+void * ehzTreeView(struct OBJ *objCalled,INT cmd,LONG info,void *ptr)
 {
  EH_DISPEXT *psExt=ptr;
- static SINT HdbMovi=-1;
+ static INT HdbMovi=-1;
  static INT16 iSend;
- SINT iLVIndex;
+ INT iLVIndex;
  
  if (fReset)
  { 
@@ -309,7 +309,7 @@ static void Main_OnBeginDrag(HWND hwndTV, LPNMTREEVIEW lpnmtv)
  
 static void Main_EndDrag(void)//HWND hwndTV, LPNMTREEVIEW lpnmtv) 
 {
-	SINT iIndex;
+	INT iIndex;
 	CHAR Serv[80];
 	//static EHDRAGDROP EhDD;
 
@@ -343,7 +343,7 @@ static void Main_OnMouseMove(HWND hwndParent, HWND hwndTV, LONG xCur, LONG yCur)
     HTREEITEM htiTarget;  // handle to target item 
     TVHITTESTINFO tvht;  // hit test information 
     //POINT Pos;
-	SINT iIndex;
+	INT iIndex;
 	struct OBJ *poj;
 
 	// xCur,yCur sono della parent
@@ -371,7 +371,7 @@ static void Main_OnMouseMove(HWND hwndParent, HWND hwndTV, LONG xCur, LONG yCur)
     return; 
 } 
 
-static void CursorAutoSelect(SINT xCur,SINT yCur,SINT iTVIndex)//HWND hwndTV,struct OBJ *poj)
+static void CursorAutoSelect(INT xCur,INT yCur,INT iTVIndex)//HWND hwndTV,struct OBJ *poj)
 {
     HTREEITEM htiTarget;  // handle to target item 
     TVHITTESTINFO tvht;   // hit test information 
@@ -396,7 +396,7 @@ static void CursorAutoSelect(SINT xCur,SINT yCur,SINT iTVIndex)//HWND hwndTV,str
 static LRESULT CALLBACK LIntercept(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam)
 {
 	LPNMHDR  pnmh = (LPNMHDR) lParam;
-	SINT iTVIndex;
+	INT iTVIndex;
 
 	switch (message)
 	{
@@ -428,7 +428,7 @@ static LRESULT CALLBACK LIntercept(HWND hWnd,UINT message,WPARAM wParam,LPARAM l
 // Gestione delle notifiche alla windows parent                                                        
 // -----------------------------------------------------------------------------------------
 
-static LRESULT TreeViewNotify(HWND hWnd, LPARAM lParam,SINT iLVIndex,LPNMHDR pnmh)
+static LRESULT TreeViewNotify(HWND hWnd, LPARAM lParam,INT iLVIndex,LPNMHDR pnmh)
 {
 	LPNMLVKEYDOWN pnkd;
 
@@ -532,7 +532,7 @@ static LRESULT TreeViewNotify(HWND hWnd, LPARAM lParam,SINT iLVIndex,LPNMHDR pnm
 
 static LRESULT CALLBACK EhTVProc(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam)
 {
-	SINT iTVIndex;
+	INT iTVIndex;
 //	PAINTSTRUCT ps;
 //	S_WINSCENA WScena;
 //	HDC hDC;
@@ -581,7 +581,7 @@ static LRESULT CALLBACK EhTVProc(HWND hWnd,UINT message,WPARAM wParam,LPARAM lPa
 			if ((iHotKey==EF_CR)||(iHotKey==EF_TAB)||(iHotKey==EF_ALT_TAB))
 				{GetWindowText(sSetup.hwndEdit,lpEEBuf,iEEBufCount);}
 			
-			//_d_("[%d]  %d  ",(SINT) nVirtKey,(SINT) GetAsyncKeyState(VK_SHIFT));
+			//_d_("[%d]  %d  ",(INT) nVirtKey,(INT) GetAsyncKeyState(VK_SHIFT));
 			if (iHotKey) fBreak=TRUE;//DestroyWindow(sSetup.hwndEdit);
 			break;
 			*/
@@ -593,7 +593,7 @@ static LRESULT CALLBACK EhTVProc(HWND hWnd,UINT message,WPARAM wParam,LPARAM lPa
 static HTREEITEM EhTreeViewItemSearch(HWND hWnd,HTREEITEM hItem,LONG lParam)
 {
 	HTREEITEM hChild,hOk;
-	static SINT iLevel=0;
+	static INT iLevel=0;
 	TVITEM pItem;
 	iLevel++;
 	while (hItem)

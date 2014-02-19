@@ -21,6 +21,7 @@ static struct {
 	BOOL	fMakeDict;
 	INT		iLine;	
 	BOOL	bShowTime;
+	BOOL	bAppMode;	// Non usa cache per traduzioni
 
 //	EH_ULT	sApp;	
 } _local={false,0,false};
@@ -101,10 +102,10 @@ static INT _ultFileBuilder(EH_ULT * psUlt,
 							BOOL fShow);
 static void _ultOrganizer(EH_ULT * psUlt);
 static void _ultIdxFind(EH_ULT * psUlt);
-static INT _ultFileRemove(EH_ULT * psUlt,CHAR *lpFileName);
+static INT	_ultFileRemove(EH_ULT * psUlt,CHAR *lpFileName);
 static EN_CHARTYPE _ultGetSourceEncode(EH_ULT *psUlt,CHAR * pszFileName);
 
-void ULTDictionaryMake(void) {_local.fMakeDict=TRUE;}
+void ULTDictionaryMake(void) {_local.fMakeDict=true;}
 static void _ultItemsLoadOld(	EH_ULT * psUlt,
 								INT iType,
 								DWORD dwId, // Solo da files
@@ -202,15 +203,15 @@ INT ultNew(EH_ULT * psUlt,UTF8 * pszFileName)
 //
 BOOL ultOpen(EH_ULT * psUlt,UTF8 * lpFileName,INT iLanguage,BOOL fLoadAll) {
 
-	return ultOpenEx(psUlt,lpFileName,iLanguage,fLoadAll,FALSE);
+	return ultOpenEx(psUlt,false,lpFileName,iLanguage,fLoadAll,FALSE);
 
 }
 
 
 //
-// _ultAutoSave()
+// _ultAutoClose()
 //
-static void _ultAutoSave(BOOL bStep) {
+static void _ultAutoClose(BOOL bStep) {
 
 	if (!sys.ultApp.bReady) return;
 	if (sys.ultApp.bModified) {
@@ -227,20 +228,49 @@ static void _ultAutoSave(BOOL bStep) {
 BOOL ultAppOpen(UTF8 * pszFileName,CHAR * pszLang,CHAR * pszLangAlternative) {
 
 	EH_ULT_LANG * psLang;
-	if (!ultOpenEx(&sys.ultApp,pszFileName,0,true,false)) return false;
+	if (!ultOpenEx(&sys.ultApp,false,pszFileName,0,true,false)) return false;
 
 	// Setto la lingua usata nel dizionario
 	ultSetLangText(&sys.ultApp,pszLang,pszLangAlternative);
 
 	// Setto la lingua dell'applicazione
 	psLang=ultLangInfo(&sys.ultApp,0,pszLang); if (!psLang) ehExit("Lingua %s sconosciuta",pszLang);
-
 	strcpy(sys.szAppLanguage,psLang->lpTransName);
 
 	_local.fMakeDict=true;
-	ehAddExit(_ultAutoSave);
+	_local.bAppMode=true;
+	ehAddExit(_ultAutoClose);
 	return true;
 }
+
+//
+// ultResource()
+//
+
+BOOL ultResource(CHAR * pszLang,CHAR * pszLangAlternative) {
+
+	HGLOBAL hMemory;
+	CHAR * psz;
+	HRSRC hRes;
+	EH_ULT_LANG * psLang;
+	hRes=FindResource(sys.EhWinInstance,"ULTDICT","ULT");  if (!hRes) {win_infoarg("ULT dictionary assente"); return true;}
+	hMemory=LoadResource(sys.EhWinInstance,hRes);
+	psz=LockResource(hMemory);
+	
+	if (!ultOpenEx(&sys.ultApp,true,psz,0,true,false)) return false;
+
+	// Setto la lingua usata nel dizionario
+	ultSetLangText(&sys.ultApp,pszLang,pszLangAlternative);
+
+	// Setto la lingua dell'applicazione
+	psLang=ultLangInfo(&sys.ultApp,0,pszLang); if (!psLang) ehExit("Lingua %s sconosciuta",pszLang);
+	strcpy(sys.szAppLanguage,psLang->lpTransName);
+
+	ehAddExit(_ultAutoClose);
+	_local.bAppMode=true;
+	return false;
+}
+
 
 CHAR * ultTag(CHAR * pszStr) {
 
@@ -252,11 +282,12 @@ CHAR * ultTag(CHAR * pszStr) {
 //
 // ultOpenEx()
 //
-BOOL ultOpenEx(	EH_ULT * psUlt,
-				CHAR *lpFileName,
-				INT iLanguage,
-				BOOL fLoadAll,
-				BOOL fOnlyHeader)
+BOOL ultOpenEx(	EH_ULT *	psUlt,
+				BOOL		bNotFile,		// T/F se i dati dell'ult sono imemoria FALSE=nome del file
+				CHAR *		pszData,
+				INT			iLanguage,
+				BOOL		fLoadAll,
+				BOOL		fOnlyHeader)
 {
 	FILE *	pfr;
 	CHAR *	pszBuffer;
@@ -283,32 +314,58 @@ BOOL ultOpenEx(	EH_ULT * psUlt,
 
 	// Se è una costruzione carico tutti i linguaggi
 	//if (fMakeDict) 
-	fLoadAll=TRUE;
+	fLoadAll=true;
 	psUlt->fLoadAll=fLoadAll;
 	psUlt->iLangWant=iLanguage;
 
-	if (strstr(lpFileName,".")==NULL) sprintf(psUlt->szFile,"%s.ult",lpFileName); else strcpy(psUlt->szFile,lpFileName);
+	if (!bNotFile) {
 
-	if (!fileCheck(psUlt->szFile)) 
-	{
-#ifdef EH_CONSOLE
-		 win_infoarg("ULT: %s ?",psUlt->szFile); return FALSE;
-#else
-		if (_local.fMakeDict) 
-		 ultNew(psUlt,NULL);
-		 else
-		 win_infoarg("ULTDictionaryLoad(): %s ?",psUlt->szFile); return FALSE;
-#endif
+		if (strstr(pszData,".")==NULL) sprintf(psUlt->szFile,"%s.ult",pszData); else strcpy(psUlt->szFile,pszData);
+		if (!fileCheck(psUlt->szFile)) 
+		{
+	#ifdef EH_CONSOLE
+			 win_infoarg("ULT: %s ?",psUlt->szFile); return FALSE;
+	#else
+			if (_local.fMakeDict) 
+			 ultNew(psUlt,NULL);
+			 else
+			 win_infoarg("ULTDictionaryLoad(): %s ?",psUlt->szFile); return FALSE;
+	#endif
+		}
+
+		pfr=fopen(psUlt->szFile,"r"); if (!pfr) ehExit("Ult1");
+		strcpy(psUlt->szUltFolder,filePath(psUlt->szFile));	
+		strcat(psUlt->szUltFolder,"ULT\\");
 	}
-
-	pfr=fopen(psUlt->szFile,"r"); if (!pfr) ehExit("Ult1");
-	strcpy(psUlt->szUltFolder,filePath(psUlt->szFile));	
-	strcat(psUlt->szUltFolder,"ULT\\");
+	else {
+		pfr=NULL;
+		*psUlt->szUltFolder=0;
+		*psUlt->szUltFolder=0;
+	}
 	pszBuffer=ehAlloc(SizeBuf);
 
 	while (true)
 	{
-		if (!fgets(pszBuffer,SizeBuf-1,pfr)) break;
+		if (pfr) {
+
+			if (!fgets(pszBuffer,SizeBuf-1,pfr)) break;
+
+		} else {
+	
+			INT iLen;
+			p=strstr(pszData,"\r\n");
+			if (!p) p=strstr(pszData,"\r");
+			if (!p) p=strstr(pszData,"\n");
+			if (!p) break;
+
+			iLen=(DWORD) p-(DWORD) pszData;
+			if (iLen>SizeBuf-1) iLen=SizeBuf-1;
+			memcpy(pszBuffer,pszData,iLen); pszBuffer[iLen]=0;
+			pszData=p+1;
+
+
+		}
+
 		_local.iLine++;
 
 		//strcpy(Buffer,strOmit(Buffer,"\n\r"));
@@ -508,10 +565,8 @@ BOOL ultOpenEx(	EH_ULT * psUlt,
 		}
 	}
 
-	fclose(pfr);
+	if (pfr) fclose(pfr);
 	ehFree(pszBuffer);
-//	sys.fTranslate=true; // mha ? non è mica vero...
-	//	sys.OemTranslate=FALSE;
 
 	_ultIdxFind(psUlt);
 	_ultOrganizer(psUlt); // Metto il file per ultimo
@@ -674,17 +729,7 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 							ehFree(lpe);
 							break;
 					}
-					/*
-					if (lpWord) 
-					{
-					fprintf(pfr,"\3%s",lpWord);
-					ehFree(lpWord);
-					}
-					else
-					{
-					fprintf(pfr,"\3");
-					}
-					*/
+
 					if (lpWord) 
 					{
 						fprintf(pfr,"\3%s\4%d",lpWord,dwUser);
@@ -1089,11 +1134,12 @@ BYTE * ultTranslate(INT iType,BYTE *lpWord)
 	if (pwcRet) {
 
 		DMIRead(&psUlt->dmiDict,iRow,psUlt->lpVoiceShare);
-		if (psUlt->lpVoiceShare->lpbText) return psUlt->lpVoiceShare->lpbText; // Traduzione gia eseguita
+		if (!_local.bAppMode&&psUlt->lpVoiceShare->lpbText) return psUlt->lpVoiceShare->lpbText; // Traduzione gia eseguita
 
 		// Creo traduzione
 //		psUlt->lpVoiceShare->lpbText=ehAlloc(wcslen(pwcRet)+1);
 //		UnicodeToChar(psUlt->lpVoiceShare->lpbText,pwcRet);
+		ehFreeNN(psUlt->lpVoiceShare->lpbText);
 		if (sys.bUtf8)
 			psUlt->lpVoiceShare->lpbText=strEnc(2,pwcRet,SE_UTF8,NULL);
 			else

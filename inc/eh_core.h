@@ -1510,6 +1510,7 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 	CHAR  *	_strPtsEx(CHAR *pStart,CHAR *pEnd EMD_END_FUNC); // new 2008
 	void	_strAssignEx(CHAR **ptr,CHAR *pNewValue EMD_END_FUNC); // new 2008
 	CHAR *	_strTakeEx(CHAR *pStart,CHAR *pEnd EMD_END_FUNC);
+	WCHAR * _wcsTakeEx(WCHAR *pStart,WCHAR *pEnd EMD_END_FUNC);
 	CHAR *  _wcsToStr(WCHAR * pwcSource EMD_END_FUNC);
 	WCHAR *	_strToWcs(CHAR *pszString EMD_END_FUNC);
 
@@ -1929,11 +1930,13 @@ typedef struct {
 INT		ultNew(EH_ULT * psUlt,UTF8 * pszFile); 
 BOOL	ultOpen(EH_ULT * psUlt,UTF8 * pszFile,INT iLanguage,BOOL fLoadAll);
 BOOL	ultOpenEx(	EH_ULT * psUlt,
-					CHAR *lpFileName,
+					BOOL	bMemoryData,
+					CHAR *	pszFileName,
 					INT iLanguage,
 					BOOL fLoadAll,
 					BOOL fOnlyHeader);
 BOOL	ultAppOpen(UTF8 * pszFileName,CHAR * pszLang,CHAR * pszLangAlternative);
+BOOL	ultResource(CHAR * pszLang,CHAR * pszLangAlternative);
 
 //void	ULTNewDictionary(EH_ULT * psUlt,CHAR *lpFileName); // ??
 INT		ultSave(EH_ULT * psUlt,BOOL fShowError);
@@ -1990,8 +1993,6 @@ BOOL	ultMultiFileBuilder(EH_ULT * psUlt,
 							INT *lpiFileMissing,
 							BOOL fShowFilesTouch);	// Numero dei File scomparsi
 
-
-
 //void *ULTTranslateCheck(INT iType,BYTE *lpWord);//,INT iCharSet);
 //
 // Usato internamente da Easyhand
@@ -2002,11 +2003,8 @@ void	ultCloseInternal(EH_ULT * psUlt); // ULTFree - Se il caso salva il dizionar
 BYTE *	ultTranslate(INT iType,BYTE *lpWord);
 CHAR *	ultTranslateSZZAlloc(CHAR *lpStringZZ); // New 2005 Double Zero String
 
-//void ULTWordUpdateW(INT Index,INT iLang,WCHAR *lpWord);
-
-
-
 #define ULT_BLOWFISH "Gioele12"
+
 //
 // <== ULT SECTION (END) ===========================================================
 //
@@ -2672,6 +2670,13 @@ CHAR *	ultTranslateSZZAlloc(CHAR *lpStringZZ); // New 2005 Double Zero String
 	DWORD		colorCMYKtoRGB(DWORD dwCMYK); // new 2012
 	EH_COLOR	colorToGray(EH_COLOR col); // 2013
 #define			colorReal(col) ((double) (col&0xFF)/255)
+	#define gdi_AlphaShift 24
+	#define gdi_RedShift 16
+	#define gdi_GreenShift 8
+	#define gdi_BlueShift 0
+	#define AlphaRGB(a,r,g,b) ( ((b) << gdi_BlueShift) | ((g) << gdi_GreenShift) | ((r) << gdi_RedShift) | ((a) << gdi_AlphaShift) )
+	#define AlphaColor(a,b) ( ((a) << gdi_AlphaShift) | ((b&0xff0000)>>16) | (b&0xff00) | ((b&0xff)<<16))
+	#define rgba(r,g,b,a) ( ((BYTE) (b*255.0) << gdi_BlueShift) | ((BYTE) (g*255.0) << gdi_GreenShift) | ((BYTE) (r*255.0) << gdi_RedShift) | ((BYTE) (a*255.0) << gdi_AlphaShift) )
 
 	// gray = 0.3 × red + 0.59 × green + 0.11 × blue (RGB)
 	// gray = 1.0 - min(1.0, 0.3 × cyan + 0.59 × magenta + 0.11 × yellow + black ) (CMYK)
@@ -3030,7 +3035,7 @@ EN_BOM bomDecode(CHAR *pszBuffer,DWORD dwBuffer);
 S_SEN *	senCreate(void);
 CHAR *	senEncode(S_SEN *pSen,INT iEncode,CHAR *lpStr);
 #define sqlStr(psSen,str) senEncode(psSen,SE_SQL,str)
-
+#define senSql(str) senEncode(psSen,SE_SQL,str)
 void *	senEncodeEx(S_SEN *pSen,
 				  INT iInputStart,
 				  void *pString,
@@ -3428,9 +3433,11 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 	void GDIGetInfo(void); // new 2007
 	void lineAdjust(RECT *rcRect);
 
-
 #define rectCopy(a,b) memcpy(&a,&b,sizeof(RECT))
 #define rectCopyD(a,b) memcpy(&a,&b,sizeof(RECTD))
+
+		
+
 
 //
 // Device Graphic (2008)
@@ -3797,14 +3804,7 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 	//
 	// GDI++ (new 2007)
 	//
-		#define gdi_AlphaShift 24
-		#define gdi_RedShift 16
-		#define gdi_GreenShift 8
-		#define gdi_BlueShift 0
-		#define AlphaRGB(a,r,g,b) ( ((b) << gdi_BlueShift) | ((g) << gdi_GreenShift) | ((r) << gdi_RedShift) | ((a) << gdi_AlphaShift) )
-		#define AlphaColor(a,b) ( ((a) << gdi_AlphaShift) | ((b&0xff0000)>>16) | (b&0xff00) | ((b&0xff)<<16))
-		#define rgba(r,g,b,a) ( ((BYTE) (b*255.0) << gdi_BlueShift) | ((BYTE) (g*255.0) << gdi_GreenShift) | ((BYTE) (r*255.0) << gdi_RedShift) | ((BYTE) (a*255.0) << gdi_AlphaShift) )
-		
+
 		void GDIPlus(INT iCmd);
 		void dcBoxGradient(	HDC hdc,
 							RECT *rcBox,
@@ -4214,6 +4214,19 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 	//
 	#ifdef __windows__
 
+		typedef struct {
+			
+			EN_MESSAGE		enMess;
+			INT				iWin;
+			void	*		psWin;	
+			BOOL			bAfter;
+			//PAINTSTRUCT *	ps;
+			LONG			lParam;
+			void	*		pVoid;
+
+		} EH_SUBWIN_PARAMS;	// Sub Win Params
+
+		
 		struct WIN {
 
 			CHAR  *	titolo;
@@ -4282,7 +4295,7 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 			EH_DG *		dgClone;	// Clone della finestra
 			//	RECT	DCZone;
 			BOOL		EhWinType;
-			void    * (*SubPaint)(INT,LONG,void *); //  CHIAMATA ALLA ROUTINE
+			void    * (*funcWin)(EH_SUBWIN_PARAMS *); //  CHIAMATA ALLA ROUTINE
 			BOOL    fBackGroundExtern; // FALSE/TRUE Gestione del Background della finestra esterno
 									   // Serve si vuole gestire un'immagine di background in una finestra
 			BOOL    ColorMode; // False/True
@@ -4294,15 +4307,16 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 
 		typedef struct WIN EH_WIN;
 
+
 		WORD win_openEx(INT  x,INT y,  // Posizione a video (x=EHWP_macro)
 						CHAR  *lpTitle,  // Titolo
 						INT  ClientLx,INT ClientLy, // Dimensioni area Client Interessata
 						LONG  col1,  // Colore finestra (Real Color) -1=Default
 						DWORD dwParam, // 1 = Ci sar‡ un menu collegato (Usi Futuri)
 						LONG  WinStyleEx,// Style Esteso
-						LONG  WinType,   // Syyle Normale
+						LONG  WinType,   // Syle Normale
 						BOOL  DosEmulation, // Emulazione Dos
-						void *(*SubPaint)(INT,LONG,void *)); // Sotto procedura dedicata al Paint
+						void * (*funcSubWin)(EH_SUBWIN_PARAMS *)); // Sotto procedura dedicata al Paint
 
 		WORD win_open(INT x,INT y,
 					  INT lx,INT ly,

@@ -62,7 +62,7 @@
 	*/
 	#define IMG_SINGLETHREAD 0
 	#define IMG_MULTITHREAD 1
-	void IMG_Mode(SINT cmd,SINT iMode);
+	void IMG_Mode(INT cmd,INT iMode);
 
 	typedef struct {
 		BYTE r;
@@ -87,7 +87,7 @@
 	} EN_IMGPT;
 
 	//void CMYKtoRGB(S_CMYK *lpCmyk,S_RGB *lpRgb); // New 2005
-	//SINT IMGToRGB(SINT hdlImage);
+	//INT IMGToRGB(INT hdlImage);
 	EH_IMG IMGConvert(EH_IMG hdlImage,EN_PIXEL_TYPE enPixelType); // new 2010
 
 	typedef struct {
@@ -102,14 +102,14 @@
 		LONG			lFileSize;				// Dimensione del file
 
 		LONG			linesize;				// Larghezza linea in byte
-		SINT			iChannels; // Dimensioni i byte del pixel
+		INT			iChannels; // Dimensioni i byte del pixel
 		BITMAPINFOHEADER bmiHeader;
 		LONG			Offset;
 		SIZE_T			dwBitmapSize;	// Dimensione dell'immagine in memoria
 		SIZE_T			dwMemoSize;		// Dimensione di tutta la memoria (HEADER+BITMAP+ALTRO es Pallette)
 		
 		// Solo con la palette COLOR8
-		SINT			idxTrasparent;	// Indice della trasparenza (-1) se non usato
+		INT			idxTrasparent;	// Indice della trasparenza (-1) se non usato
 		DWORD			dwColors;		// Numero dei colori della palette
 		S_RGB *			psRgbPalette;
 		//BYTE *	pbPalette;		// Puntatore al primo bute della palette
@@ -131,36 +131,36 @@
 				   IMGHEADER *psImgHead, // Se vuoi l'header di ritorno - può esser NULL
 				   BOOL bOnlyHeader); // TRUE se vuoi solo l'header senza allocare memoria
 	void	IMGDestroy(EH_IMG);
-	void	IMGFill(SINT hdlImage,DWORD cBackColor);
+	void	IMGFill(INT hdlImage,DWORD cBackColor);
 
-	//void IMGDisplay(HDC hdc,SINT x,SINT y,SINT hdl); // New fine 2004
+	//void IMGDisplay(HDC hdc,INT x,INT y,INT hdl); // New fine 2004
 
-	SINT	IMGFromIcone(CHAR *lpIcone,SINT iLx,SINT iLy,struct  ICO_HEAD *lpHead);
+	INT	IMGFromIcone(CHAR *lpIcone,INT iLx,INT iLy,struct  ICO_HEAD *lpHead);
 
 	// ATTENZIONE:
 	// Ofx,Ofxy da fare
 	// Immagini oltre i 1024 punti di larghezza potrebbere avere problemi
-	void	IMGDisp(SINT PosX,SINT PosY,SINT Hdl);
-	void	IMGDispEx(SINT PosX,SINT PosY,SINT SizeX,SINT SizeY,SINT OfsX,SINT OfsY,SINT Hdl);
-	void	dcImageShow(HDC hdc,SINT x,SINT y,DWORD dwCx,DWORD cxCy,SINT hImage); // New fine 2004
+	void	IMGDisp(INT PosX,INT PosY,INT Hdl);
+	void	IMGDispEx(INT PosX,INT PosY,INT SizeX,INT SizeY,INT OfsX,INT OfsY,INT Hdl);
+	void	dcImageShow(HDC hdc,INT x,INT y,DWORD dwCx,DWORD cxCy,INT hImage); // New fine 2004
 	//#define IMGDisplay dcImageShow
 
-	void IMGCalc(SINT *SizeX,SINT *SizeY,SINT Hdl);
-	void IMGTopdown(SINT HdlImage);
+	void IMGCalc(INT *SizeX,INT *SizeY,INT Hdl);
+	void IMGTopdown(INT HdlImage);
 	void IMG_RGBSwapping(IMGHEADER *psImgHead);
 	void IMGCalcSize(IMGHEADER *ImgHead,      // Dimensioni del sorgente
 					 SIZE sDim,		   // Area disponibile
-					 SINT iPhotoAdatta,  // Tipo di adattamento
-					 SINT iAlignH,	   // Allineamento orizzontale
-					 SINT iAlignV,	   // Allineamento verticale
+					 EN_IMGPT iPhotoAdatta,  // Tipo di adattamento
+					 INT iAlignH,	   // Allineamento orizzontale
+					 INT iAlignV,	   // Allineamento verticale
 					 SIZE *sDest,		   // Dimensioni della destinazione
 					 RECT *rDest,
 					 RECT *psrSource); 	   // Posizionamento in destinazione{
 	void RectCalcSize(SIZE sSource,		// Dimensioni del sorgente
 					  SIZE sAreaDest,		// Dimensione Area destinazione desiderata
 					  EN_IMGPT iPhotoAdatta,// Tipo di adattamento
-					  SINT iAlignH,	    // Allineamento richiesto orizzontale
-					  SINT iAlignV,	    // Allineamento richiesto verticale
+					  INT iAlignH,	    // Allineamento richiesto orizzontale
+					  INT iAlignV,	    // Allineamento richiesto verticale
 					  SIZE *lpsDest,		// Dimensioni della destinazione
 					  RECT *lprDest,		// Posizionamento in destinazione
 					  RECT *lprSource);	    // Rettangolo da prendere nel sorgente
@@ -175,12 +175,12 @@
 	};
 
 	void CreateGrayColourMap(BYTE *Palette,int nGrays);
-	void SetPalette(BYTE *Palette,SINT nColors, BYTE *Red, BYTE *Green, BYTE *Blue);
+	void SetPalette(BYTE *Palette,INT nColors, BYTE *Red, BYTE *Green, BYTE *Blue);
 
 	// -----------------------------------------------------------
 	// JPEG AREA
 	// -----------------------------------------------------------
-	//BOOL JPGReadFile(CHAR *imageFileName,SINT *HdlImage,BOOL Quantize);
+	//BOOL JPGReadFile(CHAR *imageFileName,INT *HdlImage,BOOL Quantize);
 
 	// Tipo di ricampionamento
 	#define TRS_NONE 0
@@ -198,24 +198,24 @@
 	#define JME_NORMAL 0 // Vedi l'errore
 	#define JME_HIDE 1 // Non mostrare l'errore
 
-	SINT IMGRemaker(SINT HdlImage,RECT *psrRectSource,SINT xNew,SINT yNew,BOOL fQuality,SINT iResampling);
-	SINT IMGResampling(SINT HdlImage,  // Handle dell'immagine
+	INT IMGRemaker(INT HdlImage,RECT *psrRectSource,INT xNew,INT yNew,BOOL fQuality,INT iResampling);
+	INT IMGResampling(INT HdlImage,  // Handle dell'immagine
 					   RECT *lpSubRange,
 					   int target_width, 
 					   int target_height, 
 					   int iTypeResampling);
-	void IMGGetSize(SINT hImage,SIZE *lps);
-	SINT IMGLevels(SINT HdlImage,
-				   SINT in_min, 
+	void IMGGetSize(INT hImage,SIZE *lps);
+	INT IMGLevels(INT HdlImage,
+				   INT in_min, 
 				   double gamma, 
-				   SINT in_max, 
-				   SINT out_min, 
-				   SINT out_max);
+				   INT in_max, 
+				   INT out_min, 
+				   INT out_max);
 
 	// new 2007
-	//HBITMAP ImgToBitmap(SINT hdlImage);
-	HBITMAP ImgToBitmap(SINT hdlImage,SIZE *psizImage,BOOL bAlphaEver);
-	SINT BitmapToImg(HBITMAP hBitmap,
+	//HBITMAP ImgToBitmap(INT hdlImage);
+	HBITMAP ImgToBitmap(INT hdlImage,SIZE *psizImage,BOOL bAlphaEver);
+	INT BitmapToImg(HBITMAP hBitmap,
 					 BOOL bGetBitmap, // Usare TRUE se diverso da DIB 
 					 RECT *prcClip,
 					 EN_PIXEL_TYPE enPixelTypeDest); // new 2010
@@ -231,33 +231,33 @@
 	// BMP AREA
 	// -----------------------------------------------------------
 
-	BOOL BMPSaveFile(TCHAR *imageFileName, SINT HdlImage);
-	SINT BMPReadFile(TCHAR *imageFileName, SINT *piImageHandle);
-	SINT BMPReadHeader(TCHAR *imageFileName, IMGHEADER * psImgHead);
+	BOOL BMPSaveFile(TCHAR *imageFileName, INT HdlImage);
+	INT BMPReadFile(TCHAR *imageFileName, INT *piImageHandle);
+	INT BMPReadHeader(TCHAR *imageFileName, IMGHEADER * psImgHead);
 	HBITMAP BMPLoadBitmap(TCHAR *imageFileName); // 2010
-	//SINT _BMPReadService(TCHAR *imageFileName, IMGHEADER *psImgHead ,BOOL bOnlyHeader);
+	//INT _BMPReadService(TCHAR *imageFileName, IMGHEADER *psImgHead ,BOOL bOnlyHeader);
 
 
 	// -----------------------------------------------------------
 	// JPG AREA
 	// -----------------------------------------------------------
-	SINT JPGGetFactor(SIZE *lpsSource,SIZE *lpsDest,SINT *lpiPerc); // 2011
-	BOOL JPGReadFile(UTF8 *imageFileName,SINT *HdlImage,BOOL *fStop,SINT *iErr,SINT iModeError,EN_PIXEL_TYPE enPixelType);
+	INT JPGGetFactor(SIZE *lpsSource,SIZE *lpsDest,INT *lpiPerc); // 2011
+	BOOL JPGReadFile(UTF8 *imageFileName,INT *HdlImage,BOOL *fStop,INT *iErr,INT iModeError,EN_PIXEL_TYPE enPixelType);
 	BOOL JPGReadFileEx(UTF8 *imageFileName,
-					   SINT *piImageHandle,
+					   INT *piImageHandle,
 					   BOOL *fStop,
 					   
-					   SINT iFactor,
-					   SINT iDct,	// JDCT_ISLOW (Default), JDCT_IFAST (Veloce ma meno accurato), JDCT_FLOAT
+					   INT iFactor,
+					   INT iDct,	// JDCT_ISLOW (Default), JDCT_IFAST (Veloce ma meno accurato), JDCT_FLOAT
 					   
-					   SINT *lpiErr,
+					   INT *lpiErr,
 					   BOOL iModeError,
 					   EN_PIXEL_TYPE enPixelType);
 
-	BOOL JPGSaveFile(UTF8 *imageFileName,SINT HdlImage,SINT iQuality);
-	BOOL JPGPutStream(FILE *outfile,SINT HdlImage,SINT iQuality);
-	SINT JPGNewFile(UTF8 *lpFileSource,UTF8 *lpFileDest,SINT iLx,SINT iLy,SINT iQuality,BOOL fAliasing,SINT iResampling,EN_PIXEL_TYPE enPixelType);
-	SINT JPGReadHeader(UTF8 *imageFileName,IMGHEADER *ImgHead,SINT iModeError);
+	BOOL JPGSaveFile(UTF8 *imageFileName,INT HdlImage,INT iQuality);
+	BOOL JPGPutStream(FILE *outfile,INT HdlImage,INT iQuality);
+	INT JPGNewFile(UTF8 *lpFileSource,UTF8 *lpFileDest,INT iLx,INT iLy,INT iQuality,BOOL fAliasing,INT iResampling,EN_PIXEL_TYPE enPixelType);
+	INT JPGReadHeader(UTF8 *imageFileName,IMGHEADER *ImgHead,INT iModeError);
 
 
 	// -----------------------------------------------------------
@@ -271,20 +271,20 @@
 
 	typedef struct {
 		BOOL  fTrasparent;	// TRUE/FALSE
-		SINT  iTraspIndex;	// Indice della trasparenza
-		SINT  iDelay;		// Tempo di Ritardo (1/100 di secondo)
+		INT  iTraspIndex;	// Indice della trasparenza
+		INT  iDelay;		// Tempo di Ritardo (1/100 di secondo)
 		POINT pImage;		// Posizione Left/Top
 		SIZE  sImage;		// Dimensione orizzontale e verticale
 		BOOL  fLocalColor;  // C'è una tabella palletes collegata all'immagine
-		SINT  iColors;		// Numeri dei colori della tabella
+		INT  iColors;		// Numeri dei colori della tabella
 		BOOL  fInterlace;   // Immagine interlacciata
-		SINT  iDisposal;	// Metodo di disposizione
-		SINT  iPointer;		// Puntatore al blocco di definizione dell'immagine
+		INT  iDisposal;	// Metodo di disposizione
+		INT  iPointer;		// Puntatore al blocco di definizione dell'immagine
 	} S_GIFFRAMEINFO;
 
 	typedef struct {
 	  TCHAR szFileName[300];
-	  SINT hdlFile;				// Handle della memoria che contiene il file compresso
+	  INT hdlFile;				// Handle della memoria che contiene il file compresso
 	  LONG lSize;				// Dimensione del file
 	  SIZE sArea;				// Area del Logical Screen (Dimensioni dell'immagine)
 	  BYTE header[7];			/* Firma and version */
@@ -293,44 +293,44 @@
 	  _DMI dmiFrames;	// DMI dei frame (GIFFRAMEINFO)
 	  
 	  GIFTABCOLOR  sTPCImage;	// Tabella dei colori Immagine
-	  SINT		  hdlImage8;	// Handle Memoria che contiene l'immagine a 256 colori (8 bit)
-	  SINT		  iImageSize;	// Dimensioni dell'area immagine a 8bit
+	  INT		  hdlImage8;	// Handle Memoria che contiene l'immagine a 256 colori (8 bit)
+	  INT		  iImageSize;	// Dimensioni dell'area immagine a 8bit
 	  BOOL		bTrasparent;	// Esiste almeno un frame con la trasparenza
 	} GIFINFO;
 
 	BOOL GIFOpenFile(TCHAR *imageFileName,GIFINFO *lpGIFInfo);
 	BOOL GIFSaveFile(TCHAR *imageFileName,GIFINFO *lpGIFInfo);
-	BOOL GIFSaveFile_IMG(TCHAR *pszImageFileName,SINT hdlImage);
+	BOOL GIFSaveFile_IMG(TCHAR *pszImageFileName,INT hdlImage);
 	void GIFCloseFile(GIFINFO *lpGIFInfo);
-	SINT GIFProcess(GIFINFO *lpGIFInfo,SINT iFromFrame,SINT iToFrame);
+	INT GIFProcess(GIFINFO *lpGIFInfo,INT iFromFrame,INT iToFrame);
 
 	BOOL GIFtoIMG(GIFINFO *lpGIFInfo,	// Struttura GIFINFO
-				  SINT iFromFrame,		// Rendering fino al Frame
-				  SINT iToFrame,		// Rendering fino al Frame
-				  SINT cBackGround,		// Color del background in TRUE Color
-				  SINT *lpHdlImage,			// Handle che conterrà l'immagine
+				  INT iFromFrame,		// Rendering fino al Frame
+				  INT iToFrame,		// Rendering fino al Frame
+				  INT cBackGround,		// Color del background in TRUE Color
+				  INT *lpHdlImage,			// Handle che conterrà l'immagine
 				  EN_PIXEL_TYPE enPixelType);
-	BOOL IMGToGIF(SINT hdlImage,
+	BOOL IMGToGIF(INT hdlImage,
 				  GIFINFO *lpGIFInfo);
 
-	BOOL GIFReadHeader(TCHAR *imageFileName,IMGHEADER *psImgHead,SINT iModeError);
-	BOOL GIFReadFile(TCHAR *imageFileName,SINT *lpHdlNewImage,SINT cBackGround,BOOL iModeError,EN_PIXEL_TYPE enPixelType);
+	BOOL GIFReadHeader(TCHAR *imageFileName,IMGHEADER *psImgHead,INT iModeError);
+	BOOL GIFReadFile(TCHAR *imageFileName,INT *lpHdlNewImage,INT cBackGround,BOOL iModeError,EN_PIXEL_TYPE enPixelType);
 
 	void JPGSyncEnter(void);
 	void JPGSyncLeave(void);
 
 	// PNG
-	BOOL PNGReadHeader(TCHAR *imageFileName,IMGHEADER *ImgHead,SINT iModeError); // new 2009
+	BOOL PNGReadHeader(TCHAR *imageFileName,IMGHEADER *ImgHead,INT iModeError); // new 2009
 	BOOL PNGReadFile(TCHAR *imageFileName,
-					 SINT *HdlImage,
-					 SINT *lpiErr,
+					 INT *HdlImage,
+					 INT *lpiErr,
 					 BOOL iModeError);
-	BOOL PNGSaveFile(TCHAR *imageFileName,SINT HdlImage,SINT iQuality); // new 2009
+	BOOL PNGSaveFile(TCHAR *imageFileName,INT HdlImage,INT iQuality); // new 2009
 
 	typedef struct {
 		CHAR szNome[80];
-		SINT iHdl;
-		SINT iGrp;
+		INT iHdl;
+		INT iGrp;
 	} PNG_MEMO;
 	void *srvPng(INT cmd,INT info,CHAR *ptr);
 

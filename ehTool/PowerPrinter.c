@@ -3083,13 +3083,13 @@ static void LayVPResize(void)
 }
 
 
-static void * LocalPaint(INT cmd,LONG info,void *ptr)
+static void * _winPrinterPaint(EH_SUBWIN_PARAMS * psSwp)
 {
- PAINTSTRUCT *ps;
- switch (cmd)
+ //PAINTSTRUCT *ps;
+ switch (psSwp->enMess)
  {
   case WS_DISPLAY:
-	ps=(PAINTSTRUCT *) ptr;
+//	ps=(PAINTSTRUCT *) ptr;
 //	box3d(0,50,WIN_info[sys.WinWriteFocus].lx,50,2);
 	break;
 
@@ -3219,7 +3219,7 @@ static BOOL LREPreview(CHAR *lpParam)
 		goto FINE;
 	}
   
-    win_openEx(EHWP_SCREENCENTER,0,"Power Printer preview",800,500,-1,OFF,0,WS_EHMOVEHIDE,FALSE,LocalPaint);
+    win_openEx(EHWP_SCREENCENTER,0,"Power Printer preview",800,500,-1,OFF,0,WS_EHMOVEHIDE,FALSE,_winPrinterPaint);
 	win_SizeLimits(AUTOMATIC,AUTOMATIC,-1,-1);
 
 	LREOwner=sys.WinInputFocus;

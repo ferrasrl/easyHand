@@ -4478,7 +4478,7 @@ HBITMAP GIFReadLikeBitmap(TCHAR *tsFile)
 // partendo dal rettangolo di un sorgente dell'immagine
 //
 // --------------------------------------------------------
-void IMGCalcSize(IMGHEADER *ImgHead,      // Dimensioni del sorgente
+void IMGCalcSize(IMGHEADER * ImgHead,      // Dimensioni del sorgente
 				 SIZE sDim,		   // Area disponibile
 				 INT iPhotoAdatta,  // Tipo di adattamento
 				 INT iAlignH,	   // Allineamento orizzontale

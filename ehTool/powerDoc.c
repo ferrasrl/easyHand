@@ -14,7 +14,7 @@
 
 
 #ifdef EH_PDF 
-
+// /easyhand/extSource/libharu
 	#include "/easyhand/Ehtoolx/libharu-2.1.0/include/hpdf.h" 
 	#include "/easyhand/Ehtoolx/libharu-2.1.0/include/hpdf_conf.h" 
 	#include "/easyhand/Ehtoolx/libharu-2.1.0/include/hpdf_encoder.h" 
@@ -23,12 +23,17 @@
 	#pragma message("--> Includo /easyhand/ehtoolx/libharu-2.1.0/lib/libhpdf.lib <-------------------")
 	#pragma comment(lib, "/easyhand/ehtoolx/libharu-2.1.0/lib/libhpdf.lib")
 
-typedef struct {
+/*
+	
+//	#pragma comment(lib, "/easyhand/extSource/libharu/lib/libhpdf.lib")
+	#include "/easyhand/extSource/libharu/include/hpdf.h" 
+	#include "/easyhand/extSource/libharu/include/hpdf_conf.h" 
+	#include "/easyhand/extSource/libharu/include/hpdf_encoder.h" 
+	#include "/easyhand/extSource/libharu/include/hpdf_utils.h" 
 
-	CHAR	  szFontFullPath[500];
-	HPDF_Font psPdfFont;
-
-} S_PDFFONT;
+	#pragma message("--> Includo /easyhand/extSource/libharu/lib/libhpdf.lib <-------------------")
+	#pragma comment(lib, "/easyhand/extSource/libharu/lib/libhpdf.lib")
+*/
 
 static CHAR *_pdfStrDecode(WCHAR *pwcText);
 
@@ -111,6 +116,7 @@ static struct {
 	BOOL		bUserAbort;
 	HWND		hDlgPrint;
 
+
 #ifdef EH_PDF
 
 	HPDF_Doc	pdfDoc;
@@ -120,6 +126,7 @@ static struct {
 	jmp_buf		pdfEnv;
 	BYTE	  * pbCharMap;	
 	EH_AR		arPngTemp;
+//	_DMI		dmiPdfFont;
 
 #endif
 
@@ -131,12 +138,12 @@ static	EH_PWD	_sPower;
 //
 //	Dichiarazioni funzioni statiche private
 //
-static void *_itemBuilder(PWD_TE uType,
-						   PWD_RECT	*prumObj,	// Puntatore all'area occupata dall'oggetto
-						   void *psObj,			// Puntatore alla struttura di dettaglio del tipo
-						   INT	iObjSize,		// Dimensioni della struttura
-						   INT *lpiSize);
-
+static void *	_itemBuilder(	PWD_TE		uType,
+								PWD_RECT *	prumObj,	// Puntatore all'area occupata dall'oggetto
+								void *		psObj,			// Puntatore alla struttura di dettaglio del tipo
+								INT			iObjSize,		// Dimensioni della struttura
+								INT *		lpiSize);
+static void *	_getItemObj(PWD_ITEM  * psDraw);
 static PWD_ITEM *_LItemNext(PWD_ITEM *pbItem);
 
 static void		_LFileTempLoad(void);
@@ -153,21 +160,23 @@ static void		_LWinStart(void);
 static BOOL		_addItem(PWD_TE uType,PWD_RECT *prumObj,void *psObj,INT iSizeObj);
 static BOOL		_addItemMem(PWD_TE uType,PWD_RECT *prumObj,void *psObj,INT iSizeObj);
 
-//static double	_LDotToUm(INT bHoriz,INT iDot);
-//static INT		_LUmToDot(INT bHoriz,double dValue);
 static void		_LItemReposition(void);
-//static INT		_LTextInRect(RECT *prRect,PDO_TEXT *psCharBox,WCHAR *pwcText,BOOL bOutput,INT *lpiRows);//,INT iMaxRows);
-static INT		_LTextInRect(HDC hdc,RECT *precObj,PDO_TEXT *psText,WCHAR *pwcText,BOOL bOutput,INT *lpiRows);
-//static void		_LImageDispEx(HDC hDC,INT PosX,INT PosY,INT SizeX,INT SizeY,INT OfsX,INT OfsY,INT hImage);
-static S_FAC *	_fontPowerCreate(HDC hdc,PDO_TEXT *psText,BOOL bDcAlign,TEXTMETRIC * psTextMetrics);
+static S_FAC *	_fontPowerCreate(	HDC hdc,
+									BOOL bVirtual,	// T/F se devo calcolare in virtual (preview)
+									PDO_TEXT *psText,
+									BOOL bDcAlign,
+									TEXTMETRIC * psTextMetrics);
 static void		_LFontAmbientDestroy(S_FAC *psFac);
 static void		_LdcBoxDotted(HDC hdc,INT x,INT y,INT x2,INT y2,LONG Color);
 static void		_LTempWrite(void *pb,SIZE_T iLen);
 static void		_fontEnumeration(BOOL bFontAlloc);
-//static BOOL	_fontFileSearch(CHAR *pszFontName, CHAR **pszFontFile);
-static BOOL     _fontFileSearch(PWD_FONT *psPwdFont, CHAR  *pszFontPath);
-static LONG		GetNextNameValue(HKEY key, LPCTSTR pszSubkey, LPTSTR pszName, LPTSTR pszData);
+static BOOL     _fontFileSearch(PWD_FONT *psPwdFont, CHAR  *pszFontPath, BOOL * pbEmb);
+static LONG		_getNextNameValue(HKEY key, LPCTSTR pszSubkey, LPTSTR pszName, LPTSTR pszData);
 static void *	_pathListFree(EH_LST lstPathReady);
+
+static EH_LST	_pathCreate(PDO_PATH * psPath);
+static void		_pathDestroy(EH_LST lstPath);
+
 //
 // Funzioni statiche PDF
 //
@@ -178,14 +187,14 @@ static void _pdfErrorHandler(HPDF_STATUS   error_no,
 
 INT _LPdfTextAlign(INT iAllinea);
 static BOOL		_pdfBuilder(INT iPageStart,INT iPageEnd);
-static void		_LPdfMapBuilder(CHAR *pszEncode);
+static void		_pdfMapBuilder(CHAR *pszEncode);
 #endif
 
 //
 // Funzioni locali di disegno
 //
 #ifndef EH_CONSOLE
-static void		_LPagePaint(HDC hDC,INT nPage,RECT *lpRect);
+static void		_pagePaint(HDC hDC,INT nPage,RECT *lpRect);
 static void		_drawText(PWD_DRAW *psDraw); 
 static void		_drawTextBox(PWD_DRAW *psDraw);
 static void		_drawRect(PWD_DRAW *psDraw);
@@ -211,7 +220,8 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 	LONG l;
 	INT iAuto=0;
 	double dTotPerc=0;
-//	CHAR Buf[80];
+	PWD_FONT_RES * psFontRes;
+
 	INT iFieldPerRiga;
 
 //	PDO_TEXT		sText;
@@ -268,6 +278,7 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 			_sPower.pszFontBodyDefault="Arial";//Times New Roman"; // Font del corpo
 
 			DMIReset(&_sPower.dmiFont);
+			_sPower.lstFontRes=lstCreate(sizeof(PWD_FONT_RES));
 			pRet=&_sPower;
 			_sPd.bVirtual=false;
 			break;
@@ -431,10 +442,10 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 				_sPower.sizDotPerInch.cx=GetDeviceCaps(_sPower.hdcPrinter,LOGPIXELSX);
 				_sPower.sizDotPerInch.cy=GetDeviceCaps(_sPower.hdcPrinter,LOGPIXELSY);
 
-				_sPower.sumPhysicalPage.cx=pwdUm(PUM_UM_PHX,GetDeviceCaps(_sPower.hdcPrinter,PHYSICALWIDTH));
-				_sPower.sumPhysicalPage.cy=pwdUm(PUM_UM_PHY,GetDeviceCaps(_sPower.hdcPrinter,PHYSICALHEIGHT));
-				_sPower.sumPaper.cx=pwdUm(PUM_UM_PHX,GetDeviceCaps(_sPower.hdcPrinter,HORZRES));
-				_sPower.sumPaper.cy=pwdUm(PUM_UM_PHY,GetDeviceCaps(_sPower.hdcPrinter,VERTRES));
+				_sPower.sumPhysicalPage.cx=pwdUm(PUM_DTX,GetDeviceCaps(_sPower.hdcPrinter,PHYSICALWIDTH));
+				_sPower.sumPhysicalPage.cy=pwdUm(PUM_DTY,GetDeviceCaps(_sPower.hdcPrinter,PHYSICALHEIGHT));
+				_sPower.sumPaper.cx=pwdUm(PUM_DTX,GetDeviceCaps(_sPower.hdcPrinter,HORZRES));
+				_sPower.sumPaper.cy=pwdUm(PUM_DTY,GetDeviceCaps(_sPower.hdcPrinter,VERTRES));
 			}
 						
 			if (!_sPower.sumPaper.cx||!_sPower.sumPaper.cy) ehExit("Stampante/Formato carta non selezionato (%s:%d)",__FILE__,__LINE__);
@@ -507,6 +518,13 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 
 			// Libera le risorse impegnate
 			_freeResource(true);
+			//
+			// Rilascio font temporanei
+			//
+			for (lstLoop(_sPower.lstFontRes,psFontRes)) {
+				if (!strEmpty(psFontRes->szFileName)) fontUninstall(psFontRes->szFileName);
+			}
+			_sPower.lstFontRes=lstDestroy(_sPower.lstFontRes);
 			if (_sPd.lstElement) _sPd.lstElement=lstDestroy(_sPd.lstElement);
 			if (_sPower.dmiFont.Hdl>-1) DMIClose(&_sPower.dmiFont,"Font");
 			break;
@@ -1073,7 +1091,6 @@ PWD_FIELD *	pwdGetField(INT a,CHAR *pszName) {
 //  pwdSet() Setta il valore di un campo 
 //
 
-
 void pwdSet(INT iCol,void * pValue) {
 
 	PWD_COLOR		colText;
@@ -1265,6 +1282,26 @@ void pwdSetEx(INT iCol,void * pValue,PWD_COLOR colText,PWD_COLOR colBack,EH_TSTY
 	
 }
 
+//
+// pwdAddFont() > Aggiunge un font da usare (provvisoriamente per la stampa)
+//
+BOOL pwdFontAdd(CHAR * pszNameFont, UTF8 * pszFileName,BOOL bAddInFile) {
+	
+	PWD_FONT_RES sFont;
+
+	if (!strEmpty(pszFileName)) {
+		if (fontInstall(pszFileName,false)) return true;
+	}
+	
+	_(sFont);
+	strcpy(sFont.szName,pszNameFont);
+	if (!strEmpty(pszFileName)) strcpy(sFont.szFileName,pszFileName);
+	sFont.bAddInFile=bAddInFile;
+	lstPush(_sPower.lstFontRes,&sFont);
+	return false;
+
+}
+
 
 // -------------------------------------------------------------------------------
 // SERVICE FUNCTION FOR PRINTER                                                  |
@@ -1324,7 +1361,7 @@ static void _pointToPixel(PWD_VAL umX,
 						  INT * piY) {
 
 	INT x,y;
-	x=(INT) pwdUm(PUM_PHX,umX);	y=(INT) pwdUm(PUM_PHY,umY);
+	x=(INT) pwdUmTo(umX,PUM_DTXD);	y=(INT) pwdUmTo(umY,PUM_DTYD);
 
 	if (_sPd.bVirtual) {
 		x+=_sPd.recPreviewPage.left;
@@ -1340,58 +1377,40 @@ static void _pointToPixel(PWD_VAL umX,
 //
 // _LPage () (Disegna una pagina, o porzione di essa
 //
-static void _LPagePaint(HDC hDC,INT nPage,RECT *recArea)
+static void _pagePaint(HDC hDC,INT nPage,RECT * recArea)
 {
 	INT a;
 	PWD_DRAW sItemDraw;
-	BYTE *pb;
 	RECT recComp;
+	PWD_ITEM * psItem;
+
 	_(sItemDraw);
 	sItemDraw.hDC=hDC;
 
 	for (a=_sPd.ariPageIndex[nPage];a<_sPd.nItems;a++)
 	{
-		if (_sPd.arsItem[a]->iPage!=(nPage+1)) break;
+		psItem=_sPd.arsItem[a];
+		if (psItem->iPage!=(nPage+1)) break;
 		
 		// Per ora cosi
-		if (_sPd.arsItem[a]->enType!=PDT_PATH) {
+		if (psItem->enType!=PDT_PATH) {
 
 			//
 			// Calcolo le nuove coordinate / dimensioni
 			//
-			_pointToPixel(	_sPd.arsItem[a]->rumObj.left,
-							_sPd.arsItem[a]->rumObj.top,
+			_pointToPixel(	psItem->rumObj.left,
+							psItem->rumObj.top,
 							&sItemDraw.recObj.left,
 							&sItemDraw.recObj.top);
 
-			_pointToPixel(	_sPd.arsItem[a]->rumObj.right,
-							_sPd.arsItem[a]->rumObj.bottom,
+			_pointToPixel(	psItem->rumObj.right,
+							psItem->rumObj.bottom,
 							&sItemDraw.recObj.right,
 							&sItemDraw.recObj.bottom);
-			/*
-			sItemDraw.recObj.left=(INT) pwdUm(PUM_PHX,_sPd.arsItem[a]->rumObj.left);
-			sItemDraw.recObj.right=(INT) pwdUm(PUM_PHX,_sPd.arsItem[a]->rumObj.right);
-			sItemDraw.recObj.top=(INT) pwdUm(PUM_PHY,_sPd.arsItem[a]->rumObj.top);
-			sItemDraw.recObj.bottom=(INT) pwdUm(PUM_PHY,_sPd.arsItem[a]->rumObj.bottom);
-			*/
 			
 			rectCopy(recComp,sItemDraw.recObj);
 			if (recComp.left>recComp.right) swapInt(recComp.left,recComp.right);
 			if (recComp.top>recComp.bottom) swapInt(recComp.top,recComp.bottom);
-/*
-			if (_sPd.bVirtual) {
-				
-				sItemDraw.recObj.left+=_sPd.recPreviewPage.left;
-				sItemDraw.recObj.right+=_sPd.recPreviewPage.left;
-				sItemDraw.recObj.top+=_sPd.recPreviewPage.top;
-				sItemDraw.recObj.bottom+=_sPd.recPreviewPage.top;
-
-				recComp.left+=_sPd.recPreviewPage.left;
-				recComp.right+=_sPd.recPreviewPage.left;
-				recComp.top+=_sPd.recPreviewPage.top;
-				recComp.bottom+=_sPd.recPreviewPage.top;
-			}
-			*/
 
 			if (recArea) {
 			
@@ -1407,13 +1426,14 @@ static void _LPagePaint(HDC hDC,INT nPage,RECT *recArea)
 		// Verifico che sia nell'area richiesta
 		//
 		
-		sItemDraw.psItem=_sPd.arsItem[a]; pb=(BYTE *) sItemDraw.psItem;
-		sItemDraw.pObj=(pb+sizeof(PWD_ITEM));
+		sItemDraw.psItem=psItem; 
+		//pb=(BYTE *) sItemDraw.psItem;
+		//sItemDraw.pObj=(pb+sizeof(PWD_ITEM));
 
 		//
 		// Function router 
 		//
-		switch (_sPd.arsItem[a]->enType)
+		switch (psItem->enType)
 		{
 			case PDT_TEXT:		_drawText(&sItemDraw); break;
 			case PDT_TEXTBOX:	_drawTextBox(&sItemDraw);break;
@@ -1451,9 +1471,10 @@ static void _PagePrinter(INT PageStart,INT PageEnd)
 {
     //static DOCINFO  di = { sizeof (DOCINFO), "", NULL ,NULL,0} ;
 	static DOCINFO  di;
-	BOOL bSuccess ;
-	INT iPage;
-	INT iColCopy,iNoiColCopy;
+	BOOL	bSuccess ;
+	INT		iPage;
+	INT		iColCopy,iNoiColCopy;
+
 #ifndef EH_CONSOLE
 	HWND hWnd;
 #endif
@@ -1528,7 +1549,7 @@ static void _PagePrinter(INT PageStart,INT PageEnd)
 							}
 
 
-							_LPagePaint(_sPower.hdcPrinter,iPage,NULL);  
+							_pagePaint(_sPower.hdcPrinter,iPage,NULL);  
 
 						 // Fine della pagina
 							if (EndPage (_sPower.hdcPrinter) <= 0)
@@ -1674,13 +1695,15 @@ static void _LPreviewSizeCalc(void)
 		default:
 
 			// Calcolo dimensioni in percentuali sui punti fisici
-			_sPd.sizPreviewPage.cx=(INT) (pwdUm(PUM_PHX_REAL,_sPower.sumPaper.cx)*(double) _sPd.iPageZoom/100);
+//			_sPd.sizPreviewPage.cx=(INT) (pwdUm(PUM_DTX,_sPower.sumPaper.cx)*(double) _sPd.iPageZoom/100);
+			_sPd.sizPreviewPage.cx=(INT) pwdUmTo((_sPower.sumPaper.cx*(double) _sPd.iPageZoom/100),PUM_DTXD);
 			_sPd.sizPreviewPage.cy=(INT) (_sPower.sumPaper.cy*(double) _sPd.sizPreviewPage.cx/_sPower.sumPaper.cx);
 			break;
 	}
 
-	_sPd.dZoomPerc=(double) _sPd.sizPreviewPage.cx*100/pwdUm(PUM_PHX_REAL,_sPower.sumPaper.cx);
-	ehPrintd("Zoom: [%.2f]" CRLF,_sPd.dZoomPerc);//(INT) pwdUm(PUM_PHX_REAL,_sPower.sumPaper.cx));
+//	_sPd.dZoomPerc=(double) _sPd.sizPreviewPage.cx*100/pwdUm(PUM_DTX,_sPower.sumPaper.cx);
+	_sPd.dZoomPerc=(double) _sPd.sizPreviewPage.cx*100/pwdUmTo(_sPower.sumPaper.cx,PUM_DTXD);
+	ehPrintd("Zoom: [%.2f]" CRLF,_sPd.dZoomPerc);//(INT) pwdUm(PUM_DTX,_sPower.sumPaper.cx));
 
 	// Calcolo dimensioni del workspace
 	_sPd.sizWorkSpace.cx=_sPd.sizPreviewPage.cx+(PREVIEW_MARGIN*2); if (_sPd.sizWorkSpace.cx<_sPd.sizClient.cx) _sPd.sizWorkSpace.cx=_sPd.sizClient.cx;
@@ -1727,13 +1750,13 @@ static void _LPreviewSizeCalc(void)
 }
 
 
-static void * LocalPaint(INT cmd,LONG info,void *ptr)
+static void * _winPrinterPaint(EH_SUBWIN_PARAMS * psSwp)
 {
-	PAINTSTRUCT *ps;
-	switch (cmd)
+//	PAINTSTRUCT *ps;
+	switch (psSwp->enMess)
 	{
 	case WS_DISPLAY:
-		ps=(PAINTSTRUCT *) ptr;
+		//ps=(PAINTSTRUCT *) ptr;
 		//	box3d(0,50,WIN_info[sys.WinWriteFocus].lx,50,2);
 		break;
 
@@ -1878,7 +1901,7 @@ static BOOL _docPreview(CHAR *lpParam)
 		goto FINE;
 	}
   
-    win_openEx(EHWP_SCREENCENTER,0,"Power Document preview",800,500,-1,OFF,0,WS_EHMOVEHIDE,FALSE,LocalPaint);
+    win_openEx(EHWP_SCREENCENTER,0,"Power Document preview",800,500,-1,OFF,0,WS_EHMOVEHIDE,FALSE,_winPrinterPaint);
 	win_SizeLimits(AUTOMATIC,AUTOMATIC,-1,-1);
 
 	_sPd.winPreview=sys.WinInputFocus;
@@ -2169,14 +2192,14 @@ static LRESULT CALLBACK funcPreviewProcedure(HWND hWnd,UINT message,WPARAM wPara
 			if ((_sPower.rumMargin.left+_sPower.rumMargin.top+_sPower.rumMargin.right+_sPower.rumMargin.bottom)>0)
 			{
 				_LdcBoxDotted(	hdcDest,
-								(INT) pwdUm(PUM_PHX,_sPower.rumPage.left)+_sPd.recPreviewPage.left,
-								(INT) pwdUm(PUM_PHY,_sPower.rumPage.top)+_sPd.recPreviewPage.top,
-								(INT) pwdUm(PUM_PHX,_sPower.rumPage.right)+_sPd.recPreviewPage.left,
-								(INT) pwdUm(PUM_PHY,_sPower.rumPage.bottom)+_sPd.recPreviewPage.top,
+								(INT) pwdUmTo(_sPower.rumPage.left,PUM_DTXD)+_sPd.recPreviewPage.left,
+								(INT) pwdUmTo(_sPower.rumPage.top,PUM_DTYD)+_sPd.recPreviewPage.top,
+								(INT) pwdUmTo(_sPower.rumPage.right,PUM_DTXD)+_sPd.recPreviewPage.left,
+								(INT) pwdUmTo(_sPower.rumPage.bottom,PUM_DTYD)+_sPd.recPreviewPage.top,
  								sys.arsColor[2]);
 			}
 
-			_LPagePaint(hdcDest,_sPd.iPageView,&ps.rcPaint);
+			_pagePaint(hdcDest,_sPd.iPageView,&ps.rcPaint);
 			
 //			dgCopyDC(_sPd.psDg,&ps.rcPaint,0,0,hdc);
 			EndPaint(hWnd,&ps);
@@ -2208,7 +2231,7 @@ static LRESULT CALLBACK funcPreviewProcedure(HWND hWnd,UINT message,WPARAM wPara
 					_sPd.recVPR.right+_sPd.ptOffset.x,
 					_sPd.recVPR.bottom+_sPd.ptOffset.y,sys.arsColor[2]);
 
-				_LPagePaint(TRUE,hdc,_sPd.iPageView,&ps.rcPaint);
+				_pagePaint(TRUE,hdc,_sPd.iPageView,&ps.rcPaint);
 			}
 			EndPaint(hWnd,&ps);
 			return 0;
@@ -2317,8 +2340,8 @@ static void _LFileTempLoad(void)
 	INT iLastPage,iLine,iPage;
 	PWD_ITEM *psItem;
 	SIZE_T tSize;
-	BYTE *pb;
-	PDO_TEXT *psText;
+//	BYTE *pb;
+	PDO_TEXT * psText;
 
 	// --------------------------------------------------------------------
 	// Creo array dei puntatori alle pagine del file caricato in memoria
@@ -2338,15 +2361,30 @@ static void _LFileTempLoad(void)
 	do
 	{
 		_sPd.arsItem[iLine]=psItem;
-		if (psItem->enType==PDT_TEXT||psItem->enType==PDT_TEXTBOX) {
 
-			//
-			// Rimappo i puntatori al testo e font
-			//
-			pb=(BYTE *) psText=(BYTE *) psItem+sizeof(PWD_ITEM);
-			psText->pszText=pb+sizeof(PDO_TEXT);
-			if (psText->pszFontFace) psText->pszFontFace=psText->pszText+strlen(psText->pszText)+1;
+		switch (psItem->enType) {
+		
+			case PDT_TEXT:
+			case PDT_TEXTBOX:
+		
+				//
+				// Rimappo i puntatori al testo e font
+				//
+//				psText=(PDO_TEXT * ) psItem->psObj;
+				psText=_getItemObj(psItem);;
+				//pb=(BYTE *) psText+sizeof(PDO_TEXT);//psText=(BYTE *) psItem+sizeof(PWD_ITEM);
+				psText->pszText=(BYTE *) psText+sizeof(PDO_TEXT);
+				if (psText->pszFontFace) psText->pszFontFace=psText->pszText+strlen(psText->pszText)+1;
+				break;
+
+			case PDT_PATH:
+				
+				break;
+
+
+
 		}
+
 		
 		
 		if (_sPd.arsItem[iLine]->iPage!=iLastPage) 
@@ -2368,12 +2406,13 @@ static void _freeResource(BOOL bDeleteAll)
 	INT a;
 	PWD_ITEM *psElement;
 	BYTE *ptr;
+
 	if (bDeleteAll) 
 	{
 		//
 		// Rimuovo il file temporane
 		//
-		remove(_sPd.szTempFile);
+		fileRemove(_sPd.szTempFile);
 
 		//
 		// Cancello le risorse Extra
@@ -2396,13 +2435,14 @@ static void _freeResource(BOOL bDeleteAll)
 									fileRemove(ps->pszFileTemp);
 							}
 							break;
-
+/*
 					case PDT_PATH:
 						{
 							PDO_PATH * ps=(PDO_PATH *) ptr;
 							_pathListFree(ps->lstPath);
 						}
 						break;
+						*/
 				}
 			}
 		}
@@ -2422,13 +2462,15 @@ static void _freeResource(BOOL bDeleteAll)
 #ifdef EH_PDF
 		ehFreePtr(&_sPd.pbCharMap);
 #endif
-
 	}
 
 	//if (_sPd.hdlFileTemp) {memoFree(_sPd.hdlFileTemp,"LRE"); _sPd.hdlFileTemp=0;}
 	ehFreePtr(&_sPd.pbFileTemp);
 	if (_sPd.arsItem) {ehFree(_sPd.arsItem); _sPd.arsItem=NULL;}
 	if (_sPd.ariPageIndex) {ehFree(_sPd.ariPageIndex); _sPd.ariPageIndex=NULL;}
+	
+
+
 }
 
 
@@ -2555,20 +2597,22 @@ static void		_LTempWrite(void *pb,SIZE_T iLen) {
 //                                        
 //                           by Ferrà 2002/2010
 //
-static void * _itemBuilder(PWD_TE uType,
-						   PWD_RECT	*prumObj,	// Puntatore all'area occupata dall'oggetto
-						   void *psObj,		// Puntatore alla struttura di dettaglio del tipo
-						   INT	iObjSize,
-						   INT *lpiSize)
+static void * _itemBuilder(PWD_TE		uType,
+						   PWD_RECT	*	prumObj,	// Puntatore all'area occupata dall'oggetto
+						   void *		psObj,		// Puntatore alla struttura di dettaglio del tipo
+						   INT			iObjSize,	// Dimensioni della struttura 
+						   INT *		lpiSize)
 						   
 {
-    PWD_ITEM sItem;
-	BYTE *	pbMemo,*pbPoint;
+    PWD_ITEM	sItem;
+	PWD_ITEM * psItem;
+	BYTE *	pbMemo,*pbExtra;
 	INT	iMemoSize;
 	INT	iLenText;
 
-	PDO_TEXT *psText;
-	PDO_IMAGE *psImage;
+	PDO_TEXT *	psText;
+	PDO_IMAGE *	psImage;
+	PDO_PATH *	psPath;
 	
 	//
 	// Inizializzo e calcolo la lunghezza
@@ -2596,19 +2640,33 @@ static void * _itemBuilder(PWD_TE uType,
 			if (psImage->pszFileTemp) sItem.iLenItem+=strlen(psImage->pszFileTemp)+1;
 			break;
 
+		case PDT_PATH:
+			psPath=psObj;
+			sItem.iLenItem+=psPath->dwElements;
+			break;
+
+
 	}
 
 	// PWD_ITEM+(STRUCT)+(DATI) 
 	iMemoSize=sItem.iLenItem;//sizeof(sItem)+iLenStruct+iLenDati;
-	pbPoint=pbMemo=ehAlloc(iMemoSize); //if (lpMemo==NULL) ehExit("LREMAkeItem: out of memory");
+//	pbPoint=pbMemo=ehAlloc(iMemoSize); //if (lpMemo==NULL) ehExit("LREMAkeItem: out of memory");
+	pbMemo=ehAllocZero(iMemoSize); //if (lpMemo==NULL) ehExit("LREMAkeItem: out of memory");
+	psItem=(PWD_ITEM * ) pbMemo;
 
 	//
 	// Item header
 	//
-	memcpy(pbPoint,&sItem,sizeof(sItem)); 
-	pbPoint+=sizeof(sItem);
+	memcpy(psItem,&sItem,sizeof(sItem)); 
+	
+//s	pbPoint+=sizeof(sItem);
 	// Aggiungo struttura
-	if (psObj) {memcpy(pbPoint,psObj,iObjSize); pbPoint+=iObjSize;} //f_put(ch,NOSEEK,lpStruct,iLenStruct); 
+	if (psObj) {
+		//memcpy(pbPoint,psObj,iObjSize);
+		BYTE * pb=_getItemObj(psItem);
+		memcpy(pb,psObj,iObjSize);
+		pbExtra=(BYTE *) pb; pbExtra+=iObjSize;	
+	} else pbExtra=NULL;
 
 	// Se ci sono accoda i dati dinamici
 	switch(uType)
@@ -2619,11 +2677,13 @@ static void * _itemBuilder(PWD_TE uType,
 			psText=psObj;
 			if (psText->pszText) {
 				iLenText=strlen(psText->pszText)+1;
-				memcpy(pbPoint,psText->pszText,iLenText); pbPoint+=iLenText;
+				memcpy(pbExtra,psText->pszText,iLenText); 
+				pbExtra+=iLenText;
 			}
 			if (psText->pszFontFace) {
 				iLenText=strlen(psText->pszFontFace)+1;
-				memcpy(pbPoint,psText->pszFontFace,iLenText); pbPoint+=iLenText;
+				memcpy(pbExtra,psText->pszFontFace,iLenText); 
+				pbExtra+=iLenText;
 			}
 			break;
 
@@ -2633,8 +2693,14 @@ static void * _itemBuilder(PWD_TE uType,
 			psImage=psObj;
 			if (psImage->pszFileTemp) {
 				iLenText=strlen(psImage->pszFileTemp)+1;
-				memcpy(pbPoint,psImage->pszFileTemp,iLenText); pbPoint+=iLenText;
+				memcpy(pbExtra,psImage->pszFileTemp,iLenText); 
+				pbExtra+=iLenText;
 			}
+			break;
+
+		case PDT_PATH:
+			psPath=psObj;
+			memcpy(pbExtra,psPath->psEle,psPath->dwElements); 
 			break;
 
 	    default:
@@ -3054,9 +3120,9 @@ PWD_VAL pwdUm(PWD_UM enUm,double dValore) {
 			break;
 
 		case PUM_INCH:
-		case PUM_UM_PT:
+//		case PUM_UM_PT:
 
-			if (enUm==PUM_UM_PT) dValore/=72;
+//			if (enUm==PUM_UM_PT) dValore/=72;
 			switch (_sPower.enMisure) {
 		
 				case PUM_STD:
@@ -3087,55 +3153,16 @@ PWD_VAL pwdUm(PWD_UM enUm,double dValore) {
 		// Calcolo i pollici e converti in UM
 		//
 		
-		case PUM_UM_PHX:
+//		case PUM_DTXD_TO_UM :
+		case PUM_DTX:
 				dInch=dValore/(double) _sPower.sizDotPerInch.cx;
 				dValue=pwdUm(PUM_INCH,dInch);
 				break;
 
-		case PUM_UM_PHY:
+		case PUM_DTY:
 				dInch=dValore/(double) _sPower.sizDotPerInch.cy;
 				dValue=pwdUm(PUM_INCH,dInch);
 				break;
-
-
-		//
-		// Chiedo le dimensioni "fisiche" dall'um corrente
-		// Calcolo i pollici e converti in UM
-		//
-		case PUM_PHX:
-		case PUM_PHX_REAL:
-				if (_sPd.bVirtual&&enUm!=PUM_PHX_REAL) // dValore:realx=x:virtualx
-					dValue=(_sPd.sizPreviewPage.cx*dValore/_sPower.sumPaper.cx);
-					else
-					dValue=pwdUm(PUM_UM_INCH,dValore)*_sPower.sizDotPerInch.cx;
-				break;
-		
-		case PUM_PHY:
-		case PUM_PHY_REAL:
-				if (_sPd.bVirtual&&enUm!=PUM_PHY_REAL) // dValore:realx=x:virtualx
-					dValue=(_sPd.sizPreviewPage.cy*dValore/_sPower.sumPaper.cy);
-					else
-					dValue=pwdUm(PUM_UM_INCH,dValore)*_sPower.sizDotPerInch.cy;
-				break;
-
-
-// _sPd.recPreviewPage.left
-
-		//
-		// da UM > in Inch
-		//
-		case PUM_UM_INCH:
-				switch (_sPower.enMisure) {
-					case PUM_INCH:	dValue=dValore; break;
-					case PUM_PT:	dValue=dValore/72; break;
-					case PUM_STD:	dValue=dValore*300; break;
-					case PUM_CM:	dValue=dValore*0.393700787; break;
-					case PUM_MM:	dValue=dValore*0.039370079; break;
-					default:
-						ehError();
-				}				
-				break;
-
 
 //		case PUM_STD: // 1/300
 //			break;
@@ -3144,6 +3171,69 @@ PWD_VAL pwdUm(PWD_UM enUm,double dValore) {
 	}
 	return dValue;
 }
+
+//
+// pwdUmTo() UM > Unità di misura richiesta
+//
+double pwdUmTo(double dValore,PWD_UM enUmTo) {
+
+	double dValue=0;
+
+	if (_sPower.enMisure==enUmTo) return dValore;
+	
+
+	// 
+	switch (enUmTo) {
+
+		//
+		// Chiedo le dimensioni "fisiche" dall'um corrente
+		// Calcolo i pollici e converti in UM
+		//
+		case PUM_DTX:
+		case PUM_DTXD:// PUM_DTX:
+				if (_sPd.bVirtual&&enUmTo!=PUM_DTX)//PUM_DTX) // dValore:realx=x:virtualx
+					dValue=(_sPd.sizPreviewPage.cx*dValore/_sPower.sumPaper.cx);
+					else
+					dValue=pwdUmTo(dValore,PUM_INCH)*_sPower.sizDotPerInch.cx;
+				break;
+		
+//		case PUM_DTYD:
+//		case PUM_DTY:
+		case PUM_DTY:
+		case PUM_DTYD://PUM_DTY:
+				if (_sPd.bVirtual&&enUmTo!=PUM_DTY)//PUM_DTY) // dValore:realx=x:virtualx
+					dValue=(_sPd.sizPreviewPage.cy*dValore/_sPower.sumPaper.cy);
+					else
+					dValue=pwdUmTo(dValore,PUM_INCH)*_sPower.sizDotPerInch.cy;
+				break;
+
+		//
+		// da UM > in Inch
+		//
+		case PUM_INCH:
+		case PUM_PT:
+
+			switch (_sPower.enMisure) {
+			
+				case PUM_INCH:	dValue=dValore; break;
+				case PUM_PT:	dValue=dValore/72; break;
+				case PUM_STD:	dValue=dValore*300; break;
+				case PUM_CM:	dValue=dValore*0.393700787; break;
+				case PUM_MM:	dValue=dValore*0.039370079; break;
+				default:
+					ehError();
+			}	
+			if (enUmTo==PUM_PT)  dValue*=72;
+			break;
+
+		default:
+			ehError();
+
+	}
+	return dValue;
+
+}
+
 
 PWD_POINT *	pwdPointFill(PWD_POINT * ppum,PWD_VAL x,PWD_VAL y) {
 	
@@ -3187,11 +3277,19 @@ void		pwdSizeCalc(PWD_SIZE *psumSize,PWD_RECT *prumRect) {
 //
 // ##########################################################################################################################
 //
-// Visualizza una stringa pacchetizzata come PDO_CHAREX
+// Visualizza una stringa pacchetizzata come PDO_TEXT
 //
+
+static void * _getItemObj(PWD_ITEM * psItem) {
+
+	BYTE * pbObj=(BYTE * ) psItem+sizeof(PWD_ITEM);
+	return pbObj;
+}
+
 static void _drawText(PWD_DRAW * psDraw)//BOOL Printer,HDC psDraw->hDC,PDO_CHAREX *Lex,CHAR *pText,RECT *lpRect)
 {
-	PDO_TEXT * psText=psDraw->pObj;
+//	PDO_TEXT * psText=(PDO_TEXT * ) psDraw->psItem->psObj;
+	PDO_TEXT * psText=_getItemObj(psDraw->psItem);
 	S_FAC	*psFac;	
 	INT iLen;
 	UINT uFormat=DT_BOTTOM|DT_SINGLELINE|DT_NOCLIP;
@@ -3200,11 +3298,14 @@ static void _drawText(PWD_DRAW * psDraw)//BOOL Printer,HDC psDraw->hDC,PDO_CHARE
 
 	if (strEmpty(psText->pszText)) return;
 
-	psFac=_fontPowerCreate(psDraw->hDC,psText,false,&sTM);
+	psFac=_fontPowerCreate(psDraw->hDC,_sPd.bVirtual,psText,false,&sTM);
 	iLen=wcslen(psFac->pwcText);
-	switch (psText->enAlign) {
+	switch (psText->enAlign&0xf) {
 
-		case PDA_LEFT: uFormat|=DT_LEFT; break;
+		case PDA_LEFT: 
+			uFormat|=DT_LEFT; 
+			break;
+
 		case PDA_RIGHT:
 			uFormat|=DT_RIGHT; 
 			break;
@@ -3228,7 +3329,7 @@ static void _drawText(PWD_DRAW * psDraw)//BOOL Printer,HDC psDraw->hDC,PDO_CHARE
 				psFac->pwcText,iLen,
 				psRect,//&psDraw->recObj,
 				uFormat);
-	// _LTextInRect(psDraw->hDC,&psDraw->recObj,psText,psFac->pwcText,TRUE,&iRows);
+	// _textInRect(psDraw->hDC,&psDraw->recObj,psText,psFac->pwcText,TRUE,&iRows);
 	_LFontAmbientDestroy(psFac);
 }
 
@@ -3252,28 +3353,30 @@ static void _drawText(PWD_DRAW * psDraw)//BOOL Printer,HDC psDraw->hDC,PDO_CHARE
 //
 // _drawTextBox()
 //
-static void _drawTextBox(PWD_DRAW *psDraw)// BOOL Printer,HDC psDraw->hDC,PDO_CHARBOX *lpLCharBox,CHAR *pbText,RECT *lpRect)
+/*
+static void _drawTextBox(PWD_DRAW * psDraw)// BOOL Printer,HDC psDraw->hDC,PDO_CHARBOX *lpLCharBox,CHAR *pbText,RECT *lpRect)
 {
-	INT iRows;
+//	INT iRows;
 	S_FAC *psFac;
 
-	PDO_TEXT *psText=psDraw->pObj;
+//	PDO_TEXT * psText=psDraw->psObj;
 	
-	psFac=_fontPowerCreate(psDraw->hDC,psText,true,NULL);
-	_LTextInRect(psDraw->hDC,&psDraw->recObj,psText,psFac->pwcText,TRUE,&iRows);
-	_LFontAmbientDestroy(psFac);
+//	psFac=_fontPowerCreate(psDraw->hDC,psText,true,NULL);
+//	_textInRect(psDraw->hDC,&psDraw->recObj,psText,psFac->pwcText,TRUE,&iRows);
+	_textInRect(psDraw,true);
+//	_LFontAmbientDestroy(psFac);
 }
-
+*/
 
 /*
 	//
 	// Calcolo le grandezze fisiche
 	//
-	psText=psDraw->pObj;
-	iCharHeight=(INT) pwdUm(PUM_PHY,psText->umCharHeight);
-	iCharWidth=(INT) pwdUm(PUM_PHX,psText->umCharWidth);
+	psText=psDraw->psObj;
+	iCharHeight=(INT) pwdUm(PUM_DTYD,psText->umCharHeight);
+	iCharWidth=(INT) pwdUm(PUM_DTXD,psText->umCharWidth);
 	if (iCharHeight<1) return;
-	iExtraCharSpace=(INT) pwdUm(PUM_PHX,psText->umExtraCharSpace);
+	iExtraCharSpace=(INT) pwdUm(PUM_DTXD,psText->umExtraCharSpace);
 
 	// Trovo testo e font
 	pszText=(BYTE *) psText; pszText+=sizeof(PDO_TEXT);
@@ -3307,35 +3410,66 @@ static void _drawTextBox(PWD_DRAW *psDraw)// BOOL Printer,HDC psDraw->hDC,PDO_CH
 	SetMapMode(psDraw->hDC, MM_TEXT);
 	SetTextCharacterExtra(psDraw->hDC,iExtraCharSpace);
 
-	//_LTextInRect(psDraw->hDC,psText,pszText,TRUE,&iRows);//,lpLCharBox->iMaxRows);			
+	//_textInRect(psDraw->hDC,psText,pszText,TRUE,&iRows);//,lpLCharBox->iMaxRows);			
 	*/
 
+typedef struct {
+
+
+	EH_LST		lstRow;
+	RECT		recDot;		//	Posizione in dot dell'area di stampa
+	SIZE		sizDot;		//	Dimensione in dot dell'area di stampa
+
+	RECT		recText;	//	Posizione in dot del testo
+	SIZE		sizText;	//	Dimensione in dot del testo
+	PWD_SIZE	sumText;
+
+	PDO_TEXT *	psText;
+	
+	INT			iCharHeight;
+	INT			iInterlinea;
+	
+
+} PWD_TEXT_INFO;
+
 //
-// _LTextInRect()
+// pwdTextInfoCreate()
+// Crea una struttura di informazione delle dimensioni del testo in stampa
 //
-static INT	_LTextInRect(HDC hdc,RECT *precObj,PDO_TEXT *psText,WCHAR *pwcText,BOOL bOutput,INT *lpiRows)
-{
-	INT	xStart=0, yStart=0, iBreakCount=0;
-	WCHAR *	pwBegin,*pwEnd;
-	SIZE	size ;
-	BOOL	bJustify;
+PWD_TEXT_INFO * pwdTextInfoCreate(PWD_RECT * pumRect,PDO_TEXT * psText) {
+
+	PWD_TEXT_INFO *psTi=ehNew(PWD_TEXT_INFO);
+	WCHAR * pwcText,* pwBegin, * pwEnd;
+	S_FAC *		psFac;
+	INT		yStart;
+	INT		iBreakCount;
 	BOOL	bCRLF;
-	INT	iRowsCount=0;
-	INT	iStrLen;
-//	WCHAR	*pwMemory;
-	SIZE	sizArea;
-	INT	iCharHeight,iInterlinea;
-//	HDC		hdc;
+	BOOL	bJustify;
+	INT		iStrLen;
+	INT		iRowsCount=0;
+	HDC		hdc;
+//	PWD_SIZE sumBox;
 
-// 	hdc=CreateCompatibleDC(0);
+	psTi->lstRow=lstCreate(sizeof(WCHAR *));
+	psTi->psText=psText;
+	hdc=CreateCompatibleDC(0);
+	psFac=_fontPowerCreate(hdc,false,psTi->psText,true,NULL);
+//	pwdSizeCalc(&sumBox,psText->rum
+
+	// Calcolo dimensioni in dot dell'area
+	psTi->recDot.left=(INT) pwdUmTo(pumRect->left,PUM_DTX);
+	psTi->recDot.top=(INT) pwdUmTo(pumRect->top,PUM_DTY);
+	psTi->recDot.right=(INT) pwdUmTo(pumRect->right,PUM_DTX);
+	psTi->recDot.bottom=(INT) pwdUmTo(pumRect->bottom,PUM_DTY);
+	sizeCalc(&psTi->sizDot,&psTi->recDot);
+
+	psTi->iCharHeight=(INT) pwdUm(psText->umCharHeight,PUM_DTY);
+	psTi->iInterlinea=(INT) pwdUm(psText->umInterlinea,PUM_DTY);
 
 	//
-	// Calcolo le grandezze fisiche
+	// Spezzo le linee in base all'allineamento
 	//
-	iCharHeight=(INT) pwdUm(PUM_PHY,psText->umCharHeight);
-//	iCharWidth=(INT) pwdUm(PUM_PHX,psText->umCharWidth);
-	iInterlinea=(INT) pwdUm(PUM_PHY,psText->umInterlinea);
-//	if (iCharHeight<1) return;
+	pwcText=psFac->pwcText;
 
 	//
 	// Regole
@@ -3343,30 +3477,24 @@ static INT	_LTextInRect(HDC hdc,RECT *precObj,PDO_TEXT *psText,WCHAR *pwcText,BO
 	// B) CR e LF devono essere tolti
 	// C) Se la linea finisce con CR (ed è piu corta dello spazio, NON VIENE GIUSTIFICATA)
 	//
-//	pwMemory=pwText=_strTextDecode(pbText);
 	wcsTrim(pwcText);
 	while (wcsReplace(pwcText,LCRLF,L"\r"));
 	while (wcsReplace(pwcText,L"\n\r",L"\r"));
 
-	sizeCalc(&sizArea,precObj);
-
 	// Non ne sono sicuro .... (se vuoto ritorno l'altezza di uno spazio
 	if (wcsEmpty(pwcText)) {
-	
-		GetTextExtentPoint32W(hdc, L" ", 1, &size);
-		*lpiRows=0;
-		return size.cy;
+
+		// Vuoto ?
 	}
 
-	yStart = precObj->top;//psDraw->recObj.top;
+	yStart = psTi->recDot.top;//psDraw->recObj.top;
 	do {                            // for each text line 
 
+		SIZE sizPhrase;
 		iBreakCount=0;
-	//	while (*pText==' ') pText++;  // skip over leading blanks (Salta i blank in testa)
 		pwBegin=pwcText;
 		
 		// Trova la linea piu lunga che sta nel Rect
-		// iBreakCount,contiene gli spazi di separazione delle parole
 		bCRLF=FALSE;
 		do                       // until the line is known / 
 		{
@@ -3384,11 +3512,227 @@ static INT	_LTextInRect(HDC hdc,RECT *precObj,PDO_TEXT *psText,WCHAR *pwcText,BO
 			// for each space, calculate extents
 			iBreakCount++;
 			SetTextJustification(hdc,0,0);
-			GetTextExtentPoint32W(hdc, pwBegin, pwcText - pwBegin, &size) ;
+			GetTextExtentPoint32W(hdc, pwBegin, pwcText - pwBegin, &sizPhrase) ;
 			if (!*pwcText) break;
 			if (bCRLF) break; // E' un fine linea mi fermo
 
-		} while (size.cx<sizArea.cx) ;
+		} while (sizPhrase.cx<psTi->sizDot.cx) ;
+		iBreakCount--; 
+
+		while (*(pwEnd - 2)==L' ')   // eliminate trailing blanks (Elimina i blank in coda)
+		{
+			pwEnd--; iBreakCount--;
+		}
+		
+		// Controllo se è l'ultima linea
+		bJustify=true;
+		if ((!*pwcText && sizPhrase.cx<psTi->sizDot.cx) || iBreakCount <= 0)
+		{
+			pwEnd=pwcText;
+			if (!psText->bJustifyLast) bJustify=FALSE; // new 2007
+		}
+		// Controllo se finisce con un ritorno a capo
+		if (bCRLF) bJustify=FALSE; // E' un fine linea mi fermo
+		
+		iStrLen=pwEnd-pwBegin;
+		if (iStrLen>0) iRowsCount++;
+		if (psText->iMaxRows&&iRowsCount>=psText->iMaxRows) break; // new 2004
+
+		// Frase
+		if (!psTi->lstRow) {
+
+			memcpy(&psTi->sizText,&sizPhrase,sizeof(SIZE));
+		
+		} else {
+		
+			if (sizPhrase.cx>psTi->sizText.cx) psTi->sizText.cx=sizPhrase.cx;
+			psTi->sizText.cy=(yStart+sizPhrase.cy)-psTi->recDot.top;
+
+		}
+
+
+		{
+			WCHAR * pwc=wcsTake(pwBegin,pwEnd);
+			lstPushPtr(psTi->lstRow,pwc);
+		}
+		
+
+
+		yStart+= sizPhrase.cy + psTi->iInterlinea;
+		// Se c'è un CR o LF avanzo
+		while (*pwEnd==L'\n'||*pwEnd==L'\r') {pwEnd++;}
+		pwcText= pwEnd;
+
+	} while (*pwcText);// && yStart < psDraw->recObj.bottom);
+
+	psTi->sumText.cx= pwdUm(PUM_DTX,psTi->sizText.cx);
+	psTi->sumText.cy= pwdUm(PUM_DTY,psTi->sizText.cy);
+	_LFontAmbientDestroy(psFac);
+	DeleteDC(hdc);
+	return psTi;
+}
+
+PWD_TEXT_INFO * pwdTextInfoDestroy(PWD_TEXT_INFO * psTi) {
+	
+	WCHAR * pwc;
+	for (lstLoop(psTi->lstRow,pwc)) {
+		ehFreeNN(pwc);
+	}
+
+	lstDestroy(psTi->lstRow);
+	
+	ehFree(psTi);
+	return NULL;
+}
+
+//
+// _textInRect()
+//
+//static INT	_textInRect(HDC hdc,RECT * precObj,PDO_TEXT * psText,WCHAR * pwcText,BOOL bOutput,INT *lpiRows)
+void _drawTextBox(PWD_DRAW * psDraw)
+{
+	INT	xStart=0, yStart=0, iBreakCount=0;
+//	WCHAR *		pwBegin,*pwEnd;
+	SIZE		sizText;
+	SIZE		sizBox;
+	BOOL		bJustify;
+	INT			iRowsCount=0;
+	INT			iCharHeight,iInterlinea;
+	PDO_TEXT *  psText;
+	
+	PWD_TEXT_INFO * psTi;
+	WCHAR *			pwcText;
+	HDC				hdc;
+	S_FAC *			psFac;
+	TEXTMETRIC		sTM;
+	WCHAR *			pwc;
+	INT				iRow;
+	INT				iBodyAlt;
+
+	// _textInRect(psDraw->hDC,&psDraw->recObj,psText,psFac->pwcText,TRUE,&iRows);
+
+	psTi=pwdTextInfoCreate(&psDraw->psItem->rumObj,_getItemObj(psDraw->psItem));
+	psText=psTi->psText;
+	sizeCalc(&sizBox,&psDraw->recObj);
+
+	//
+	// Calcolo le grandezze fisiche
+	//
+	hdc=psDraw->hDC;
+	iCharHeight=(INT) pwdUmTo(psText->umCharHeight,PUM_DTYD);
+	iInterlinea=(INT) pwdUmTo(psText->umInterlinea,PUM_DTYD);
+	iBodyAlt=(INT) pwdUmTo(psTi->sumText.cy,PUM_DTYD);
+	psFac=_fontPowerCreate(psDraw->hDC,_sPd.bVirtual,psText,false,&sTM);
+	pwcText=psFac->pwcText;
+
+	switch (psText->enAlign&0xf0)
+	{
+		case PDA_TOP:
+		default:
+			yStart = psDraw->recObj.top;
+			break;
+
+		case PDA_MIDDLE:
+			yStart = psDraw->recObj.top+((sizBox.cy-iBodyAlt)/2);
+			break;
+
+		case PDA_BOTTOM:
+			yStart = psDraw->recObj.bottom-iBodyAlt;
+			break;
+			
+
+	}
+
+	iRow=1;
+	for (lstLoop(psTi->lstRow,pwc)) {
+
+		//UINT uFormat=DT_BOTTOM|DT_SINGLELINE|DT_NOCLIP;
+		UINT uMode=TA_TOP;
+		RECT recText;
+		INT	iStrLen=wcslen(pwc);
+
+		SetTextJustification(hdc, 0, 0) ;
+		GetTextExtentPoint32W(hdc, pwc, iStrLen, &sizText) ;
+		bJustify=true; if (iRow==psTi->lstRow->iLength) bJustify=false;
+
+		if (bJustify&&psText->enAlign==PDA_JUSTIFY) SetTextJustification(hdc,sizBox.cx-sizText.cx,iBreakCount) ;
+		memcpy(&recText,&psDraw->recObj,sizeof(RECT));
+		//recText.top=yStart;
+		switch (psText->enAlign&0xf)
+		{
+			case PDA_JUSTIFY:
+			case PDA_LEFT: 
+				uMode|=TA_LEFT; 
+				xStart = psDraw->recObj.left; 
+				break;
+
+			case PDA_RIGHT: 
+				uMode|=TA_RIGHT; 
+				xStart = psDraw->recObj.right;  // ###
+				break;
+
+			case PDA_CENTER: 
+				uMode|=TA_CENTER; 
+				xStart = psDraw->recObj.left+(sizBox.cx>>1);//((sizBox.cx-sizText.cx)>>1); 
+				break;
+		}
+		SetTextAlign(hdc,uMode);
+		TextOutW(hdc, xStart, yStart, pwc, wcslen(pwc)) ;
+		iRow++;
+	
+	}
+/*
+
+	//
+	// Regole
+	// A) La linea và troncata con CR o LF
+	// B) CR e LF devono essere tolti
+	// C) Se la linea finisce con CR (ed è piu corta dello spazio, NON VIENE GIUSTIFICATA)
+	//
+	wcsTrim(pwcText);
+	while (wcsReplace(pwcText,LCRLF,L"\r"));
+	while (wcsReplace(pwcText,L"\n\r",L"\r"));
+
+	sizeCalc(&sizBox,&psDraw->recObj);
+
+	// Non ne sono sicuro .... (se vuoto ritorno l'altezza di uno spazio
+	if (wcsEmpty(pwcText)) {
+	
+		GetTextExtentPoint32W(hdc, L" ", 1, &sizText);
+//		*lpiRows=0;
+		pwdTextInfoDestroy(psTi);
+//		return sizText.cy;
+	}
+
+	yStart = psDraw->recObj.top;//psDraw->recObj.top;
+	do {                            // for each text line 
+
+		iBreakCount=0;
+		pwBegin=pwcText;
+		
+		// Trova la linea piu lunga che sta nel Rect
+		bCRLF=FALSE;
+		do                       // until the line is known / 
+		{
+			pwEnd=pwcText;
+			// Cerca uno spazio (Punto di interruzione possibile
+			//while (*pText!='\0'&&*pText++!=' '); // Era così
+			for (;*pwcText;pwcText++)
+			{
+				if (*pwcText==L' ') {pwcText++; break;}
+				if (*pwcText==L'\n'||*pwcText==L'\r') {pwEnd=pwcText; bCRLF=TRUE; break;}
+			}
+
+			// Fino alla fine o allo spazio
+			// Avanzo; Fino alla fine della stringa o al primo spazio o al primo ritorno a capo
+			// for each space, calculate extents
+			iBreakCount++;
+			SetTextJustification(hdc,0,0);
+			GetTextExtentPoint32W(hdc, pwBegin, pwcText - pwBegin, &sizText) ;
+			if (!*pwcText) break;
+			if (bCRLF) break; // E' un fine linea mi fermo
+
+		} while (sizText.cx<sizBox.cx) ;
 		iBreakCount--; 
 
 		while (*(pwEnd - 2)==L' ')   // eliminate trailing blanks (Elimina i blank in coda)
@@ -3398,7 +3742,7 @@ static INT	_LTextInRect(HDC hdc,RECT *precObj,PDO_TEXT *psText,WCHAR *pwcText,BO
 		
 		// Controllo se è l'ultima linea
 		bJustify=TRUE;
-		if ((!*pwcText && size.cx<sizArea.cx) || iBreakCount <= 0)
+		if ((!*pwcText && sizText.cx<sizBox.cx) || iBreakCount <= 0)
 		{
 			pwEnd=pwcText;
 			if (!psText->bJustifyLast) bJustify=FALSE; // new 2007
@@ -3411,30 +3755,41 @@ static INT	_LTextInRect(HDC hdc,RECT *precObj,PDO_TEXT *psText,WCHAR *pwcText,BO
 		if (psText->iMaxRows&&iRowsCount>=psText->iMaxRows) break; // new 2004
 
 		// Stampa dell'oggetto
-		if (bOutput) 
+//		if (bOutput) 
 		{
-			 SetTextJustification(hdc, 0, 0) ;
-			 GetTextExtentPoint32W(hdc, pwBegin, iStrLen, &size) ;
-			 if (bJustify&&psText->enAlign==PDA_JUSTIFY) SetTextJustification(hdc,sizArea.cx-size.cx,iBreakCount) ;
-			 switch (psText->enAlign)
-			 {
+			//UINT uFormat=DT_BOTTOM|DT_SINGLELINE|DT_NOCLIP;
+			UINT uMode=TA_TOP;
+			RECT recText;
+
+			SetTextJustification(hdc, 0, 0) ;
+			GetTextExtentPoint32W(hdc, pwBegin, iStrLen, &sizText) ;
+			if (bJustify&&psText->enAlign==PDA_JUSTIFY) SetTextJustification(hdc,sizBox.cx-sizText.cx,iBreakCount) ;
+			memcpy(&recText,&psDraw->recObj,sizeof(RECT));
+			//recText.top=yStart;
+			switch (psText->enAlign&0xf)
+			{
 				case PDA_JUSTIFY:
 				case PDA_LEFT: 
-					xStart = precObj->left; 
+					uMode|=TA_LEFT; 
+					xStart = psDraw->recObj.left; 
 					break;
 
 				case PDA_RIGHT: 
-					xStart = precObj->right-size.cx;  // ###
+					uMode|=TA_RIGHT; 
+					xStart = psDraw->recObj.right;  // ###
 					break;
 
 				case PDA_CENTER: 
-					xStart = precObj->left+(sizArea.cx>>1)-(size.cx>>1); 
+					uMode|=TA_CENTER; 
+					xStart = psDraw->recObj.left+(sizBox.cx>>1);//((sizBox.cx-sizText.cx)>>1); 
 					break;
-			 }
+			}
+			//DrawTextW(	hdc, pwBegin, iStrLen, &recText, uFormat); 
+			SetTextAlign(hdc,uMode);
 			 TextOutW(hdc, xStart, yStart, pwBegin, iStrLen) ;
 		}
 	
-		yStart+= size.cy + iInterlinea;
+		yStart+= sizText.cy + iInterlinea;
 		// Se c'è un CR o LF avanzo
 		while (*pwEnd==L'\n'||*pwEnd==L'\r') {pwEnd++;}
 		pwcText= pwEnd;
@@ -3442,8 +3797,9 @@ static INT	_LTextInRect(HDC hdc,RECT *precObj,PDO_TEXT *psText,WCHAR *pwcText,BO
 	} while (*pwcText);// && yStart < psDraw->recObj.bottom);
 
 	SetTextJustification(hdc, 0, 0);
-	if (lpiRows) *lpiRows=iRowsCount;
-	return (yStart-precObj->top);
+	*/
+//	if (lpiRows) *lpiRows=iRowsCount;
+//	return (yStart-precObj->top);
 	
 }
 
@@ -3457,13 +3813,13 @@ static void _drawRect(PWD_DRAW *psDraw) {
 	SIZE	sizRound;
 	HPEN	hPen=0,hPenOld;
 	HBRUSH	hBrush,hBrushOld;
-	PDO_BOXLINE *psBox=psDraw->pObj;
+	PDO_BOXLINE *psBox=_getItemObj(psDraw->psItem);
 	BOOL	bBrushFree;
 
 
-	iPenWidth=(INT) pwdUm(PUM_PHX,psBox->sPenBrush.umPenWidth); //Box->iPenWidth;
-	sizRound.cx=(INT) pwdUm(PUM_PHX,psBox->sumRound.cx); 
-	sizRound.cy=(INT) pwdUm(PUM_PHY,psBox->sumRound.cy); 
+	iPenWidth=(INT) pwdUmTo(psBox->sPenBrush.umPenWidth,PUM_DTXD); //Box->iPenWidth;
+	sizRound.cx=(INT) pwdUmTo(psBox->sumRound.cx,PUM_DTXD); 
+	sizRound.cy=(INT) pwdUmTo(psBox->sumRound.cy,PUM_DTYD); 
 
 	//
 	// Seleziono la penna (se ho colore e spessore
@@ -3517,9 +3873,9 @@ static void _drawLine(PWD_DRAW *psDraw) {
 	HPEN hPen, hOldPen;
 	LOGBRUSH sLogBrush;
 	INT iPenWidth;
-	PDO_BOXLINE *psBox=psDraw->pObj;
+	PDO_BOXLINE *psBox=_getItemObj(psDraw->psItem);
 
-	iPenWidth=(INT) pwdUm(PUM_PHX,psBox->sPenBrush.umPenWidth); 
+	iPenWidth=(INT) pwdUm(PUM_DTXD,psBox->sPenBrush.umPenWidth); 
 
 	if (iPenWidth>1)
 	{
@@ -3546,14 +3902,15 @@ static void _drawLine(PWD_DRAW *psDraw) {
 //
 static void _drawPath(PWD_DRAW * psDraw) {
 
-	PDO_PATH * psPath=psDraw->pObj;
+	PDO_PATH * psPath=_getItemObj(psDraw->psItem);
 	PWD_PTHE * psEle;
 	INT		iPenWidth;
 	HPEN	hPen=0,hPenOld;
 	HBRUSH	hBrush,hBrushOld;
 	BOOL	bBrushFree;
+	EH_LST  lstPath;
 
-	iPenWidth=(INT) pwdUm(PUM_PHX,psPath->sPenBrush.umPenWidth); //Box->iPenWidth;
+	iPenWidth=(INT) pwdUmTo(psPath->sPenBrush.umPenWidth,PUM_DTXD); //Box->iPenWidth;
 
 	//
 	// Seleziono la penna (se ho colore e spessore
@@ -3586,10 +3943,12 @@ static void _drawPath(PWD_DRAW * psDraw) {
 
 	// Traccio e disegno il percorso
 	BeginPath(psDraw->hDC);
-	for (lstLoop(psPath->lstPath,psEle)) {
-
+	lstPath=_pathCreate(psPath);
+	for (lstLoop(lstPath,psEle)) {
+	
 		INT iX,iY;
-		PWD_POINT * pumPoint=psEle->psData;
+		PWD_POINT * pumPoint;
+		pumPoint=psEle->psData;
 	
 		switch (psEle->enType) {
 		
@@ -3634,7 +3993,9 @@ static void _drawPath(PWD_DRAW * psDraw) {
 			default:
 				ehError();
 		}
+
 	}
+	_pathDestroy(lstPath);
 	EndPath(psDraw->hDC);
 
 	if (bBrushFree)
@@ -3656,7 +4017,7 @@ static void _drawPath(PWD_DRAW * psDraw) {
 static void _drawImage(PWD_DRAW *psDraw) //BOOL Printer,HDC psDraw->hDC,INT iType,PDO_BOX *Box,RECT *lpRect)
 {
 //	INT x,y,xDim,yDim;
-	PDO_IMAGE	*psImage=psDraw->pObj;
+	PDO_IMAGE	*psImage=_getItemObj(psDraw->psItem);
 	SIZE		sizImage;
 	IMAGEINFO	sImageInfo;
 
@@ -3812,15 +4173,17 @@ static void _ImgOutEx(	HDC hDC,
 	//
 	// Creo il nuovo bitmap
 	//
-		hImageNew=IMGResampling(	hImage,  // Handle dell'immagine
-									NULL,
-									SizeX,SizeY,
-									TRS_LANCZOS);
-		//HdlImageNew=IMGRemaker(hdlImage,NULL,SizeX,SizeY,TRUE,TRS_NONE);
-		if (hImageNew<1) ehExit("_ImgOutEx():Non memory");
+		if (SizeY>4) {
+			hImageNew=IMGResampling(	hImage,  // Handle dell'immagine
+										NULL,
+										SizeX,SizeY,
+										TRS_LANCZOS);
+			//HdlImageNew=IMGRemaker(hdlImage,NULL,SizeX,SizeY,TRUE,TRS_NONE);
+			if (hImageNew<1) ehExit("_ImgOutEx():Non memory");
 
-		dcImageShow(hDC,PosX,PosY,0,0,hImageNew);
-		memoFree(hImageNew,"LREPIMG");
+			dcImageShow(hDC,PosX,PosY,0,0,hImageNew);
+			memoFree(hImageNew,"LREPIMG");
+		}
 
 	}
 
@@ -3972,7 +4335,9 @@ void pwdPath(EH_LST lstPath,
 			 PWD_COLOR colBrush,INT iBrushStyle)
 {
     PDO_PATH sObj;
-	PWD_PTHE * psEle,sEle; 
+	PWD_PTHE * psEle; 
+	DWORD dwMemo;
+	BYTE * pb;
 
 	_(sObj);
 	sObj.sPenBrush.colPen=colPen;
@@ -3985,19 +4350,66 @@ void pwdPath(EH_LST lstPath,
 	//
 	// Clono il percorso
 	//
-	sObj.lstPath=lstCreate(sizeof(PWD_PTHE));
+	sObj.iElements=lstPath->iLength; // Numero degli elementi (punti)
+	
+	//
+	// Calcolo occupazione memoria per serializzazione
+	// |PWD_PTHE+dati|PWD_PTHE+dati|PWD_PTHE+dati| ecc...
+	dwMemo=0;
 	for (lstLoop(lstPath,psEle)) {
-		_(sEle);
-		memcpy(&sEle,psEle,sizeof(sEle));
-		if (sEle.dwSizeData) {
-			sEle.psData=ehAlloc(sEle.dwSizeData);
-			memcpy(sEle.psData,psEle->psData,sEle.dwSizeData);
+		dwMemo+=sizeof(PWD_PTHE)+psEle->dwSizeData;
+	}	
+	sObj.dwElements=dwMemo;	// Dimensione di tutti gli elementi dell'array [PWD_PTHE+dati]
+	sObj.psEle=(PWD_PTHE *) pb=ehAlloc(dwMemo);
+//	sObj.arsPoint=ehAlloc(sizeof(PWD_PTHE)*sObj.iPoints);
+	
+	// lst > serializzato
+	for (lstLoop(lstPath,psEle)) {
+		
+		memcpy(pb,psEle,sizeof(PWD_PTHE)); pb+=sizeof(PWD_PTHE);
+		
+		//_(sEle);
+		//memcpy(&sEle,psEle,sizeof(sEle));
+		if (psEle->dwSizeData) {
+			memcpy(pb,psEle->psData,psEle->dwSizeData); pb+=psEle->dwSizeData;
+			//sEle.psData=ehAlloc(sEle.dwSizeData);
+			//memcpy(sEle.psData,psEle->psData,sEle.dwSizeData);
 		}
-		lstPush(sObj.lstPath,&sEle);
 	}
 
 	// Calcolo le dimensioni del rettangolo occupato (da fare)
 	_addItem(PDT_PATH,NULL,&sObj,sizeof(sObj));
+	ehFree(sObj.psEle);
+}
+
+//
+//  _pathCreate() > Trasforma l'oggetto serializzato in una lista (per usarla meglio)
+//
+static EH_LST _pathCreate(PDO_PATH * psPath) {
+
+	INT pt;
+	PWD_PTHE sEle,* psEle, * psNext;
+	EH_LST lst=lstCreate(sizeof(PWD_PTHE));
+	
+	
+	psEle=(PWD_PTHE  *) ((BYTE * ) psPath+sizeof(PDO_PATH));
+	for (pt=0;pt<psPath->iElements;pt++,psEle=psNext) {
+
+		_(sEle);
+		memcpy(&sEle,psEle,sizeof(sEle));
+		if (sEle.dwSizeData) sEle.psData=(BYTE *) psEle+sizeof(PWD_PTHE);
+		lstPush(lst,&sEle);
+
+		psNext=(PWD_PTHE *) ((BYTE *) psEle+sizeof(PWD_PTHE)+psEle->dwSizeData);
+
+	}
+	return lst;
+}
+
+static void _pathDestroy(EH_LST lstPath) {
+	
+	lstDestroy(lstPath);
+
 }
 
 //
@@ -4051,9 +4463,9 @@ void pwdText(PWD_VAL	umX,
 
 	// Calcolo in base ai DPI la dimensione dell'oggetto
 	hdc=CreateCompatibleDC(0);
-	psFac=_fontPowerCreate(hdc,&sObj,false,NULL);
-	sumSize.cx=pwdUm(PUM_UM_PHX,psFac->sizText.cx);
-	sumSize.cy=pwdUm(PUM_UM_PHY,psFac->sizText.cy);
+	psFac=_fontPowerCreate(hdc,false,&sObj,false,NULL);
+	sumSize.cx=pwdUm(PUM_DTX,psFac->sizText.cx);
+	sumSize.cy=pwdUm(PUM_DTY,psFac->sizText.cy);
 	DeleteDC(hdc);
  	switch (sObj.enAlign) {
 
@@ -4218,12 +4630,12 @@ void pwdTextJs(PWD_VAL umX,PWD_VAL umY,CHAR * pszParams,CHAR *pszText)
 
 	// Calcolo in base ai DPI la dimensione dell'oggetto
 	hdc=CreateCompatibleDC(0);
-	psFac=_fontPowerCreate(hdc,&sObj,false,&sTm);
-	sumSize.cx=pwdUm(PUM_UM_PHX,psFac->sizText.cx);
-	sumSize.cy=pwdUm(PUM_UM_PHY,psFac->sizText.cy);
+	psFac=_fontPowerCreate(hdc,false,&sObj,false,&sTm);
+	sumSize.cx=pwdUm(PUM_DTX,psFac->sizText.cx);
+	sumSize.cy=pwdUm(PUM_DTY,psFac->sizText.cy);
 	
 	psz=jsonGet(psJs,"baseline"); if (psz) bBaseLine=atoi(psz);
-	if (bBaseLine) sumRect.top-=pwdUm(PUM_UM_PHY,sTm.tmAscent);
+	if (bBaseLine) sumRect.top-=pwdUm(PUM_DTY,sTm.tmAscent);
 	DeleteDC(hdc);
  	switch (sObj.enAlign) {
 
@@ -4327,7 +4739,7 @@ void pwdTextRiemp(PWD_RECT *prum,PWD_COLOR colText,EH_TSTYLE enStyles,CHAR *lpFo
 //	LRTCharEx.fBold=_sPower.fBold;//sys.fFontBold;
 //	LRTCharEx.fItalic=_sPower.fItalic;//sys.fFontItalic;
 	LRTCharEx.colText=Color;
-	strcpy(LRTCharEx.szFontName,lpFont);
+	strcpy(LRTCharEx.szFontSearch,lpFont);
 	_addItem(PDT_CHAREX,&LRTCharEx,sizeof(LRTCharEx),szServ,0);
 	return;
 }
@@ -4394,8 +4806,8 @@ void pwdImage(PWD_VAL px,PWD_VAL py,PWD_SIZE *psumSize,INT hImage,BOOL bStore) {
 			sImage.hImage=0; // Non in memoria
 
 			// b) Calcolo dimensioni fisiche necessarie
-			sizImageDest.cx= (LONG) pwdUm(PUM_PHX_REAL,psumSize->cx);
-			sizImageDest.cy= (LONG) pwdUm(PUM_PHY_REAL,psumSize->cy);
+			sizImageDest.cx= (LONG) pwdUm(PUM_DTX,psumSize->cx); // PUM_DTX
+			sizImageDest.cy= (LONG) pwdUm(PUM_DTY,psumSize->cy);
 
 			_LImageResampleSave(hImage, sizImageSorg, sizImageDest,szFileTemp);
 			sImage.pszFileTemp=strDup(szFileTemp);
@@ -4487,8 +4899,8 @@ void pwdBitmap(PWD_VAL px,
 		INT hImageTemp;
 
 		sImage.hBitmap=0;
-		sizImageDest.cx= (LONG) pwdUm(PUM_PHX_REAL,psumSize->cx);
-		sizImageDest.cy= (LONG) pwdUm(PUM_PHY_REAL,psumSize->cy);
+		sizImageDest.cx= (LONG) pwdUm(PUM_DTX,psumSize->cx);
+		sizImageDest.cy= (LONG) pwdUm(PUM_DTY,psumSize->cy);
 
 		//
 		// Converto l'immagine nel coloreDepth desiderato
@@ -4540,8 +4952,8 @@ void pwdImageList(PWD_VAL px,PWD_VAL py,PWD_SIZE *psumSize,HIMAGELIST himl,INT i
 
 		// Crei il file e salvi come PDT_EHIMG
 /*
-		sizImageDest.cx= pwdUm(PUM_PHX_REAL,psumSize->cx);
-		sizImageDest.cy= pwdUm(PUM_PHY_REAL,psumSize->cy);
+		sizImageDest.cx= pwdUm(PUM_DTX,psumSize->cx);
+		sizImageDest.cy= pwdUm(PUM_DTY,psumSize->cy);
 
 		_LImageResampleSave(INT HdlImage, SIZE sizImageSorg, SIZE sizImageDest);
 */	
@@ -4585,18 +4997,26 @@ void pwdImageList(PWD_VAL px,PWD_VAL py,PWD_SIZE *psumSize,HIMAGELIST himl,INT i
 // pwdGetTextInRectAlt()
 //
 //static double pwdGetTextInRectAlt(PDO_CHARBOX *LCharBox,CHAR *lpString,INT *lpiRows)
-PWD_VAL pwdGetTextInRectAlt(PWD_RECT *prRect,PDO_TEXT *psText,INT *lpiRows) {
+PWD_VAL pwdGetTextInRectAlt(PWD_RECT * pumRect,PDO_TEXT * psText,INT * lpiRows) {
 
+	/*
 	INT  xChar;
 	INT y;
 	S_FAC *psFac;
 	HDC	hdc;
 	RECT recArea;
 	PWD_VAL cyRet;
-
-	xChar=0;
+*/
+	PWD_TEXT_INFO * psTi;
+	PWD_VAL cyRet;
+//	xChar=0;
 	if (psText->umCharHeight<1) return 0;
 
+	psTi=pwdTextInfoCreate(pumRect,psText);
+	if (lpiRows) * lpiRows=psTi->lstRow->iLength;
+	cyRet=psTi->sumText.cy;
+	pwdTextInfoDestroy(psTi);
+/*
 	//
 	// ATTENZIONE
 	// Devo avere un device context di dimensioni identiche alla stampante per simulare
@@ -4607,24 +5027,26 @@ PWD_VAL pwdGetTextInRectAlt(PWD_RECT *prRect,PDO_TEXT *psText,INT *lpiRows) {
 	hdc=CreateCompatibleDC(0);
 
 	psFac=_fontPowerCreate(hdc,psText,false,NULL);
-	recArea.left=(INT) pwdUm(PUM_PHX,prRect->left);
-	recArea.right=(INT) pwdUm(PUM_PHX,prRect->right);
-	recArea.top=(INT) pwdUm(PUM_PHX,prRect->top);
-	recArea.bottom=(INT) pwdUm(PUM_PHX,prRect->bottom);
-// _sPower.hdcPrinter
-	y=_LTextInRect(hdc,&recArea,psText,psFac->pwcText,FALSE,lpiRows);//,INT iMaxRows);
+	recArea.left=(INT) pwdUm(PUM_DTXD,prRect->left);
+	recArea.right=(INT) pwdUm(PUM_DTXD,prRect->right);
+	recArea.top=(INT) pwdUm(PUM_DTXD,prRect->top);
+	recArea.bottom=(INT) pwdUm(PUM_DTXD,prRect->bottom);
+
+	y=_textInRect(hdc,&recArea,psText,psFac->pwcText,FALSE,lpiRows);//,INT iMaxRows);
+
 	_LFontAmbientDestroy(psFac);
 	DeleteDC(hdc);
-	if (!y) //y=(INT) pwdUm(PUM_PHY,psText->umCharHeight);
-		y=_LTextInRect(hdc,&recArea,psText,L" ",FALSE,lpiRows);//,INT iMaxRows);
-	cyRet=pwdUm(PUM_UM_PHY,y);
+	if (!y) //y=(INT) pwdUm(PUM_DTYD,psText->umCharHeight);
+		y=_textInRect(hdc,&recArea,psText,L" ",FALSE,lpiRows);//,INT iMaxRows);
+	cyRet=pwdUm(PUM_DTYD_TO_UM ,y);
+	*/
 	return cyRet;
 }
 
 //
 // _LFontAmbientBuilder()
 //
-static S_FAC * _fontPowerCreate(HDC hdc,PDO_TEXT *psText,BOOL bDcAlign,TEXTMETRIC * psTextMetrics) {
+static S_FAC * _fontPowerCreate(HDC hdc,BOOL bVirtual,PDO_TEXT *psText,BOOL bDcAlign,TEXTMETRIC * psTextMetrics) {
 
 	INT	iCharHeight,iCharWidth,iExtraSpace;
 	BYTE	*pszText=NULL;
@@ -4634,9 +5056,9 @@ static S_FAC * _fontPowerCreate(HDC hdc,PDO_TEXT *psText,BOOL bDcAlign,TEXTMETRI
 	//
 	// Calcolo le grandezze fisiche
 	//
-	iCharHeight=(INT) pwdUm(PUM_PHY,psText->umCharHeight);
-	iCharWidth=(INT) pwdUm(PUM_PHX,psText->umCharWidth);
-	iExtraSpace=(INT) pwdUm(PUM_PHX,psText->umExtraCharSpace);
+	iCharHeight=(INT) pwdUmTo(psText->umCharHeight,bVirtual?PUM_DTYD:PUM_DTY);
+	iCharWidth=(INT) pwdUmTo(psText->umCharWidth,bVirtual?PUM_DTXD:PUM_DTX);
+	iExtraSpace=(INT) pwdUmTo(psText->umExtraCharSpace,bVirtual?PUM_DTXD:PUM_DTX);
 	if (iCharHeight==0) return psFac;
 
 	// Trovo testo e font
@@ -4710,7 +5132,11 @@ static void _LFontAmbientDestroy(S_FAC *psFac) {
 }
 
 //
-// _fontEnumeration() - Enumero i font presenti nel documento
+// _fontEnumeration() 
+//  Enumero i font presenti nel documento
+//  Costruisco _sPower.dmiFont con i font usati nel documento
+//  I fonts sono divisi per fontFace/Peso/Style/Larghezza del carattere (per i fix) 
+//
 //
 static void	_fontEnumeration(BOOL bFontAlloc) {
 
@@ -4718,79 +5144,69 @@ static void	_fontEnumeration(BOOL bFontAlloc) {
 	PDO_TEXT *psText;
 	INT a,b,nPage,idx;
 	PWD_DRAW sItemDraw;
-	BYTE *pb;
-	PWD_FONT * arFont;
+//	BYTE *pb;
+	
 
 	DMIOpen(&_sPower.dmiFont,RAM_AUTO,100,sizeof(PWD_FONT),"Font");
-	arFont=DMILock(&_sPower.dmiFont,NULL);
+	_sPower.arsFont=DMILock(&_sPower.dmiFont,NULL);
+	// Loop sulle pagine
 	for (nPage=0;nPage<_sPower.iPageCount;nPage++)
 	{
 		_(sItemDraw);
-
+		// Loop sugli item delle pagine
 		for (a=_sPd.ariPageIndex[nPage];a<_sPd.nItems;a++)
 		{
-			if ((_sPd.arsItem[a]->enType!=PDT_TEXTBOX) && (_sPd.arsItem[a]->enType!=PDT_TEXT)) continue;
-
 			sItemDraw.psItem=_sPd.arsItem[a]; 
-			pb=(BYTE *) sItemDraw.psItem;
-			sItemDraw.pObj=(pb+sizeof(PWD_ITEM));
 
-			psText=sItemDraw.pObj;
+			// Solo testi
+			if ((sItemDraw.psItem->enType!=PDT_TEXTBOX) && (sItemDraw.psItem->enType!=PDT_TEXT)) continue;
+			
+			psText=_getItemObj(sItemDraw.psItem);
 			
 			_(sFont);
 			sFont.enStyles=psText->enStyles;
+			sFont.dwItalic=psText->dwItalic;
+			sFont.dwWeight=psText->dwWeight;
+
+			/*
+			printf("- %s %s %d %d" CRLF,
+					psText->pszText,
+					psText->pszFontFace,
+					psText->dwItalic,
+					psText->dwWeight);
+*/
 			if (psText->pszFontFace) 
 				strcpy(sFont.szFontFace,psText->pszFontFace);
-			else 
+				else 
 				strcpy(sFont.szFontFace,_sPower.pszFontBodyDefault);
-//				sFont.pszFontFace=_sPower.pszFontBodyDefault;
 
-			sFont.umCharHeight=0;//psText->umCharHeight;
+			sFont.umCharHeight=0;
 			sFont.umCharWidth=psText->umCharWidth;
 
 			idx=-1;
 			for (b=0;b<_sPower.dmiFont.Num;b++)
 			{
 				PWD_FONT sFontTmp;
-
 				_(sFontTmp);
-//				DMIRead(&_sPower.dmiFont,b,&sFontTmp);
-
-				if (!memcmp(arFont+b,&sFont,sizeof(PWD_FONT)))
-				{
+				if (!memcmp(_sPower.arsFont+b,&sFont,sizeof(PWD_FONT))) {
 					idx=b; break;
 				}
 			}
 
 			// se non trovo il font lo inserisco nella dmi
 			if (idx<0) {
-//				DMIUnlock(&_sPower.dmiFont);
+				// 
+				// 400 = FW_NORMAL
 				DMIAppendDyn(&_sPower.dmiFont,&sFont); 
 				idx=_sPower.dmiFont.Num-1;
-				arFont=DMILock(&_sPower.dmiFont,NULL);
+				_sPower.arsFont=DMILock(&_sPower.dmiFont,NULL);
 			}
 
 			// Aggiorno l'elemento font con l'indice
 			psText->idxFont=idx;
 		}
 	}
-	/*
-	if (_sPower.arFontFace) ARDestroy(_sPower.arFontFace);
-	_sPower.arFontFace=ARNew();
-	for (a=0;a<_sPower.dmiFont.Num;a++)
-	{
-		CHAR szFontDesc[300];
-
-		_(sFont);
-		DMIRead(&_sPower.dmiFont,a,&sFont);
-
-		strcpy(szFontDesc,sFont.pszFontFace);
-		if (sFont.enStyles&STYLE_BOLD) strcat(szFontDesc," Bold");
-		if (sFont.enStyles&STYLE_ITALIC) strcat(szFontDesc," Italic");
-		if (!ARIsIn(_sPower.arFontFace,szFontDesc,FALSE)) ARAdd(&_sPower.arFontFace,szFontDesc);
-	}
-	*/
-
+	
 }
 
 //
@@ -4818,74 +5234,122 @@ void pwdImgCalc(PWD_SIZE *psSize,INT hImage)
 //
 // _fontFileSearch()
 //
-static BOOL _fontFileSearch(PWD_FONT * psPwdFont, CHAR *pszFontPathFile)
+static BOOL _fontFileSearch(PWD_FONT * psPwdFont, CHAR * pszFontPathFile,BOOL * pbEmbedd)
 {
-	static HKEY hkey = NULL;
-	TCHAR szName[1000];
-  	TCHAR szData[1000]; // <------------- ERRORRRONE !!!!!!!!!!!!!!!!!!
-	BOOL bResult = FALSE;
-   	CHAR szFontFullPath[1000];
-	CHAR szFontName[300];
+	static	HKEY hkey = NULL;
+	CHAR	szName[1000];
+	CHAR	szNameFont[1000];
+  	CHAR	szData[1000]; // <------------- ERRORRRONE !!!!!!!!!!!!!!!!!!
+	BOOL	bResult = FALSE;
+   	CHAR	szFontFullPath[1000];
+	CHAR	szFontSearch[300];
 	LPCTSTR lpszFontName=NULL;
-	LPTSTR lpszDisplayName=NULL;
-	LPTSTR lpszFontFile=NULL;
-  
+	LPTSTR	lpszDisplayName=NULL;
+	LPTSTR	lpszFontFile=NULL;
+	CHAR *	pszName;
+    PWD_FONT_RES * psFontRes=NULL;
+	INT iTent;
 
 	// calcolo del nome font
-	strcpy(szFontName,psPwdFont->szFontFace);
-	if (psPwdFont->enStyles&STYLE_BOLD) strcat(szFontName," Bold");
-	if (psPwdFont->enStyles&STYLE_ITALIC) strcat(szFontName," Italic");
-//	if (psPwdFont->enStyles&STYLE_UNDERLINE) strcat(szFontName," Underline");
-	
-	*szName=0;	*szData=0;
- 	strcpy(szFontFullPath, "Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts");
-  	while (GetNextNameValue(HKEY_LOCAL_MACHINE, szFontFullPath, szName, szData) == ERROR_SUCCESS)
-  	{
-//		if (!_tcsnicmp(szFontName, szName, _tcslen(szFontName)))
-		if (!strCaseCmp(szName,szFontName)) {
-  			bResult = TRUE;
-  			break;
-  		}
-  		*szFontFullPath=0;
-  	}
-  	GetNextNameValue(HKEY_LOCAL_MACHINE, NULL, NULL, NULL); // ??
-	if (strEmpty(szData)) {
-		strcat(szFontName," ");
- 		strcpy(szFontFullPath, "Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts");
-  		while (GetNextNameValue(HKEY_LOCAL_MACHINE, szFontFullPath, szName, szData) == ERROR_SUCCESS)
-  		{
-	//		if (!_tcsnicmp(szFontName, szName, _tcslen(szFontName)))
-			if (!strCaseBegin(szName,szFontName)) {
-  				bResult = TRUE;
-  				break;
-  			}
-  			*szFontFullPath=0;
-  		}
-  		GetNextNameValue(HKEY_LOCAL_MACHINE, NULL, NULL, NULL); // ??
-	}
+	for (iTent=0;iTent<4;iTent++) {
 
+		strcpy(szFontSearch,psPwdFont->szFontFace);
+
+		switch (iTent) {
+			
+			case 0:
+				if ((psPwdFont->enStyles&STYLE_BOLD)||(psPwdFont->dwWeight>=700)) strcat(szFontSearch," Bold");
+				if ((psPwdFont->enStyles&STYLE_ITALIC)||psPwdFont->dwItalic) strcat(szFontSearch," Italic");
+				break;
+
+			case 1:
+				if ((psPwdFont->enStyles&STYLE_BOLD)||(psPwdFont->dwWeight>=700)) strcat(szFontSearch," Bold");
+				break;
+
+			case 2:
+				if ((psPwdFont->enStyles&STYLE_ITALIC)||psPwdFont->dwItalic) strcat(szFontSearch," Italic");
+				break;
+			
+			case 3:
+				break;
+
+		}
+//	if (psPwdFont->enStyles&STYLE_UNDERLINE) strcat(szFontSearch," Underline");
+	
+		printf("Cerco '%s'" CRLF ,szFontSearch);
+		*pbEmbedd=HPDF_FALSE;
+
+		//
+		// Risorse temporanee
+		//
+		for (lstLoop(_sPower.lstFontRes,psFontRes)) {
+		
+			if (!strCmp(psFontRes->szName,szFontSearch)) {
+			
+				bResult = true;
+				*pbEmbedd=psFontRes->bAddInFile;
+				if (!strEmpty(psFontRes->szFileName)) {
+					strcpy(pszFontPathFile,psFontRes->szFileName);
+					return bResult;
+				}
+			}
+		}
+
+	// psFontRes se carico contiene le indicazioni per il caricamento nel PDF
+
+		//
+		// Cerco il font
+		//
+	
+		*szName=0;	*szData=0;
+ 		strcpy(szFontFullPath, "Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts");
+  		while (_getNextNameValue(HKEY_LOCAL_MACHINE, szFontFullPath, szName, szData) == ERROR_SUCCESS)
+  		{
+
+			if (*szName==*szFontSearch) {
+
+				pszName=strExtract(szName,NULL," (",false,false);
+				if (pszName) {strcpy(szNameFont,pszName);  ehFree(pszName);} else strcpy(szNameFont,szName);
+				strTrim(szNameFont);
+				printf("[%s]" CRLF ,szNameFont);
+
+				if (!strCaseCmp(szNameFont,szFontSearch)) {
+	  				
+					sprintf(szFontFullPath,"%s\\Fonts\\%s",_sPower.szWinDir,szData); // <--------------
+					if (fileCheck(szFontFullPath)) {
+						bResult = true; break;
+					}
+  				}
+			}
+			*szFontFullPath=0;
+
+  		}
+		_getNextNameValue(HKEY_LOCAL_MACHINE, NULL, NULL, NULL); // Chiudo la funzione di accesso al registro
+
+		if (!strEmpty(szData)) break;
+	}
 
 	// se non trovo la corrispondenza nel registro lo segnalo
 	if (strEmpty(szData)) {
-	//if (strEmpty(szFontPathFile)) {
-	
-		ehLogWrite("Errore nella ricerca del nome file per il font : %s",szFontName);
-#ifdef EH_CONSOLE
-		printf("font %s non trovato" CRLF,szFontName);
-#endif
-
-		return FALSE;
+		//if (strEmpty(szFontPathFile)) {
+		
+			ehLogWrite("Errore nella ricerca del nome file per il font : %s",szFontSearch);
+	#ifdef EH_CONSOLE
+			printf("font %s non trovato" CRLF,szFontSearch);
+	#endif
+			return FALSE;
 	}
-	strcpy(pszFontPathFile,szData);
-	return TRUE;
+
+	strcpy(pszFontPathFile,szFontFullPath);
+	return bResult;
 }
 
 
 
 
-static LONG GetNextNameValue(HKEY key, LPCTSTR pszSubkey, LPTSTR pszName, LPTSTR pszData)
+static LONG _getNextNameValue(HKEY key, LPCTSTR pszSubkey, LPTSTR pszName, LPTSTR pszData)
 {
-  	static HKEY hkey = NULL;	// registry handle, kept open between calls
+  	static HKEY hKey = NULL;	// registry handle, kept open between calls
   	static DWORD dwIndex = 0;	// count of values returned
   	LONG retval;
   	TCHAR szValueName[MAX_PATH];
@@ -4895,19 +5359,18 @@ static LONG GetNextNameValue(HKEY key, LPCTSTR pszSubkey, LPTSTR pszName, LPTSTR
   	DWORD dwType = 0;
   
   	// if all parameters are NULL then close key
-  	if (pszSubkey == NULL && pszName == NULL && pszData == NULL)
+  	if (!pszSubkey && !pszName && !pszData)
   	{
   		//TRACE(_T("closing key\n"));
-  		if (hkey)
-  			RegCloseKey(hkey);
-  		hkey = NULL;
+  		if (hKey) RegCloseKey(hKey);
+  		hKey = NULL;
   		return ERROR_SUCCESS;
   	}
   
   	// if subkey is specified then open key (first time)
-  	if (pszSubkey && pszSubkey[0] != 0)
+  	if (!hKey&&!strEmpty((CHAR *) pszSubkey))//  pszSubkey && pszSubkey[0] != 0)
   	{
-  		retval = RegOpenKeyEx(key, pszSubkey, 0, KEY_ALL_ACCESS, &hkey);
+  		retval = RegOpenKeyEx(key, pszSubkey, 0, KEY_ALL_ACCESS, &hKey);
   		if (retval != ERROR_SUCCESS)
   		{
   			//TRACE(_T("ERROR: RegOpenKeyEx failed\n"));
@@ -4929,14 +5392,14 @@ static LONG GetNextNameValue(HKEY key, LPCTSTR pszSubkey, LPTSTR pszName, LPTSTR
   	*pszName = 0;
   	*pszData = 0;
   
-
+	if (!hKey) ehError();
   
-  	retval = RegEnumValue(hkey, dwIndex, szValueName, &dwValueNameSize, NULL, &dwType, szValueData, &dwValueDataSize);
+  	retval = RegEnumValue(hKey, dwIndex, szValueName, &dwValueNameSize, NULL, &dwType, szValueData, &dwValueDataSize);
   	if (retval == ERROR_SUCCESS)
   	{
   		//TRACE(_T("szValueName=<%s>  szValueData=<%s>\n"), szValueName, szValueData);
-  		lstrcpy(pszName, (LPTSTR)szValueName);
-  		lstrcpy(pszData, (LPTSTR)szValueData);
+  		lstrcpy(pszName, (LPTSTR) szValueName);
+  		lstrcpy(pszData, (LPTSTR) szValueData);
   	}
   	else
   	{
@@ -5205,35 +5668,43 @@ static void _TextSetFont(HPDF_Page psPage,HPDF_Font psFont,PWD_VAL dFontAlt,HPDF
 	PWD_VAL dAscent,dDescent,dFontPdf,dFontAltCalc;
 	PWD_VAL dXHeight,dCap,dFontWin;
 	HPDF_REAL drBaseLine;
+	HPDF_STATUS hStatus;
 
 	if (dFontAlt<0) dFontAlt=-dFontAlt; // Probabilmente in baseline
+	
 
-	dCap=(PWD_VAL) HPDF_Font_GetCapHeight(psFont);
-	dAscent	=(PWD_VAL) HPDF_Font_GetAscent(psFont);
-	dDescent=(PWD_VAL) HPDF_Font_GetDescent(psFont); if (dDescent<0) dDescent*=-1;
-	dXHeight=(PWD_VAL) HPDF_Font_GetXHeight(psFont);
+		dCap=(PWD_VAL) HPDF_Font_GetCapHeight(psFont);
+		dAscent	=(PWD_VAL) HPDF_Font_GetAscent(psFont);
+		dDescent=(PWD_VAL) HPDF_Font_GetDescent(psFont); if (dDescent<0) dDescent*=-1;
+		dXHeight=(PWD_VAL) HPDF_Font_GetXHeight(psFont);
 
-	// dFontAlt:dFontSum=x:dAscent;
-	dFontWin=1000;		// Altezza intesa da Windows è Totale = 1000
-	dFontPdf=dAscent;	// Altezza Pdf: intende solo parte ascendente del carattere
+		// dFontAlt:dFontSum=x:dAscent;
+		dFontWin=1000;		// Altezza intesa da Windows è Totale = 1000
+		dFontPdf=dAscent;	// Altezza Pdf: intende solo parte ascendente del carattere
 
-	// Calcolo proporzionalmente l'altezza "logica" del font
-	// dFontAlt:dFontWin=x:dFontPdf
-	dFontAltCalc=((dFontAlt*dFontPdf)/dFontWin);
+		// Calcolo proporzionalmente l'altezza "logica" del font
+		// dFontAlt:dFontWin=x:dFontPdf
+		dFontAltCalc=((dFontAlt*dFontPdf)/dFontWin);
 
-	// Calcolo la "baseline" (ritorno la parte discendente)
-	// dDescent:1000=x:dFontAltCalc;
-	drBaseLine=(HPDF_REAL) ((dFontAltCalc*dDescent)/1000);
-	*pdBaseLineOffset=drBaseLine;
+		// Calcolo la "baseline" (ritorno la parte discendente)
+		// dDescent:1000=x:dFontAltCalc;
+		drBaseLine=(HPDF_REAL) ((dFontAltCalc*dDescent)/1000);
+		*pdBaseLineOffset=drBaseLine;
 
-	if (!_sPower.iVer)
-		HPDF_Page_SetFontAndSize(	psPage, 
+	if (!_sPower.iVer) {
+		hStatus=HPDF_Page_SetFontAndSize(	psPage, 
 									psFont, // arsPdfFont[psText->idxFont], 
 									(HPDF_REAL) dFontAltCalc);//dFontAltCalc);// pwdUm(PUM_UM_PT,psText->umCharHeight) );
+	}
 		else
-		HPDF_Page_SetFontAndSize(	psPage, 
+		hStatus=HPDF_Page_SetFontAndSize(	psPage, 
 									psFont, // arsPdfFont[psText->idxFont], 
-									(HPDF_REAL) dFontAlt);//dFontAltCalc);// pwdUm(PUM_UM_PT,psText->umCharHeight) );
+ 									(HPDF_REAL) dFontAlt);//dFontAltCalc);// pwdUm(PUM_UM_PT,psText->umCharHeight) );
+/*
+	if (hStatus!=HPDF_OK) {
+		printf("qui");
+	}
+	*/
 }
 
 
@@ -5287,7 +5758,7 @@ static void _pdfBox(HPDF_Page psPage,PWD_RECT * prumArea,PWD_COLOR colPen,PWD_VA
 	rumWidth=prumArea->right-prumArea->left;
 	rumHeight=prumArea->top-prumArea->bottom;
 
-	HPDF_Page_SetLineWidth(psPage, (HPDF_REAL) pwdUm(PUM_UM_PT,umPenWidth));
+	HPDF_Page_SetLineWidth(psPage, (HPDF_REAL) pwdUmTo(umPenWidth,PUM_PT));
 	_pdfColorStroke(psPage,&colPen);
 
 	HPDF_Page_Rectangle(psPage,
@@ -5326,7 +5797,7 @@ static void _pointToReal(	PWD_SIZE	sumPage,
 							HPDF_REAL	*	piY) {
 /*
 	INT x,y;
-	x=(INT) pwdUm(PUM_PHX,umX);	y=(INT) pwdUm(PUM_PHY,umY);
+	x=(INT) pwdUm(PUM_DTXD,umX);	y=(INT) pwdUm(PUM_DTYD,umY);
 
 	if (_sPd.bVirtual) {
 		x+=_sPd.recPreviewPage.left;
@@ -5335,8 +5806,8 @@ static void _pointToReal(	PWD_SIZE	sumPage,
 
 	*piX=x;	*piY=y;
 	*/
-	*piX=(HPDF_REAL) pwdUm(PUM_UM_PT,umX);
-	*piY=(HPDF_REAL) (sumPage.cy-pwdUm(PUM_UM_PT,umY));
+	*piX=(HPDF_REAL) pwdUmTo(umX,PUM_PT);
+	*piY=(HPDF_REAL) (sumPage.cy-pwdUmTo(umY,PUM_PT));
 
 }
 
@@ -5353,7 +5824,7 @@ static void _pdfSetPenBrush(HPDF_Page psPage,PWD_PB * psPenBrush) {
 	// PenBrush
 
 	if (psPenBrush->colPen.dAlpha&&psPenBrush->umPenWidth) {
-		HPDF_Page_SetLineWidth(psPage, (HPDF_REAL) pwdUm(PUM_UM_PT,psPenBrush->umPenWidth));
+		HPDF_Page_SetLineWidth(psPage, (HPDF_REAL) pwdUmTo(psPenBrush->umPenWidth,PUM_PT));
 		_pdfColorStroke(psPage,&psPenBrush->colPen);
 	} else {
 		HPDF_Page_SetLineWidth(psPage, (HPDF_REAL) 0);
@@ -5373,6 +5844,84 @@ static void _pdfFillStroke(HPDF_Page psPage,PWD_PB * psPenBrush) {
 		HPDF_Page_Stroke(psPage);
 }
 
+//
+//  _pdfFontLoad() > Cerce il file del font per allegarlo al PDF
+//
+static void  _pdfFontLoad(CHAR * pszPdfEncode) {
+
+	INT a;
+	CHAR		szFontFullPath[500];
+	BOOL		bEmbedded;
+	HPDF_Font	psDefPdfFont;
+
+	psDefPdfFont = HPDF_GetFont(_sPd.pdfDoc,"Helvetica",pszPdfEncode); // font di default
+
+	for (a=0;a<_sPower.dmiFont.Num;a++)//ARLen(_sPower.arFontFace);a++)
+	{
+		PWD_FONT sPwdFont;
+
+		DMIRead(&_sPower.dmiFont,a,&sPwdFont);
+
+		//
+		// devo associare l' handle del font all' indice della dmi
+		//
+		*szFontFullPath=0;
+		bEmbedded=HPDF_FALSE;
+		if (_fontFileSearch(&sPwdFont,szFontFullPath,&bEmbedded))
+		{	
+			BOOL bFound=FALSE;
+			if (!_sPower.arsFont[a].pVoid)
+			{
+				CHAR *pszFontTmp=NULL;
+				pszFontTmp = (CHAR *) HPDF_LoadTTFontFromFile(_sPd.pdfDoc, szFontFullPath, bEmbedded);
+				_sPower.arsFont[a].pVoid = HPDF_GetFont(_sPd.pdfDoc, pszFontTmp, pszPdfEncode);  //"90ms-RKSJ-H"); 
+				if (!_sPower.arsFont[a].pVoid) 
+					ehError();
+				lstPushf(_sPower.lstPdfReport,"importo %s (%s) ...",sPwdFont.szFontFace,szFontFullPath);
+
+
+			}
+/*
+			for (b=0;b<_sPd.dmiPdfFont.Num;b++)
+			{
+				_(sPFont);
+				DMIRead(&_sPd.dmiPdfFont,b,&sPFont);
+
+				if (!strcmp(sPFont.szFontFullPath,szFontFullPath)) { // trovato !!
+					bFound=true; 
+					break;
+				} 
+
+			}
+
+			//
+			// Aggiungo il font al file PDF (se non l'ho gia fatto)
+			//
+			if (!bFound) { 
+
+				CHAR *pszFontTmp=NULL;
+				
+				_(sPFont);
+				pszFontTmp = (CHAR *) HPDF_LoadTTFontFromFile (_sPd.pdfDoc, szFontFullPath, HPDF_FALSE);
+				sPFont.psPdfFont = HPDF_GetFont (_sPd.pdfDoc, pszFontTmp, pszPdfEncode);  //"90ms-RKSJ-H"); 
+				lstPushf(_sPower.lstPdfReport,"importo %s (%s) ...",sPwdFont.szFontFace,szFontFullPath);
+				strcpy(sPFont.szFontFullPath,szFontFullPath);
+				DMIAppendDyn(&_sPd.dmiPdfFont,&sPFont);
+				
+			}
+
+			arsPdfFont[a]=sPFont.psPdfFont;
+			*/
+		} 
+		else // font di default
+
+			_sPower.arsFont[a].pVoid=psDefPdfFont;
+	}
+
+//	return arsPdfFont;
+}
+
+
 
 //
 // _pdfBuilder()
@@ -5381,13 +5930,13 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 {
 	INT nPage;
 	HPDF_Page psPage;
-	INT a,b;
+	INT a;
 	PWD_DRAW sItemDraw;
-	PDO_TEXT *psText;
-	PDO_PATH * psPath;
-	PWD_PTHE * psEle;
-	BYTE *pb;
-	CHAR szFontFullPath[500];
+	PDO_TEXT *	psText;
+	PDO_PATH *	psPath;
+	PWD_PTHE *	psEle;
+	EH_LST		lstPath;
+//	BYTE *pb;
 	CHAR *pszFontFile=NULL;
 	CHAR *pszFontName=NULL;
 	CHAR *pszFontFace=NULL;
@@ -5398,17 +5947,11 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 	WCHAR *pwcText;
 
 	PDO_BOXLINE *psBox;
-	HPDF_Image   hPdfimage;
+//	HPDF_Image   hPdfimage;
 	PDO_IMAGE	*psImage;
 	HPDF_ColorSpace    hPdefcolor_space;
 	HPDF_REAL	drValue;
 	IMGHEADER *	psImg;
-	HPDF_Font * arsPdfFont;
-	HPDF_Font psDefPdfFont;
-	CHAR		szFontFile[500];
-	S_PDFFONT sPFont;
-	_DMI	  dmiPdfFont;
-	CHAR		szWinDir[MAX_PATH];
 	CHAR		szFileOutput[500];
 
 	BYTE *	pszText;
@@ -5417,6 +5960,16 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 	HPDF_REAL dBaseLineOffset;
 
 	EH_IMG himFile;
+
+	typedef struct {
+
+		EH_IMG		imgPwd;
+		HPDF_Image	pdfImage;
+	
+	} S_IMG_PDF;
+
+	EH_LST lstImgPdf;
+
 
 	//
 	// Nome del file PDF generato
@@ -5441,93 +5994,34 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 	}
 
 	pbTableEncode = ehAlloc(0xFFFF);
-	GetWindowsDirectory(szWinDir,sizeof(szWinDir)-1);
+	GetWindowsDirectory(_sPower.szWinDir,sizeof(_sPower.szWinDir)-1);
+	_sPower.lstPdfReport=lstNew(); // lst di report
+
 #ifndef EH_CONSOLE
 	MouseCursorWait();
 #endif
 
-	sumPage.cx=pwdUm(PUM_UM_PT,_sPower.sumPaper.cx);
-	sumPage.cy=pwdUm(PUM_UM_PT,_sPower.sumPaper.cy);
+	sumPage.cx=pwdUmTo(_sPower.sumPaper.cx,PUM_PT);
+	sumPage.cy=pwdUmTo(_sPower.sumPaper.cy,PUM_PT);
+	lstImgPdf=lstCreate(sizeof(S_IMG_PDF));
 
 	_sPd.pdfDoc= HPDF_New(_pdfErrorHandler, NULL); if (!_sPd.pdfDoc) ehError();
 	pszPdfEncode=_sPower.pszPdfEncode; if (!pszPdfEncode) pszPdfEncode="ISO8859-16";
 	if (strCmp(pszPdfEncode,"UTF-8")) {
-	
-		_LPdfMapBuilder(pszPdfEncode); // Crea la mappa di ricodifica ....
+		_pdfMapBuilder(pszPdfEncode); // Crea la mappa di ricodifica ....
 	}
 	
-	HPDF_SetCompressionMode (_sPd.pdfDoc, HPDF_COMP_ALL);
+	HPDF_SetCompressionMode(_sPd.pdfDoc, HPDF_COMP_ALL);
 
 	//
 	// FONT 
 	// - Enumerazione usati nel documento
 	// - Rintraccio il font come file
 	//
-	_fontEnumeration(0);
-//	arsPdfFont=_sPower.dmiFont.Num?ehAllocZero(sizeof(HPDF_Font)*_sPower.dmiFont.Num):NULL;
-	arsPdfFont=ehAllocZero(sizeof(HPDF_Font)*_sPower.dmiFont.Num+1);
-
-	psDefPdfFont = HPDF_GetFont(_sPd.pdfDoc,"Helvetica",pszPdfEncode); // font di default
-	DMIReset(&dmiPdfFont);
-	DMIOpen(&dmiPdfFont,RAM_AUTO,100,sizeof(S_PDFFONT),"FontName");
-
-	for (a=0;a<_sPower.dmiFont.Num;a++)//ARLen(_sPower.arFontFace);a++)
-	{
-		PWD_FONT sPwdFont;
-		
-
-		DMIRead(&_sPower.dmiFont,a,&sPwdFont);
-
-
-		//
-		// devo associare l' handle del font all' indice della dmi
-		//
-		*szFontFile=0;
-		if (_fontFileSearch(&sPwdFont,szFontFile))
-		{	
-			BOOL bFound=FALSE;
-
-			sprintf(szFontFullPath,"%s\\Fonts\\%s",szWinDir,szFontFile); // <--------------
-
-			// verifico in dmifontname se ho già caricato il font
-			
-			for (b=0;b<dmiPdfFont.Num;b++)
-			{
-				_(sPFont);
-				DMIRead(&dmiPdfFont,b,&sPFont);
-
-				if (!strcmp(sPFont.szFontFullPath,szFontFullPath)) { // trovato !!
-					bFound=true; 
-					break;
-				} 
-
-			}
-
-			//
-			// Aggiungo il font al file PDF (se non l'ho gia fatto)
-			//
-			if (!bFound) { 
-
-				CHAR *pszFontTmp=NULL;
-				
-				_(sPFont);
-
-				pszFontTmp = (CHAR *) HPDF_LoadTTFontFromFile (_sPd.pdfDoc, szFontFullPath, HPDF_FALSE);
-				sPFont.psPdfFont = HPDF_GetFont (_sPd.pdfDoc, pszFontTmp, pszPdfEncode);  //"90ms-RKSJ-H"); 
-				
-				strcpy(sPFont.szFontFullPath,szFontFullPath);
-				DMIAppendDyn(&dmiPdfFont,&sPFont);
-				
-			}
-
-			arsPdfFont[a]=sPFont.psPdfFont;
-		} 
-		else // font di default
-
-			arsPdfFont[a]=psDefPdfFont;
-			
-	}
-
+	
+	_fontEnumeration(0);			// Enumero i font presenti nel documento in (riempo _sPower.dmiFont)
+	_pdfFontLoad(pszPdfEncode);		// Alloco i fonts (se presenti) inserndoli nel docuimento nel documento	 (riempo _sPd.dmiPdfFont)
+	
 
 	//	ARPrint(arFonts);
 	//
@@ -5536,7 +6030,6 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
  	for (nPage=PageStart;nPage<=PageEnd;nPage++)
 	{
 		psPage = HPDF_AddPage (_sPd.pdfDoc);
-
 		HPDF_Page_SetHeight (psPage, (HPDF_REAL) sumPage.cy);
 		HPDF_Page_SetWidth (psPage, (HPDF_REAL) sumPage.cx);
 //		if (!strCmp(pszPdfEncode,"UTF-8")) HPDF_UseUnicodeEncodings(_sPd.pdfDoc);
@@ -5545,7 +6038,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 		//HPDF_SetPageMode(_sPd.pdfDoc, HPDF_PAGE_MODE_USE_OUTLINE);
 		_(sItemDraw);
 
-		for (a=_sPd.ariPageIndex[nPage];a<_sPd.nItems;a++)
+		for (a=_sPd.ariPageIndex[nPage];a<_sPd.nItems;a++) 
 		{
 			HPDF_RECT pdfRect;
 			HPDF_SIZE pdfSize;
@@ -5579,8 +6072,8 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 			pdfSize.cy*=-1;
 
 			sItemDraw.psItem=_sPd.arsItem[a]; 
-			pb=(BYTE *) sItemDraw.psItem;
-			sItemDraw.pObj=(pb+sizeof(PWD_ITEM));
+			//pb=(BYTE *) sItemDraw.psItem;
+			//sItemDraw.psObj=(pb+sizeof(PWD_ITEM)); 
 
 			switch (_sPd.arsItem[a]->enType)
 			{
@@ -5589,23 +6082,25 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 				//
 
 				case PDT_TEXT:	
-					psText=sItemDraw.pObj;
+
+					psText=_getItemObj(sItemDraw.psItem);
 					if (strEmpty(psText->pszText)) break;	
 
 					pwcText=_strTextDecode(psText->pszText);
 					pszText = _pdfStrDecode(pwcText);
 					ehFree(pwcText);
 
-					HPDF_Page_BeginText(psPage);
-
+					HPDF_Page_BeginText(psPage); 
+					
 					_TextSetFont(	psPage,
-									arsPdfFont[psText->idxFont],
-									pwdUm(PUM_UM_PT,psText->umCharHeight),
+									//_arsPdfFont[psText->idxFont],
+									_sPower.arsFont[psText->idxFont].pVoid,
+									pwdUmTo(psText->umCharHeight,PUM_PT),
 									&dBaseLineOffset);
 
 
 					_pdfColorFill(psPage,&psText->colText);
-					HPDF_Page_SetCharSpace(psPage, (HPDF_REAL) pwdUm(PUM_UM_PT,psText->umExtraCharSpace));
+					HPDF_Page_SetCharSpace(psPage, (HPDF_REAL) pwdUmTo(psText->umExtraCharSpace,PUM_PT));
 
 					drValue = HPDF_Page_TextWidth (psPage, pszText); // Calcolo Larghezza del testo
 
@@ -5632,9 +6127,10 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 					HPDF_Page_MoveTextPos(psPage,(HPDF_REAL) pdfRect.left,(HPDF_REAL) pdfRect.bottom+dBaseLineOffset); // + perché va SU !
 					HPDF_Page_ShowText(psPage,pszText);
 					HPDF_Page_EndText(psPage);
+
 					if (psText->enStyles&STYLE_UNDERLINE) {
 					
-						HPDF_REAL dLine=(HPDF_REAL) pwdUm(PUM_UM_PT,.3);
+						HPDF_REAL dLine=(HPDF_REAL) pwdUmTo(pwdUm(PUM_INCH,.3),PUM_PT);
 						pdfRect.top=pdfRect.bottom+dBaseLineOffset-dLine*2;
 						pdfRect.bottom=pdfRect.top;
 						pdfRect.right=pdfRect.left+drValue;
@@ -5649,26 +6145,30 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 //				case PDT_TEXT:	
 				case PDT_TEXTBOX:	
 
-						psText=sItemDraw.pObj;
+						psText=_getItemObj(sItemDraw.psItem);
 						if (strEmpty(psText->pszText)) break;	
 						
 						pwcText=_strTextDecode(psText->pszText);
 						pszText = _pdfStrDecode(pwcText);
 						ehFree(pwcText);
 						
+						HPDF_Page_BeginText(psPage);
+
 						_TextSetFont(	psPage,
-										arsPdfFont[psText->idxFont],
-										pwdUm(PUM_UM_PT,psText->umCharHeight),
+										//arsPdfFont[psText->idxFont],
+										_sPower.arsFont[psText->idxFont].pVoid,
+										pwdUmTo(psText->umCharHeight,PUM_PT),
 										&dBaseLineOffset);
 /*
 #ifdef _DEBUG
 						_pdfBox(psPage,&rumArea,pwdColor(RGB(255,0,0)),.1);
 #endif
 */
-						HPDF_Page_BeginText(psPage);
+						// HPDF_Page_BeginText(psPage);
+						
 
 						_pdfColorFill(psPage,&psText->colText);
-						HPDF_Page_SetCharSpace(psPage, (HPDF_REAL) pwdUm(PUM_UM_PT,psText->umExtraCharSpace));
+						HPDF_Page_SetCharSpace(psPage, (HPDF_REAL) pwdUmTo(psText->umExtraCharSpace,PUM_PT));
 						drValue = HPDF_Page_TextWidth (psPage, pszText);
 				
 						HPDF_Page_TextRect (psPage,
@@ -5697,7 +6197,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 
 				case PDT_LINE:		//_drawLine(&sItemDraw); 
 						
-						psBox=sItemDraw.pObj;
+						psBox=_getItemObj(sItemDraw.psItem);
 						_pdfSetPenBrush(psPage,&psBox->sPenBrush);
 
 						HPDF_Page_MoveTo(psPage, (HPDF_REAL) pdfRect.left, (HPDF_REAL) pdfRect.top);
@@ -5712,7 +6212,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 				//
 				case PDT_RECT:		//_drawRect(&sItemDraw);
 					
-					psBox=sItemDraw.pObj;
+					psBox=_getItemObj(sItemDraw.psItem);
 					if (psBox->sPenBrush.colPen.dAlpha==0.0&&
 						psBox->sPenBrush.colBrush.dAlpha==0.0) 
 					{
@@ -5807,10 +6307,10 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 				//
 				case PDT_PATH:
 
-					psPath=sItemDraw.pObj;
+					psPath=_getItemObj(sItemDraw.psItem);
 					_pdfSetPenBrush(psPage,&psPath->sPenBrush); // Preset pen/Brush
-
-					for (lstLoop(psPath->lstPath,psEle)) {
+					lstPath=_pathCreate(psPath);
+					for (lstLoop(lstPath,psEle)) {
 
 						HPDF_REAL umX,umY;
 						PWD_POINT * pumPoint=psEle->psData;
@@ -5879,80 +6379,106 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 //					EndPath(psDraw->hDC);
 
 					_pdfFillStroke(psPage,&psPath->sPenBrush);
-
+					_pathDestroy(lstPath);
 					// printf("qui");
 					break;
 
 				//
-				// Immagine (Easyhand)
+				// Immagine (formato easyHand)
 				//
 
 				case PDT_EHIMG:
 
-					psImage=sItemDraw.pObj;
-
+					
+					psImage=_getItemObj(sItemDraw.psItem);
 					if (psImage->hImage) {
-
-						
-						psImg=memoLock(psImage->hImage); // brutto ma temporaneo
-
-						//
-						// Se JPG > inserisco il file originale
-						//
-						if (psImg->enType==IMG_JPEG&&
-							*psImg->utfFullFileName) {
-								hPdfimage=HPDF_LoadJpegImageFromFile(_sPd.pdfDoc,psImg->utfFullFileName);
-								if (!hPdfimage) {
-									ehExit("Errore in caricamento nel PDF: %s",psImg->utfFullFileName);
-								}
-								// break;
-						}
-						//
-						// PNG > Da fare e da provare
-						//
-						else if (psImg->enType==IMG_PNG&&
-							*psImg->utfFullFileName) {
-								hPdfimage=HPDF_LoadPngImageFromFile(_sPd.pdfDoc,psImg->utfFullFileName);
-								if (!hPdfimage) {
-									ehExit("Errore in caricamento nel PDF: %s",psImg->utfFullFileName);
-								}
-								// break;
-						}
-
-						//
-						// Altro tipo > inserisco il bitmap non compresso
-						//
-						else 
-						{
-							switch(psImg->enPixelType) {
-								case IMG_PIXEL_RGB:
-								case IMG_PIXEL_BGR:
-										hPdefcolor_space=HPDF_CS_DEVICE_RGB;
-									break;
-								case IMG_PIXEL_CMYK:
-										hPdefcolor_space=HPDF_CS_DEVICE_CMYK;
-									break;
-								case IMG_PIXEL_GRAYSCALE:
-										hPdefcolor_space=HPDF_CS_DEVICE_GRAY;
-									break;
-								
-								default:
-										ehError();
-									break;
-							}
 				
-							hPdfimage = HPDF_LoadRawImageFromMem  (_sPd.pdfDoc,
-																   psImg->pbImage,
-																   psImg->bmiHeader.biWidth,
-																   psImg->bmiHeader.biHeight,
-																   hPdefcolor_space,
-																   8);
-							// 
-							// DAFARE: Bisogna rovesciare l'immagine SOTTOSOPRA
-							//
+						S_IMG_PDF * psImgPdf=NULL;
+
+						//
+						// Cerco se l'ho già letta
+						//
+						for (lstLoop(lstImgPdf,psImgPdf)) {
+							if (psImgPdf->imgPwd==psImage->hImage) break;
 						}
+						
+						if (!psImgPdf) {
+
+							S_IMG_PDF sImg;
+							_(sImg);
+							sImg.imgPwd=psImage->hImage;
+
+							psImg=memoLock(psImage->hImage); // brutto ma temporaneo
+
+							//
+							// Se JPG > inserisco il file originale
+							//
+							if (psImg->enType==IMG_JPEG&&
+								*psImg->utfFullFileName) {
+									sImg.pdfImage=HPDF_LoadJpegImageFromFile(_sPd.pdfDoc,psImg->utfFullFileName);
+									if (!sImg.pdfImage) {
+										ehExit("Errore in caricamento nel PDF: %s",psImg->utfFullFileName);
+									}
+									// break;
+							}
+							//
+							// PNG > Da fare e da provare
+							//
+							else if (psImg->enType==IMG_PNG&&
+									*psImg->utfFullFileName) {
+									sImg.pdfImage=HPDF_LoadPngImageFromFile(_sPd.pdfDoc,psImg->utfFullFileName);
+									if (!sImg.pdfImage) {
+										ehExit("Errore in caricamento nel PDF: %s",psImg->utfFullFileName);
+									}
+									// break;
+							}
+
+							//
+							// Altro tipo > inserisco il bitmap non compresso
+							//
+							else 
+							{
+								switch(psImg->enPixelType) {
+									case IMG_PIXEL_RGB:
+									case IMG_PIXEL_BGR:
+											hPdefcolor_space=HPDF_CS_DEVICE_RGB;
+										break;
+									case IMG_PIXEL_CMYK:
+											hPdefcolor_space=HPDF_CS_DEVICE_CMYK;
+										break;
+									case IMG_PIXEL_GRAYSCALE:
+											hPdefcolor_space=HPDF_CS_DEVICE_GRAY;
+										break;
+									
+									default:
+											ehError();
+										break;
+								}
+					
+								sImg.pdfImage = HPDF_LoadRawImageFromMem  (_sPd.pdfDoc,
+																	   psImg->pbImage,
+																	   psImg->bmiHeader.biWidth,
+																	   psImg->bmiHeader.biHeight,
+																	   hPdefcolor_space,
+																	   8);
+								// 
+								// DAFARE: Bisogna rovesciare l'immagine SOTTOSOPRA
+								//
+							}
+
+//							if (!sImg.pdfImage) ehError();
+							psImgPdf=lstPush(lstImgPdf,&sImg);	
+
+						}
+						else {
+						
+							psImg=memoLock(psImage->hImage); 
+
+						}
+						if (!psImgPdf->pdfImage) ehError();
+
 						HPDF_Page_DrawImage  (psPage,
-											  hPdfimage,
+											  psImgPdf->pdfImage,//hPdfimage,
 											  pdfRect.left,
 											  (pdfRect.top-pdfSize.cy),
 											  pdfSize.cx,//Img->bmiHeader.biWidth,
@@ -5962,9 +6488,12 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 					}
 					else
 					{
+						//
+						// Converto BMP in PNG 
+						//
+						HPDF_Image   hPdfimage;
 						CHAR szTempPngFile[500];
 
-						// Converto BMP in PNG e importo il PNG (DA FARE)
 						if (!BMPReadFile(psImage->pszFileTemp, &himFile) ) ehExit("errore nel caricamento del bitmap temporaneo");
 									
 						
@@ -5981,7 +6510,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 											  (HPDF_REAL) pdfSize.cx,//Img->bmiHeader.biWidth,
 											  (HPDF_REAL) pdfSize.cy);
 					
-						remove(szTempPngFile);
+						fileRemove(szTempPngFile);
 						IMGDestroy(himFile);
 					}
 					
@@ -5989,7 +6518,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 
 				case PDT_BITMAP:	//_drawImage(&sItemDraw);
 					
-					psImage=sItemDraw.pObj;
+					psImage=_getItemObj(sItemDraw.psItem);
 			
 					if (psImage->hBitmap) { // da finire / vedere
 	
@@ -6006,11 +6535,11 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 						sizImageSorg.cy=psImg->bmiHeader.biHeight;
 						memoUnlock(HdlTemp); 
 
-						//sizImageDest.cx= (LONG) pwdUm(PUM_PHX_REAL,psumSize->cx);
-						//sizImageDest.cy= (LONG) pwdUm(PUM_PHY_REAL,psumSize->cy);
+						//sizImageDest.cx= (LONG) pwdUm(PUM_DTX,psumSize->cx);
+						//sizImageDest.cy= (LONG) pwdUm(PUM_DTY,psumSize->cy);
 
-						sizImageDest.cx= (LONG) pwdUm(PUM_PHX_REAL,pdfSize.cx);
-						sizImageDest.cy= (LONG) pwdUm(PUM_PHY_REAL,pdfSize.cy);
+						sizImageDest.cx= (LONG) pwdUm(PUM_DTX,pdfSize.cx);
+						sizImageDest.cy= (LONG) pwdUm(PUM_DTY,pdfSize.cy);
 
 //						HdlTemp = BitmapToImg(psImage->hBitmap,NULL);
 						_LImageResampleSave(HdlTemp, sizImageSorg, sizImageDest,szTempPngFile);
@@ -6020,6 +6549,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 					}  // da finire / vedere
 					else // Leggo BMP
 					{
+						HPDF_Image   hPdfimage;
 						CHAR szTempPngFile[500];
 
 						// Converto BMP in PNG e importo il PNG (DA FARE)
@@ -6037,7 +6567,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 											  (HPDF_REAL) pdfSize.cx,//Img->bmiHeader.biWidth,
 											  (HPDF_REAL) pdfSize.cy);
 					
-						remove(szTempPngFile);					
+						fileRemove(szTempPngFile);					
 						IMGDestroy(himFile);
 
 					}
@@ -6049,7 +6579,8 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 					break;
 
 				case PDT_IMAGELIST:
-					psImage=sItemDraw.pObj;
+
+				psImage=_getItemObj(sItemDraw.psItem);
 #ifndef EH_CONSOLE
 					if (psImage->himl) {
 						// Creo BMP al volo
@@ -6125,13 +6656,25 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 */
 //						break;
 			}
-		}
-	}
+
+		} // loop sugli elementi
+	
+
+	} // loop sulle pagine
 
 	// save the document to a file 
-	HPDF_SaveToFile(_sPd.pdfDoc, szFileOutput);
+	{
+		EH_FILE * psFile=fileOpen(szFileOutput,FO_WRITE|FO_OPEN_EXCLUSIVE); 
+		if (!psFile) ehExit("Il file %s non puo essere scritto",szFileOutput);
+		fileClose(psFile);
+		HPDF_SaveToFile(_sPd.pdfDoc, szFileOutput);
+	}
+
+	
 	HPDF_Free(_sPd.pdfDoc);
-	DMIClose(&dmiPdfFont,"FontName");
+	lstDestroy(lstImgPdf);
+
+//	DMIClose(&_sPd.dmiPdfFont,"FontName");
 #ifndef EH_CONSOLE
 	MouseCursorDefault();
 #endif
@@ -6140,7 +6683,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 	_sPower.bPdfShow=true;
 #endif
 
-	ehFreePtrs(2,&pbTableEncode,&arsPdfFont);
+	ehFreePtrs(1,&pbTableEncode);
 	if (_sPower.bPdfShow) ShellExecute(NULL,"open",szFileOutput,NULL,NULL,SW_NORMAL);
 	return FALSE;
 }
@@ -6162,9 +6705,9 @@ static CHAR * _pdfStrDecode(WCHAR *pwcText)
 
 
 //
-//	 _LPdfMapBuilder() - Crea mappa caratteri
+//	 _pdfMapBuilder() - Crea mappa caratteri
 //
-static void _LPdfMapBuilder(CHAR *pszEncode) {
+static void _pdfMapBuilder(CHAR *pszEncode) {
 
 	typedef struct {
 		BYTE	bCode;
@@ -10315,8 +10858,7 @@ static int CALLBACK _funcMetaFile (
 			}
 			break;
 
-        case EMR_SETBKCOLOR:
-			printf("qui");
+        case EMR_SETBKCOLOR: // Non gestito
 			break;
 
 		//
@@ -10528,8 +11070,7 @@ static int CALLBACK _funcMetaFile (
 		case EMR_FILLPATH:
 
 		case EMR_SELECTCLIPPATH: // 67 http://msdn.microsoft.com/en-us/library/windows/desktop/dd162954(v=vs.85).aspx
-
-			printf("<--- da implementare");
+			//printf("EMR_SELECTCLIPPATH <--- da implementare");
 			break;
 
 		//
@@ -10625,7 +11166,8 @@ static int CALLBACK _funcMetaFile (
 								_sMf.sLogFont.lfUnderline,
 								(yAlt<0)?true:false
 								);
-
+//					if (strlen(putf)>2)
+//						printf("- %s : %d" CRLF,putf,_sMf.sLogFont.lfWeight);
 					pwdTextJs(	_mapConvert(psTextW->emrtext.ptlReference.x,0,true),
 								_mapConvert(psTextW->emrtext.ptlReference.y,1,true),
 								szParams,
@@ -10729,17 +11271,20 @@ static HENHMETAFILE _wmfLoad(UTF8 * pszFileNameUtf) {
 //
 // pwdMetaFile() > 12/2013
 //
-void		pwdMetaFile(PWD_POINT *	ppumPos,
-						PWD_SIZE  *	psumSize,
-						PWD_ALIGN	enAlign,
+void		pwdMetaFile(PWD_POINT *	ppumPos,		// Posiziono il meta
+						PWD_SIZE  *	psumSize,		// Indico dimensioni orizzontali
+						PWD_ALIGN	enAlign,		// Posizionamento
+						UTF8 *		pszFileNameUtf,
 						BOOL		bBestInFit,		// T/F se deve calcolare la maggiore dimensione possibile
-						UTF8 *		pszFileNameUtf)
+						BOOL		bOnlyCalc,		// T/F Solo calcolo del posizionamento, usato per predeterminare l'occupazione e la dimenzione
+						PWD_RECT  *	precMeta)		// Ritorna l'area occupata (se richiesto)
+
 {
 
 	ENHMETAHEADER	emh ;
 	HENHMETAFILE	hemf ;
 	WCHAR			wcsFileName[500];
-	PWD_POINT		umpMeta;
+//	PWD_POINT		umpMeta;
 	PWD_SIZE		umsMeta; // Area di stampa
 //	double			dLen,dPpm;
 	_(_sMf);
@@ -10758,7 +11303,7 @@ void		pwdMetaFile(PWD_POINT *	ppumPos,
 	GetEnhMetaFileHeader (hemf, sizeof (emh), &emh) ;
 	
 	//
-	// NOTA: Le dimensioni del template sono in centesimi di millimetro
+	// NOTA: Le dimensioni del template sono (dovrebbero essere) in centesimi di millimetro
 	//
 //	#define WIN_X_FACTOR 7.0754716981132077
 //	#define WIN_Y_FACTOR 5.5035773252614206
@@ -10769,7 +11314,7 @@ void		pwdMetaFile(PWD_POINT *	ppumPos,
 	// 
 	// Coordinate e dimensioni
 	//
- 	if (ppumPos) memcpy(&umpMeta,ppumPos,sizeof(PWD_POINT)); else {umpMeta.x=_sPower.rumPage.left; umpMeta.y=_sPower.rumPage.top;}
+ 	// if (ppumPos) memcpy(&umpMeta,ppumPos,sizeof(PWD_POINT)); else {umpMeta.x=_sPower.rumPage.left; umpMeta.y=_sPower.rumPage.top;}
 	if (psumSize) memcpy(&umsMeta,psumSize,sizeof(PWD_SIZE)); //else {memcpy(&umsMeta,&_sPower.sumPage,sizeof(PWD_SIZE)); bBestInFit=true;}
 
 	//
@@ -10803,7 +11348,7 @@ void		pwdMetaFile(PWD_POINT *	ppumPos,
 	//
 	// Ridimensiono il template in scala
 	// 
-	printf("Dimensioni meta: %.2fmm x %.2fmm (zoom: %.2f%%)" CRLF,_sMf.sumSource.cx,_sMf.sumSource.cy,_sMf.dScale*100);
+	// printf("Dimensioni meta: %.2fmm x %.2fmm (zoom: %.2f%%)" CRLF,_sMf.sumSource.cx,_sMf.sumSource.cy,_sMf.dScale*100);
 	_sMf.sumDest.cx = (_sMf.dScale * _sMf.sumSource.cx) ; if (!umsMeta.cx)  umsMeta.cx=_sMf.sumDest.cx;
 	_sMf.sumDest.cy = (_sMf.dScale * _sMf.sumSource.cy) ; if (!umsMeta.cy)  umsMeta.cy=_sMf.sumDest.cy;
 
@@ -10811,62 +11356,74 @@ void		pwdMetaFile(PWD_POINT *	ppumPos,
 	// Trasformo la dimensione Reale in pixel 
 	//
 	/*
-	_sEmr.sizSourcePixel.cx=(DWORD) pwdUm(PUM_PHX_REAL,sumSource.cx);
-	_sEmr.sizSourcePixel.cy=(DWORD) pwdUm(PUM_PHY_REAL,sumSource.cy);
-	_sEmr.sizDestPixel.cx=(DWORD) pwdUm(PUM_PHX_REAL,sumDest.cx);
-	_sEmr.sizDestPixel.cy=(DWORD) pwdUm(PUM_PHY_REAL,sumDest.cy);
+	_sEmr.sizSourcePixel.cx=(DWORD) pwdUm(PUM_DTX,sumSource.cx);
+	_sEmr.sizSourcePixel.cy=(DWORD) pwdUm(PUM_DTY,sumSource.cy);
+	_sEmr.sizDestPixel.cx=(DWORD) pwdUm(PUM_DTX,sumDest.cx);
+	_sEmr.sizDestPixel.cy=(DWORD) pwdUm(PUM_DTY,sumDest.cy);
 */
 	if (!enAlign) enAlign=PDA_CENTER|PDA_MIDDLE;
 	
 	switch (enAlign&0xf) {
 		
 		case PDA_LEFT:
-			_sMf.rumMeta.left=umpMeta.x; break;
+			if (ppumPos) 
+					_sMf.rumMeta.left=ppumPos->x; 
+					else
+					_sMf.rumMeta.left=_sPower.rumPage.left;
+			break;
+
+
 		case PDA_CENTER:
-			_sMf.rumMeta.left=umpMeta.x+(umsMeta.cx-_sMf.sumDest.cx)/2; break;
+			
+			if (ppumPos) // Posiziono e centro al rettangolo indicato
+					_sMf.rumMeta.left=ppumPos->x+(umsMeta.cx-_sMf.sumDest.cx)/2; 
+					else
+					_sMf.rumMeta.left=_sPower.rumPage.left+(_sPower.sumPage.cx-_sMf.sumDest.cx)/2; 
+			break;
+
 		case PDA_RIGHT:
-			_sMf.rumMeta.left=umpMeta.x+umsMeta.cx-_sMf.sumDest.cx; break;
+			if (ppumPos) 
+					_sMf.rumMeta.left=ppumPos->x+umsMeta.cx-_sMf.sumDest.cx; 
+					else
+					_sMf.rumMeta.left=_sPower.rumPage.right-_sMf.sumDest.cx; 
+			break;
+
 	
 	}
 
 	switch (enAlign&0xf0) {
 	
 		case PDA_TOP:
-			_sMf.rumMeta.top=umpMeta.y; break;
+			if (ppumPos) 
+				_sMf.rumMeta.top=ppumPos->y; 
+				else
+				_sMf.rumMeta.top=_sPower.rumPage.top;
+			break;
 
 		case PDA_MIDDLE:
-			_sMf.rumMeta.top=umpMeta.y+(umsMeta.cy-_sMf.sumDest.cy) / 2 ; break;
+			if (ppumPos) 
+				_sMf.rumMeta.top=ppumPos->y+(umsMeta.cy-_sMf.sumDest.cy)/2; 
+				else
+				_sMf.rumMeta.top=_sPower.rumPage.top+(_sPower.sumPage.cy-_sMf.sumDest.cy)/2; 
+			break;
 
 		case PDA_BOTTOM:
-			_sMf.rumMeta.top=umpMeta.y+umsMeta.cy-_sMf.sumDest.cy; break;
+			if (ppumPos) 
+				_sMf.rumMeta.top=ppumPos->y+umsMeta.cy-_sMf.sumDest.cy; 
+				else
+				_sMf.rumMeta.top=_sPower.rumPage.bottom-_sMf.sumDest.cy; 
+			break;
 
 	}			
 	
 	_sMf.rumMeta.right=_sMf.rumMeta.left+_sMf.sumDest.cx;
 	_sMf.rumMeta.bottom=_sMf.rumMeta.top+_sMf.sumDest.cy;
 
-	//
-	// Centro il template all'interno della area scelta
-	//
-//	_sMf.rumMeta.left   = prumPrintArea->left+(_sMf.sumArea.cx-_sMf.sumDest.cx) / 2 ;
-//	_sMf.rumMeta.right  = prumPrintArea->left+(_sMf.sumArea.cx+_sMf.sumDest.cx) / 2 ;
-//	_sMf.rumMeta.top    = prumPrintArea->top+(_sMf.sumArea.cy-_sMf.sumDest.cy) / 2 ;
-//	_sMf.rumMeta.bottom = prumPrintArea->top+(_sMf.sumArea.cy+_sMf.sumDest.cy) / 2 ;
+	if (precMeta) memcpy(precMeta,&_sMf.rumMeta,sizeof(PWD_RECT));
+	if (!bOnlyCalc)	EnumEnhMetaFile (NULL, hemf, _funcMetaFile, NULL, NULL) ;
 
-//	pwdRect(&_sMf.rumMeta,PDC_TRASP,PDC_YELLOW,0);
-//	PlayEnhMetaFile (hdc, hemf, &rect) ;
-	
-	//
-	// Traduco il template in direttive PWD
-	//
-//	hdc=UsaDC(WS_OPEN,NULL);
-
-	EnumEnhMetaFile (NULL, hemf, _funcMetaFile, NULL, NULL) ;
 	_pathListFree(_sMf.lstPathReady);
 	lstDestroy(_sMf.lstObj);
-	DeleteEnhMetaFile (hemf) ; // Libero la memoria
+	DeleteEnhMetaFile(hemf) ; // Libero la memoria
 
 }
-
-
-

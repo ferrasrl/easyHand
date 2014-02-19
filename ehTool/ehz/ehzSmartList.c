@@ -865,7 +865,7 @@ LRESULT CALLBACK _funcWinSL(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) 
 						SIZE sizClient;
 						
 						sizeCalc(&sizClient,&rcClient);
-						sizArea.cx=200; sizArea.cy=30;
+						sizArea.cx=200; sizArea.cy=38;
 						rc.left=rc.right=rcClient.left+((sizClient.cx-sizArea.cx)/2);
 						rc.top=rc.bottom=rcClient.top+((sizClient.cy-sizArea.cy)/2);
 						rc.right+=sizArea.cx;
@@ -873,8 +873,8 @@ LRESULT CALLBACK _funcWinSL(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) 
 						
 						rectToD(&rcd,&rc);
 						dcRectRoundEx(	psDg->hdc,&rcd,
-										AlphaColor(160,sys.ColorBackGround),
-										AlphaColor(255,sys.ColorBackGround),8,8,3);
+										AlphaColor(160,sys.Color3DShadow),
+										AlphaColor(255,sys.ColorBackGround),8,8,5);
 
 						dcDrawText(	psDg->hdc,
 									&rc,
@@ -1873,6 +1873,9 @@ static BOOL		_this_getCell(void * this,INT iRow,INT iCol,S_SL_CELL * psCell) {
 
 	EHZ_SMARTLIST * psSl=this;
 
+	//memset(psCell,0,sizeof(S_SL_CELL)); 
+	psCell->psCol=NULL;
+	psCell->psRowInfo=NULL;
 	if (iRow<0||iRow>=psSl->iRows) return true;
 	if (iCol<0||iCol>=psSl->dmiCol.iLength) return true;
 
