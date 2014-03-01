@@ -129,7 +129,10 @@ typedef struct {
 	
 	BOOL		bRowCheckBox;		// T/F Le linee hanno il checkbox di selezione
 	BOOL		bRowRequest;		// T/F Se bisogna richiedere lo status delle righe
-	CHAR *		pszTitleProcess;	// 
+	CHAR *		pszTextProcess;	// 
+
+	BOOL		bWaiting;
+	CHAR *		pszTextWaiting;	// 
 	
 	RECT		rcClient;		// Dimensione Client (Workarea)
 	SIZE		sizClient;		// 
@@ -139,6 +142,7 @@ typedef struct {
 	void *		(*funcNotify)(void * this,EH_SRVPARAMS);
 
 	// Interfacche
+	BOOL	(* clean)(void * this,BOOL bWait);
 	BOOL	(* addCol)(void *, INT idCode, CHAR * pszCode, CHAR * pszTitle, CHAR * pszStyle); 
 	BOOL	(* setItemCount)(void * this, INT iItems); 
 	BOOL	(* setNotify)(void * this,void * (*funcNotify)(void * this,EH_SRVPARAMS));
@@ -155,6 +159,8 @@ typedef struct {
 	BOOL	(* setHeaderHeight)(void * this,INT iHeight);
 	BOOL	(* setColVisibility)(void * this,CHAR * pszCode,BOOL bVisible);
 	BOOL	(* setBodyStyle)(void * this,CHAR * pszParams);
+	BOOL	(* setWaiting)(void * this,BOOL bWait,CHAR * pszText);
+			
 
 } EHZ_SMARTLIST;
 

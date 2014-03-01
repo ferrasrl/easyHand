@@ -521,7 +521,6 @@ BOOL mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWOR
 	S_FLD_INFO * arsFld;
 	INT		a;
 	INT		iCount,iOffset,iMaxRecords,iBlock;
-//	CHAR *	pszQueryFields=NULL;
 	CHAR *	pszQueryCols=NULL;
 	SQL_RS rsSet;
 	DWORD iExport=0;
@@ -530,11 +529,9 @@ BOOL mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWOR
 	INT iUpdate=0;
 	INT iBack;
 
-//	if (pdwRecords) * pdwRecords=0;
 	if (pdwUpdate) *pdwUpdate=0;
 	if (!mysGetTableInfo(DYN_SECTIONC pszTable,&dmiField,&dmiIndex)) { return true;}	
 	arsFld=DMILock(&dmiField,NULL);
-//	pszQueryFields=ehAlloc(dmiField.Num*50); *pszQueryFields=0;
 
 	lstCols=lstNew();
 	lstUtf=lstNew();

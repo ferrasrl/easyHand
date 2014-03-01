@@ -50,6 +50,8 @@ static BOOL		_this_setVScroll(void * this,INT iSBMode,INT iOffset);
 static BOOL		_this_setHeaderHeight(void * this,INT iHeight);
 static BOOL		_this_setColVisibility(void * this,CHAR * pszCode,BOOL bVisible);
 static BOOL		_this_setBodyStyle(void * this,CHAR * pszParam);
+static BOOL		_this_clean(void * this,BOOL bWait);
+static BOOL		_this_setWaiting(void * this,BOOL bWait,CHAR * pszWaiting);
 
 //
 // ehzSmartList()
@@ -126,6 +128,8 @@ void * ehzSmartList(EH_OBJPARAMS)
 			psSl->setHeaderHeight=_this_setHeaderHeight;
 			psSl->setColVisibility=_this_setColVisibility;
 			psSl->setBodyStyle=_this_setBodyStyle;
+			psSl->clean=_this_clean;
+			psSl->setWaiting=_this_setWaiting;
 
 /*
 			psSl->Add=_this_Add;
@@ -139,6 +143,9 @@ void * ehzSmartList(EH_OBJPARAMS)
 
 			psSl->psFontTitle=fontCreate("#Tahoma",13,STYLE_BOLD,true,&bAllocated,NULL);
 			psSl->psFontText=fontCreate("#Arial",15,STYLE_NORMAL,true,&bAllocated,NULL);
+			psSl->pszTextWaiting=strDup(ultTag("Attendere prego ..."));
+			
+
 //			SendMessageW(psSl->wnd,WM_SETFONT,(WPARAM) psSl->psFontTitle->hFont,MAKELPARAM(TRUE, 0));
 			psSl->iCellPadding=4;
 			psSl->bHeadToolBar=false;
@@ -186,7 +193,7 @@ void * ehzSmartList(EH_OBJPARAMS)
 			fontDestroy(psSl->psFontTitle,TRUE);
 			fontDestroy(psSl->psFontText,TRUE);
 			
-			ehFreePtrs(3,&psSl->pszCellBuffer,&psSl->pszTitleProcess,&psSl->arsRowsInfo);
+			ehFreePtrs(4,&psSl->pszCellBuffer,&psSl->pszTextProcess,&psSl->pszTextWaiting,&psSl->arsRowsInfo);
 			ehFreePtr(&psObjCaller->pOther); psSl=NULL; // -> cioè, psSl
 			break;
 
@@ -348,15 +355,42 @@ static BOOL	_this_setItemCount(void * this, INT iItems) {
 	ehFreePtr(&psSl->arsRowsInfo);
 	if (psSl->iRows>0) {
 		psSl->arsRowsInfo=ehAllocZero(sizeof(S_SLROWI)*iItems);
+		psSl->bWaiting=false;
 	}
 	_tableCalc(psSl);
 	return false;	
 
 }
 
+//
+// _this_clean()
+//
+static BOOL	_this_clean(void * this, BOOL bWait) {
+	
+	EHZ_SMARTLIST * psSl=this;
+	_this_setItemCount(this,0);
+	if (bWait) 
+		_this_setWaiting(this,bWait,NULL);
+		else
+		_this_refresh(this);
+	return false;	
+}
+
 
 //
-// -_this_FldDestroy() > Libera le risorse impegnate con un campo
+// _this_setWaiting()
+//
+static BOOL	_this_setWaiting(void * this, BOOL bWait,CHAR * pszWait) {
+	
+	EHZ_SMARTLIST * psSl=this;
+	psSl->bWaiting=bWait;
+	if (pszWait) strAssign(&psSl->pszTextWaiting,pszWait);
+	_this_refresh(this);
+	return false;	
+}
+
+//
+// _colDestroy() > Libera le risorse impegnate con un campo
 //
 static BOOL _colDestroy(S_SL_COL * psCol)
 {
@@ -854,10 +888,15 @@ LRESULT CALLBACK _funcWinSL(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) 
 				rectFill(&rcArea,0,0,psDg->sizArea.cx-1,psDg->sizArea.cy-1);
 				if (!psSl->iRows) {
 
+					CHAR * pszText;
+					pszText=psSl->bWaiting?psSl->pszTextWaiting:psSl->pszTextProcess;
 					//dcBoxp(psDg->hdc,&rcClient,sys.ColorShadow);
-					dcBoxBrush(psDg->hdc,&rcClient,HS_BDIAGONAL,sys.Color3DLight,sys.Color3DShadow);
-
-					if (!strEmpty(psSl->pszTitleProcess)) {
+					if (psSl->bWaiting)
+						dcBoxBrush(psDg->hdc,&rcClient,HS_BDIAGONAL,sys.Color3DLight,sys.Color3DShadow);
+						else
+						dcBoxBrush(psDg->hdc,&rcClient,HS_BDIAGONAL,sys.Color3DShadow,ColorLum(sys.Color3DShadow,-10));
+					
+					if (!strEmpty(pszText)) {
 
 						RECT rc;
 						RECTD rcd;
@@ -874,7 +913,7 @@ LRESULT CALLBACK _funcWinSL(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) 
 						rectToD(&rcd,&rc);
 						dcRectRoundEx(	psDg->hdc,&rcd,
 										AlphaColor(160,sys.Color3DShadow),
-										AlphaColor(255,sys.ColorBackGround),8,8,5);
+										AlphaColor(255,sys.ColorBackGround),8,8,8);
 
 						dcDrawText(	psDg->hdc,
 									&rc,
@@ -882,7 +921,7 @@ LRESULT CALLBACK _funcWinSL(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) 
 									-1,//psCell->colBack,
 									psSl->psFontTitle,
 									1,
-									psSl->pszTitleProcess,
+									pszText,
 									-1,
 									DPL_CENTER,
 									DT_WORD_ELLIPSIS|DT_SINGLELINE|DT_VCENTER);

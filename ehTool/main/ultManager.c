@@ -1135,7 +1135,8 @@ BYTE * ultTranslate(INT iType,BYTE *lpWord)
 	ehFree(pwcSend);
 
 	// Non presente nel dizionario
-	if (iRow<0) return lpWord;
+	if (iRow<0) 
+		return lpWord;
 
 	if (pwcRet) {
 

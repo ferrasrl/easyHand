@@ -28,6 +28,7 @@ static struct {
 #define _mutex_section_close_ {if (!ReleaseMutex(_p.mtxSection)) {ehPrintf("_memoMultiThread mutex error"); exit(128);}}
 
 
+EH_LST odbcGetDiagnostic(SQLRETURN erErr,HANDLE hStmt,SQLSMALLINT iType,BOOL bShow);
 // static HANDLE _mtxOdbc=NULL;
 /*
 #ifdef EH_ODBC_MT
@@ -242,6 +243,7 @@ static BOOL _odbcConnection(EH_ODBC_SECTION * psOdbcSection, HANDLE hConn, BOOL 
 	//  Leggo ASYNC
 		sqlReturn=SQLGetInfo(psOdbcSection->hConn,SQL_ASYNC_MODE,(SQLPOINTER) &psOdbcSection->uiAsync,sizeof(psOdbcSection->uiAsync),0);
 		sqlReturn=SQLGetInfo(psOdbcSection->hConn,SQL_SCROLL_OPTIONS,(SQLPOINTER) &psOdbcSection->uiScroll,sizeof(psOdbcSection->uiScroll),0);
+		// printf("* SQL_SCROLL_OPTIONS: %d" CRLF,psOdbcSection->uiScroll);
 	} 
 	//
 	// Clonazione 
@@ -631,6 +633,9 @@ int odbcQuery(EH_ODBC_SECTION * psOdbcSection,CHAR *pQuery)
 	}
 	if (bAlloc) ehFree(pRealQuery);
 
+
+
+
 //	_mutex(WS_CLOSE);
 
 	return err;
@@ -718,10 +723,11 @@ EH_ODBC_RS odbcStore(EH_ODBC_SECTION * psOdbcSection,INT iLimit)
 #endif
 {
 	EH_ODBC_RS pRes;
+//	SQLRETURN sqlReturn;
 
 	// Trovo dizionario e creo buffer
 	if (psOdbcSection->sqlLastError!=SQL_SUCCESS&&
-		psOdbcSection->sqlLastError!=SQL_SUCCESS_WITH_INFO) 	{return NULL;} // Precedente errore in query
+		psOdbcSection->sqlLastError!=SQL_SUCCESS_WITH_INFO) {return NULL;} // Precedente errore in query
 
 	pRes=odbcQueryResultCreate(psOdbcSection,iLimit); 
 	pRes->psOdbcSection=psOdbcSection;
@@ -729,6 +735,19 @@ EH_ODBC_RS odbcStore(EH_ODBC_SECTION * psOdbcSection,INT iLimit)
 		memDebugUpdate(pRes,pProg,iLine);
 #endif
 	SQLAllocHandle(SQL_HANDLE_STMT, psOdbcSection->hConn, &psOdbcSection->hStmt);
+		
+/*
+	// Indicare il tipo di cursore > Sospesa per ora
+	sqlReturn=SQLSetStmtAttr(psOdbcSection->hStmt, SQL_ATTR_CURSOR_SCROLLABLE, (SQLPOINTER) SQL_SCROLLABLE , 0);
+	if (sqlReturn==SQL_ERROR)  
+	{
+		sqlReturn=SQLSetStmtAttr( psOdbcSection->hStmt,SQL_ATTR_CURSOR_TYPE,  (SQLPOINTER) SQL_CURSOR_STATIC, 0);
+		if (sqlReturn==SQL_ERROR) win_infoarg("errore in assegnazione cursore");
+		sqlReturn=SQLSetStmtAttr( psOdbcSection->hStmt, SQL_ATTR_USE_BOOKMARKS, (SQLPOINTER) SQL_UB_VARIABLE, 0);
+		if (sqlReturn==SQL_ERROR) win_infoarg("SQL_ATTR_USE_BOOKMARKS");
+	}
+*/
+
 	if (pRes) pRes->pszQuery=strDup(psOdbcSection->pLastQuery);
 	return pRes;
 }
@@ -755,13 +774,23 @@ BOOL odbc_fetch_row( EH_ODBC_RS pRes)
 	}
 	else
 	{
-		pRes->iCurrentRow++; if ((pRes->iCurrentRow-pRes->iOffset)<pRes->iRowsReady) return TRUE;
+		pRes->iCurrentRow++; 
+		if ((pRes->iCurrentRow-pRes->iOffset)<pRes->iRowsReady) return true;
 		pRes->iOffset+=pRes->iRowsReady;
 	}
 
-	sqlReturn=SQLFetch(pRes->hStmt);
-	if (sqlReturn==SQL_NO_DATA_FOUND) return FALSE;
-	if (sqlReturn==SQL_SUCCESS||sqlReturn==SQL_SUCCESS_WITH_INFO) return TRUE;
+	pRes->psOdbcSection->sqlLastError=sqlReturn=SQLFetch(pRes->hStmt);
+	if (sqlReturn==SQL_ERROR) {
+
+		odbcGetDiagnostic(sqlReturn,pRes->hStmt,SQL_HANDLE_STMT,true);//,"x",pRes->hStmt,sqlReturn);
+		ehError();
+		//odbcError(pRes->psOdbcSection, "Fetch",0); 
+
+	}
+
+	// sqlReturn=SQLFetchScroll(pRes->hStmt,SQL_FETCH_NEXT,0);
+	if (sqlReturn==SQL_NO_DATA_FOUND) return false;
+	if (sqlReturn==SQL_SUCCESS||sqlReturn==SQL_SUCCESS_WITH_INFO) return true;
 	return TRUE;
 }
 
@@ -1920,10 +1949,12 @@ int odbcHookUpdate(EH_ODBC_SECTION * psOdbcSection,EH_TABLEHOOK *arsHook,CHAR *p
 //
 // odbcDisplay
 //
-CHAR * odbcDisplay(SQLSMALLINT iType,CHAR *WhoIs,SQLHSTMT hstmt,SQLRETURN rc1)
+CHAR * odbcDisplay(	SQLSMALLINT iType,
+					CHAR *WhoIs,
+					SQLHSTMT hstmt,
+					SQLRETURN rc1)
 {
 	SQLCHAR  SqlState[6], Msg[SQL_MAX_MESSAGE_LENGTH];
-	//SQLCHAR  szServ[1500];
 	CHAR *lpServ=ehAlloc(26000);
 	SQLINTEGER NativeError;
 	SQLSMALLINT i, MsgLen;
@@ -1937,19 +1968,51 @@ CHAR * odbcDisplay(SQLSMALLINT iType,CHAR *WhoIs,SQLHSTMT hstmt,SQLRETURN rc1)
 		lpError=ehAlloc(16000); *lpError=0;
 		while ((rc2 = SQLGetDiagRec(iType, hstmt, i, SqlState, &NativeError,Msg, sizeof(Msg), &MsgLen)) != SQL_NO_DATA) 
 		{
-		 //DisplayError(SqlState,NativeError,Msg,MsgLen);
-		  *lpServ=0;
-		 sprintf(lpServ,"Error rc1=%d da '%s'\nSQLState = %s\nNativeError=%d\n%s (LenMsg=%d)\n", rc1,WhoIs,
-						"SqlState",//SqlState,
-						NativeError,Msg,MsgLen);
-		 strcat(lpError,lpServ);
-		 i++;
+			// DisplayError(SqlState,NativeError,Msg,MsgLen);
+			  *lpServ=0;
+			 sprintf(lpServ,"Error rc1=%d da '%s'\nSQLState = %s\nNativeError=%d\n%s (LenMsg=%d)\n", rc1,WhoIs,
+							"SqlState",//SqlState,
+							NativeError,Msg,MsgLen);
+			 strcat(lpError,lpServ);
+			 i++;
 		}
 	}
 	ehFree(lpServ);
 	return lpError;
 }
 
+
+//
+// odbcGetDiagnostic
+//
+EH_LST odbcGetDiagnostic(SQLRETURN  sqlErr,HANDLE hStmt,SQLSMALLINT iType,BOOL bShow) {
+
+	SQLCHAR  SqlState[20], szMsg[SQL_MAX_MESSAGE_LENGTH];
+	SQLINTEGER iNativeError;
+	SQLSMALLINT i, iMsgLen;
+	SQLRETURN  rc2;
+	CHAR *lpError=NULL;
+	EH_LST lst=lstNew();
+
+	if ((sqlErr == SQL_SUCCESS_WITH_INFO) || (sqlErr == SQL_ERROR)) 
+	{
+		// Get the status records.
+		i = 1;
+		
+		while (true) {
+			rc2 = SQLGetDiagRec(iType, hStmt, i, SqlState, &iNativeError,szMsg, sizeof(szMsg), &iMsgLen);
+//			if (rc2==SQL_ERROR) break;
+//			if (rc2==SQL_INVALID_HANDLE) break;
+			if (rc2==SQL_NO_DATA) break;
+
+			// DisplayError(SqlState,NativeError,Msg,MsgLen);
+			lstPushf(lst,"NativeError=%d:%s",iNativeError,szMsg,iMsgLen);
+			i++;
+		}
+	}
+	if (bShow) {lstPrint(lst); lst=lstDestroy(lst);}
+	return lst;
+}
 
 void odbcSetParam(EH_ODBC_SECTION * psOdbcSection,EN_ODBC_PARAM enParam,DWORD dwParam) // 2010
 {

@@ -495,10 +495,15 @@ typedef enum {
 // Stampa con posizionamento New 2000
 typedef enum {
 
-	DPL_LEFT,
-	DPL_CENTER,
-	DPL_RIGHT,
-	DPL_JUSTIFY	// solo TextInRect
+	DPL_DEFAULT,
+	DPL_LEFT=0x0001,	// 0=Default è left
+	DPL_CENTER=0x0002,
+	DPL_RIGHT=0x0004,
+	DPL_JUSTIFY=0x0008,
+
+	DPL_TOP=0x0010,
+	DPL_MIDDLE=0x0020,
+	DPL_BOTTOM=0x0040
 
 } EN_DPL;
 
@@ -678,6 +683,9 @@ extern "C" {
 		void MemoDebugSet(BOOL bSet);
 		void memoDebugOutput(FILE * ch,BOOL bBreak);
 
+	#else
+		#define EMD_END_FUNC
+
 	#endif
 
 
@@ -783,7 +791,7 @@ typedef struct			// Usato per compatibilit‡ con i vecchi font
 typedef struct {
 
 	INT		iType;			// 0= Vecchio tipo con nfi fissi
-	CHAR *	lpFontFace;	// Nome reale nel sistema operativo
+	CHAR *	pszFontFace;	// Nome reale nel sistema operativo
 	INT		iHeight;			// Altezza di trasformazione in base all'nfi style
 	INT		iStyles;			// Altezza di trasformazione in base all'nfi style
 	INT		iCharExtra;	// Spazio extra tra i caratteri
@@ -792,8 +800,9 @@ typedef struct {
 	HFONT	hFont;
 	#endif
 
-	DWORD	dwCount;
+//	DWORD	dwCount;
 	BOOL	bLock;		// T/F non è "bloccato" non è liberabile automaticamente
+	INT		idx;		// Id del font allocato > Simulazione per compatibilità con il passato (array)
 
 } EH_FONT;
 
@@ -861,7 +870,7 @@ typedef struct {
 	BOOL	bObj;		// Evento associato ad un oggetto
 	HWND	hWnd;		// windows di appartenenza dell'evento
 	POINT	sPoint;	// Coordinata dell'evento (per il mouse)
-	//BYTE	szChar[2];	// Tasto premuto
+
 	INT16	iTasto;
 	INT		iObject;	// Oggetto selezionato
 	CHAR	szObjName[20];
@@ -2863,6 +2872,7 @@ typedef struct {
 	BOOL		lstIsIn(EH_LST psList,void * pElement);
 	void		lstSort(EH_LST psList, int (*compare )(const void *elem1, const void *elem2 ));
 	#define		lstLoop(lst,psEle) psEle=lstFirst(lst);psEle;psEle=lstNext(lst)
+	#define		lstForSafe(lst,psEle,lstI) lstI=lst->psFirst; for (lstI=lst->psFirst,psEle=lstI->ptr;lstI;lstI=lstI->psNext,psEle=lstI?lstI->ptr:NULL)
 
 #ifndef EH_MEMO_DEBUG
 	CHAR *		lstToString(EH_LST psList,CHAR *pdzDelim,CHAR *pszStart,CHAR *pszStop); 
@@ -3326,25 +3336,21 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 							BOOL *	fAllocated, // T/F se il font Ë stato allocato ed Ë da liberare
 							INT *	idxFont);
 
-#ifdef EH_MEMO_DEBUG
-		EH_FONT * _fontCreate(	CHAR *	pszFontFace, // Font name
-								INT		iHeight,	 // Altezza
-								INT		iStyles,	 // Stili
-
-								BOOL	bNotCache,	 // 2010 = Chiedo di non memorizzarlo nei fonti in memoria
-								BOOL *	pbNotCached, // T/F se il font è stato allocato ed è da liberare
-								INT *	pidxFont,
-								CHAR *pszProgram,INT iLine);
+		#ifdef EH_MEMO_DEBUG
 		#define		fontCreate(a,b,c,d,e,f) _fontCreate(a,b,c,d,e,f,__FILE__,__LINE__)
-#else
-		EH_FONT * fontCreate(	CHAR *	pszFontFace, // Font name
-								INT		iHeight,	 // Altezza
-								INT		iStyles,	 // Stili
+		EH_FONT *	_fontCreate(
+		#else
+		EH_FONT *	fontCreate(	
+		#endif
+						CHAR *	pszFontFace, // Font name
+						INT		iHeight,	 // Altezza
+						INT		iStyles,	 // Stili
 
-								BOOL	bNotCache,	 // 2010 = Chiedo di non memorizzarlo nei fonti in memoria
-								BOOL *	pbNotCached, // T/F se il font è stato allocato ed è da liberare
-								INT *	pidxFont) ;
-#endif
+						BOOL	bAlloc,		// 2010 = Chiedo di non memorizzarlo nei font in memoria (dovrà essere liberato a mano)
+						BOOL *	pbNotCached, // T/F se il font è stato allocato ed è da liberare
+						INT *	pidxFont
+						EMD_END_FUNC);
+
 
 
 	EH_FONT *	fontCreateEx(CHAR *	pszFontFace, // Font name
@@ -3358,6 +3364,7 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 	void *		fontDestroy(EH_FONT *psFont,BOOL bFreeThis);
 	BOOL		fontInstall(UTF8 * pszFileName,BOOL bSilenceMode);
 	BOOL		fontUninstall(UTF8 * pszFileName);
+	EH_FONT *	fontPtr(INT idxFont);
 
 	void		fontGetSize(CHAR *lpTextOriginal,DWORD dwLen,EH_FONT *psFont,SIZE *psSize); // new 2010
 	void		dcFontGetSize(HDC hdc,INT iCharByte,void *pTextOriginal,DWORD dwLen,EH_FONT *psFont,SIZE *psSize,TEXTMETRIC * psText);
@@ -3372,7 +3379,6 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 	INT			fontFind(CHAR *pFontName,INT iAlt,INT iStyles);
 	BOOL		fontLock(INT idx,BOOL bLock);
 	INT			font_style(INT idxFont,INT iStyles);
-	EH_FONT *	fontPtr(INT idxFont);
 
 	INT			Wfont_altChar(LOGFONT *LogFont); // Conversione da pitch a pixel
 	INT			Wfont_alt(LOGFONT *LogFont); // Altezza reale del carattere in pixel
@@ -5325,8 +5331,10 @@ typedef struct {
 #ifndef _WIN32_WCE
 
 		// Font
-		INT			iFonts;					// Font caricati in memoria
-		EH_FONT *	arsFonts;				// array dei font gestiti
+//		INT			iFonts;					// Font caricati in memoria
+//		EH_FONT *	arsFonts;				// array dei font gestiti
+		INT			iFontEnum;				// Enumeratore degli indici del font
+		EH_LST		lstFontCache;			// Contenitore del font
 
 		CHAR *	pFontStandardName;		// Nome del font standard
 		INT		iFontStandardIndex;	// Handle del font standard

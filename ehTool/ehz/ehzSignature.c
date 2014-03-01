@@ -56,6 +56,7 @@ static BOOL		_this_writeSign(void * this, CHAR * pszFileName);
 static BOOL		_this_readSign(void * this, CHAR * pszFileName);
 static BOOL		_this_writeImage(void * this, CHAR * pszFileName, EN_FILE_TYPE, INT cx,INT cy);
 static void		_this_getSignRect(void * this,RECT * psRect);
+static void		_this_maximize(void * this,double dPerc,EN_DPL enAlign);
 
 
 static struct {
@@ -133,6 +134,8 @@ void * ehzSignature(EH_OBJPARAMS)
 			psSign->readSign=_this_readSign;
 			psSign->writeSign=_this_writeSign;
 			psSign->writeImage=_this_writeImage;
+			psSign->maximize=_this_maximize;
+			
 
 			psSign->setFont(psSign,"normal 14px Arial");
 			psObjCaller->hWnd=CreateWindowEx(	0,
@@ -703,7 +706,9 @@ LRESULT CALLBACK _signProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARAM lPar
 							(short int) HIWORD(lParam),
 							true,
 							true);
-				SetCapture(hWnd);
+				SetFocus(hWnd);
+				ehSetCapture(hWnd);
+				
 				break;
 
 			case WM_LBUTTONUP:  
@@ -717,7 +722,12 @@ LRESULT CALLBACK _signProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARAM lPar
 							true,
 							true);
 
-				ReleaseCapture();
+				ehReleaseCapture();
+				break;
+
+			case WM_KILLFOCUS:
+				//printf("qui");
+				ehReleaseCapture();
 				break;
 
 			case WM_TIMER: break;
@@ -1039,7 +1049,7 @@ static BOOL _this_readSign(void * this, CHAR * pszFileName)
 
 
 //
-//
+// _this_getSignRect()
 //
 static void _this_getSignRect(void * this,RECT * psRect) {
 
@@ -1189,4 +1199,67 @@ static BOOL _this_writeImage(void * this, UTF8 * pszFileName, EN_FILE_TYPE enFil
 	dgDestroy(dgSign);
 	
 	return false;
+}
+
+//
+// _this_maximize()
+//
+static void _this_maximize(void * this,double dPerc,EN_DPL enAlign) {
+
+	EHZ_SIGNATURE * psSign=this;
+	RECT rcSign;
+	SIZE sizSign;
+	double dScale;
+	S_SIGNPOINT * psPoint;
+	POINT ptOfs;
+	
+	//
+	// Leggo il rettangolo della firma
+	//
+	_this_getSignRect(psSign,&rcSign);
+	sizeCalc(&sizSign,&rcSign);
+
+	// 
+	// Calcolo la percentuale di scala possibile 
+	//
+	dScale = min ((double) psSign->sizArea.cx / sizSign.cx, (double) psSign->sizArea.cy / sizSign.cy) ;
+	dScale=dScale*dPerc/100;
+
+	//
+	// Ricalcolo le posizioni
+	//
+	
+	for (lstLoop(psSign->lstPoint,psPoint)) {
+		psPoint->pt.x=(LONG) (psPoint->pt.x*dScale);
+		psPoint->pt.y=(LONG) (psPoint->pt.y*dScale);
+	}
+
+	_this_getSignRect(psSign,&rcSign);
+	sizeCalc(&sizSign,&rcSign);
+
+	ptOfs.x=(psSign->sizArea.cx-sizSign.cx)/2;
+	ptOfs.y=(psSign->sizArea.cy-sizSign.cy)/2;
+
+	for (lstLoop(psSign->lstPoint,psPoint)) {
+		psPoint->pt.x-=rcSign.left;
+		switch (enAlign&0xf) {
+			case DPL_LEFT: break;
+			case DPL_CENTER: psPoint->pt.x+=ptOfs.x; break;
+			case DPL_RIGHT: psPoint->pt.x+=(psSign->sizArea.cx-sizSign.cx); break;
+		}
+		psPoint->pt.y-=rcSign.top;
+
+		switch (enAlign&0xf0) {
+			case DPL_TOP: break;
+			case DPL_MIDDLE: psPoint->pt.y+=ptOfs.y; break;
+			case DPL_BOTTOM: psPoint->pt.y+=(psSign->sizArea.cy-sizSign.cy); break;
+		}
+
+
+	}
+
+
+	psSign->refresh(psSign);
+
+
 }

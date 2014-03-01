@@ -205,9 +205,10 @@ static void		_ImgOutEx(HDC hDC,
 					   INT PosX,INT PosY,
 					   INT SizeX,INT SizeY,
 					   INT hdlImage);
+static void		_LImageResampleSave(INT hImage, SIZE sizImageSorg, SIZE sizImageDest,CHAR *pszTempFile);
 #endif
 
-static void		_LImageResampleSave(INT hImage, SIZE sizImageSorg, SIZE sizImageDest,CHAR *pszTempFile);
+
 
 
 //
@@ -5232,6 +5233,40 @@ void pwdImgCalc(PWD_SIZE *psSize,INT hImage)
 }
 
 //
+// _LImageResampleSave
+// esegue il resampling (se conveniente) dell' immagine e la salva in un file temporaneo
+//
+void _LImageResampleSave(INT hImage, SIZE sizImageSorg, SIZE sizImageDest,CHAR *pszTempFile)
+{
+	BOOL	bFree=FALSE;
+	INT	hImageTemp=0;
+
+	//
+	// c) Ricampioni
+	//
+	hImageTemp=hImage;
+	if ((sizImageDest.cx<sizImageSorg.cx) || (sizImageDest.cy<sizImageSorg.cy)) {
+
+		IMGHEADER *psImgHeader;
+		INT iBitColor;
+		psImgHeader=memoLock(hImage); 
+		iBitColor=psImgHeader->bmiHeader.biBitCount;
+		memoUnlock(hImage);
+	}
+	
+	fileTempName( _sPower.pszTempFolder, "pwd", pszTempFile,  FALSE ); 
+	if (!BMPSaveFile(pszTempFile, hImageTemp)) ehExit("errore salvataggio bitmap temporaneo!");
+	if (bFree) memoFree(hImageTemp,"memo");
+	//return pszTempFile;
+
+}
+
+
+
+
+#ifdef EH_PDF
+
+//
 // _fontFileSearch()
 //
 static BOOL _fontFileSearch(PWD_FONT * psPwdFont, CHAR * pszFontPathFile,BOOL * pbEmbedd)
@@ -5410,36 +5445,6 @@ static LONG _getNextNameValue(HKEY key, LPCTSTR pszSubkey, LPTSTR pszName, LPTST
 }
 
 
-//
-// _LImageResampleSave
-// esegue il resampling (se conveniente) dell' immagine e la salva in un file temporaneo
-//
-void _LImageResampleSave(INT hImage, SIZE sizImageSorg, SIZE sizImageDest,CHAR *pszTempFile)
-{
-	BOOL	bFree=FALSE;
-	INT	hImageTemp=0;
-
-	//
-	// c) Ricampioni
-	//
-	hImageTemp=hImage;
-	if ((sizImageDest.cx<sizImageSorg.cx) || (sizImageDest.cy<sizImageSorg.cy)) {
-
-		IMGHEADER *psImgHeader;
-		INT iBitColor;
-		psImgHeader=memoLock(hImage); 
-		iBitColor=psImgHeader->bmiHeader.biBitCount;
-		memoUnlock(hImage);
-	}
-	
-	fileTempName( _sPower.pszTempFolder, "pwd", pszTempFile,  FALSE ); 
-	if (!BMPSaveFile(pszTempFile, hImageTemp)) ehExit("errore salvataggio bitmap temporaneo!");
-	if (bFree) memoFree(hImageTemp,"memo");
-	//return pszTempFile;
-
-}
-
-
 
 //
 //	Gestione PDF
@@ -5448,7 +5453,6 @@ void _LImageResampleSave(INT hImage, SIZE sizImageSorg, SIZE sizImageDest,CHAR *
 //  https://github.com/libharu/libharu/wiki/API%3A-Page
 // 
 //
-#ifdef EH_PDF
 
 typedef struct {
 	

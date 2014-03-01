@@ -96,6 +96,7 @@ typedef struct {
 	void		(*refresh)(void *);
 	void		(*setFont)(void *,CHAR *);
 	void		(*getSignRect)(void *,RECT * precSign);
+	void		(*maximize)(void *,double dPerc,EN_DPL enAlign);
 
 	void		(*readSign)(void *,CHAR *);
 	BOOL		(*writeSign)(void *,CHAR *);
