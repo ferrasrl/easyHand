@@ -437,6 +437,7 @@ static BOOL _cellFromPoint(	EHZ_SMARTLIST * psSl,
 	//
 	for (a=0;a<psSl->dmiCol.iLength;a++) {
 		psCol=psSl->arsCol+a;
+		if (!psCol->bVisible) continue;
 		if (psPoint->x>=psCol->recHeader.left-(psCol->bFix?0:psSl->ofsHorz)&&
 			psPoint->x<=psCol->recHeader.right-(psCol->bFix?0:psSl->ofsHorz)) {
 				iCol=a; break;

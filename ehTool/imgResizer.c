@@ -12,23 +12,23 @@
 #include "/easyhand/ehtool/imgPowerToy.h"
 #include "/easyhand/inc/imgResizer.h"
 
-// SINT JPGGetFactor(SIZE *lpsSource,SIZE *lpsDest,SINT *lpiPerc)
+// INT JPGGetFactor(SIZE *lpsSource,SIZE *lpsDest,INT *lpiPerc)
 // Indicar
-static void TextProcessor(SINT hdlImageEnd,CHAR *lpText);
+static void TextProcessor(INT hdlImageEnd,CHAR *lpText);
 void LPrint(HDC hdc,
-			SINT x,
-			SINT y,
+			INT x,
+			INT y,
 			LONG col1,
 			LONG col2,
 			CHAR *lpFont,
-			SINT iAlt,
+			INT iAlt,
 			BOOL fBold,
 			CHAR *lpString);
 
 static CHAR *LNoSpaceCue(CHAR *lp)
 {
   CHAR *lpRet=lp;
-  SINT a,iLen;
+  INT a,iLen;
   iLen=strlen(lp); 
   if (!iLen) return lpRet;
   
@@ -46,18 +46,18 @@ static CHAR *LNoSpaceCue(CHAR *lp)
 
 BOOL imgResizer(CHAR *	lpFile, 
 				CHAR *	lpAdd, 
-				SINT	iX,SINT iY,
-				SINT	iQuality,
+				INT	iX,INT iY,
+				INT	iQuality,
 				INT		iOrientation,
 				BOOL	fMakeEver,
-				SINT	iResampling)
+				INT	iResampling)
 {
 	CHAR szNewFile[255];
 	CHAR szExt[10];
 	CHAR *lpMess="";
-	SINT fTrack=FALSE;
+	INT fTrack=FALSE;
 	CHAR *lp;
-	SINT iErr;
+	INT iErr;
 
 	if (!lpFile) return 0;
 
@@ -107,38 +107,38 @@ BOOL imgResizer(CHAR *	lpFile,
 BOOL imgResizerEx(CHAR *	lpFileSource,		// Nome del file sorgente
 				  CHAR *	lpFileDest,			// Stringa da aggiungere al nome del file
 				  SIZE		sDim,				// Dimensioni della foto finale
-				  SINT		iQuality,			// 10>100 Qualità del JPG
+				  INT		iQuality,			// 10>100 Qualità del JPG
 				  double	dPhotoPerc,			// Percentuale dell'immagine da occupare 25= 1/4
 				  BOOL		fMakeEver,			// T/F: Costruisce sempre
-				  SINT		iResampling,		// Tipo di ricampionamento TRS_LANCZOS=10
+				  INT		iResampling,		// Tipo di ricampionamento TRS_LANCZOS=10
 				  EN_IMGPT	iPhotoAdatta,		// Tipo di adattamento alla foto
 												// 0= Proporzionale
 												// 1= Best in fit (Adatta al formato)
 												// 2= adatta al corto
 												// 3= adatta al lungo
 
-				  SINT		cBackColor,			// Colore di background (per riempire gli spazi vuoti)
-				  SINT		iAlignH,			// Allineamento foto orizzontale 0=Centrale, 1=Left, 2=Right
-				  SINT		iAlignV,			// Allineamento foto verticale   0=Centrale, 1=Top,  2=Down
-				  SINT		iPhotoOffsetX,		// Correzione su allineamento Orizzontale
-				  SINT		iPhotoOffsetY,		// Correzione su allineamento Verticale
-				  SINT		iImageAlpha,		// Percentuale di trasparenza dell'immagine con il background
+				  INT		cBackColor,			// Colore di background (per riempire gli spazi vuoti)
+				  INT		iAlignH,			// Allineamento foto orizzontale 0=Centrale, 1=Left, 2=Right
+				  INT		iAlignV,			// Allineamento foto verticale   0=Centrale, 1=Top,  2=Down
+				  INT		iPhotoOffsetX,		// Correzione su allineamento Orizzontale
+				  INT		iPhotoOffsetY,		// Correzione su allineamento Verticale
+				  INT		iImageAlpha,		// Percentuale di trasparenza dell'immagine con il background
 				  BOOL		fAutoLevel,
-				  SINT		iOrientation,		// Rotazione Exif dell'immagine
+				  INT		iOrientation,		// Rotazione Exif dell'immagine
 
 				  CHAR *	lpLogoFile,			// Logo del file da fondere all'immagine (può non esserci)
 				  double	dLogoPerc,			// Percentuale dell'immagine da occupare 25= 1/4
-				  SINT		iLogoAlignH,		// Allineamento foto orizzontale 0=Centrale, 1=Left, 2=Right
-				  SINT		iLogoAlignV,		// Allineamento foto verticale 0=Centrale, 1=Top, 2=Down
-				  SINT		iLogoOffsetX,		// Correzione su allineamento Orizzontale
-				  SINT		iLogoOffsetY,		// Correzione su allineamento Verticale
-				  SINT		iLogoAlpha,
+				  INT		iLogoAlignH,		// Allineamento foto orizzontale 0=Centrale, 1=Left, 2=Right
+				  INT		iLogoAlignV,		// Allineamento foto verticale 0=Centrale, 1=Top, 2=Down
+				  INT		iLogoOffsetX,		// Correzione su allineamento Orizzontale
+				  INT		iLogoOffsetY,		// Correzione su allineamento Verticale
+				  INT		iLogoAlpha,
 				  BOOL		fLogoPos,			// 0 sulla nuova Immagine calcolata, 1= Sull'immagine originale
 
 				  CHAR *	lpText)				// Testo da stampare
 {
 	IMG_RESIZE sImgResize;
-	ZeroFill(sImgResize);
+	_(sImgResize);
 	sImgResize.pszFileSource=lpFileSource;
 	sImgResize.pszFileDest=lpFileDest;
 	memcpy(&sImgResize.sDim,&sDim,sizeof(SIZE));
@@ -181,8 +181,8 @@ BOOL imgResizerEx(CHAR *	lpFileSource,		// Nome del file sorgente
 BOOL imgResize(IMG_RESIZE *psImgResize)
 {
 	CHAR *lpMess="";
-	SINT fTrack=FALSE;
-	SINT iErr;
+	INT fTrack=FALSE;
+	INT iErr;
 	EN_FILE_TYPE enImageType=0;
     IMGHEADER ImgHead;
 	POINT pArea;
@@ -191,9 +191,9 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 	SIZE sDest; // Dimensione destinazione
 	RECT rDest; // Rettangolo destinazione
 
-	SINT hdlImage;
-	SINT hdlImageNew;
-	SINT hdlImageEnd;
+	INT hdlImage;
+	INT hdlImageNew;
+	INT hdlImageEnd;
 	SIZE sPhotoDest;
 	DWORD dw;
 
@@ -255,8 +255,8 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 		return TRUE;
 	}
 	
-	sPhotoDest.cx=(SINT) (psImgResize->sDim.cx*psImgResize->sPhoto.dPercSize/100);
-	sPhotoDest.cy=(SINT) (psImgResize->sDim.cy*psImgResize->sPhoto.dPercSize/100);
+	sPhotoDest.cx=(INT) (psImgResize->sDim.cx*psImgResize->sPhoto.dPercSize/100);
+	sPhotoDest.cy=(INT) (psImgResize->sDim.cy*psImgResize->sPhoto.dPercSize/100);
 
 	// 
 	// B) Calcolare le nuove dimensioni
@@ -389,7 +389,7 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 	//
 	if (psImgResize->iOrientation>1) {
 
-		SINT hdlImage;
+		INT hdlImage;
 		
 		switch (psImgResize->iOrientation) {
 		
@@ -490,8 +490,8 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 	//
 	if (!strEmpty(psImgResize->sPaint.szFile))
 	{
-		SINT iErr;
-		SINT hdlLogo=-1,hdlLogoNew=-1;
+		INT iErr;
+		INT hdlLogo=-1,hdlLogoNew=-1;
 		IMGHEADER ImgLogoHead;
 		SIZE sLogoDest;
 		RECT rLogoDest;
@@ -510,8 +510,8 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 		memcpy(&ImgLogoHead,memoLock(hdlLogo),sizeof(IMGHEADER));
 		memoUnlockEx(hdlLogo,"A3");
 
-		sLogoDest.cx=(SINT) (ImgLogoHead.bmiHeader.biWidth*psImgResize->sPaint.dPercSize/100);
-		sLogoDest.cy=(SINT) (ImgLogoHead.bmiHeader.biHeight*psImgResize->sPaint.dPercSize/100);
+		sLogoDest.cx=(INT) (ImgLogoHead.bmiHeader.biWidth*psImgResize->sPaint.dPercSize/100);
+		sLogoDest.cy=(INT) (ImgLogoHead.bmiHeader.biHeight*psImgResize->sPaint.dPercSize/100);
 
 		// b) Calcolo le nuove dimensioni
 		IMGCalcSize(&ImgLogoHead,      // Dimensioni del sorgente
@@ -541,7 +541,7 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 		// Applico
 		for (pArea.y=(psImgResize->sPaint.iOffsetY-sLogoDest.cy);pArea.y<psImgResize->sDim.cy;pArea.y+=sLogoDest.cy)
 		{
-			SINT iOffset=psImgResize->sPaint.iOffsetX-sLogoDest.cx;
+			INT iOffset=psImgResize->sPaint.iOffsetX-sLogoDest.cx;
 
 			for (pArea.x=iOffset;pArea.x<psImgResize->sDim.cx;pArea.x+=sLogoDest.cx)
 			{
@@ -576,8 +576,8 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 	//
 	if (!strEmpty(psImgResize->sLogo.szFile))
 	{
-		SINT iErr;
-		SINT hdlLogo=-1,hdlLogoResized=-1;
+		INT iErr;
+		INT hdlLogo=-1,hdlLogoResized=-1;
 		IMGHEADER sImgLogoHead;
 		SIZE sLogoDest;
 		RECT rLogoDest;
@@ -596,8 +596,8 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 		memoUnlockEx(hdlLogo,"A4");
 
 		if (psImgResize->sLogo.dPercSize<1) psImgResize->sLogo.dPercSize=100;
-		sLogoDest.cx=(SINT) (psImgResize->sDim.cx*psImgResize->sLogo.dPercSize/100);
-		sLogoDest.cy=(SINT) (psImgResize->sDim.cy*psImgResize->sLogo.dPercSize/100);
+		sLogoDest.cx=(INT) (psImgResize->sDim.cx*psImgResize->sLogo.dPercSize/100);
+		sLogoDest.cy=(INT) (psImgResize->sDim.cy*psImgResize->sLogo.dPercSize/100);
 
 		// b) Calcolo le nuove dimensioni
 		IMGCalcSize(&sImgLogoHead,      // Dimensioni del sorgente
@@ -739,7 +739,7 @@ CHAR * AddToName(CHAR *lpFileSource,CHAR *lpAdd)
 // Processo i compandi di stampa del testo
 // ---------------------------------------
 
-static void TextProcessor(SINT hdlImage,CHAR *lpText)
+static void TextProcessor(INT hdlImage,CHAR *lpText)
 {
 	BYTE *lp;
 	CHAR szTesto[1024];
@@ -748,12 +748,12 @@ static void TextProcessor(SINT hdlImage,CHAR *lpText)
 	HDC hDC,hDClone;
 	HBITMAP hbCopy;
 	BYTE *lpSorg;
-	SINT iLx,iLy;
+	INT iLx,iLy;
 	BITMAPINFOHEADER *BmpHeader;
 	BITMAPINFO *BmpInfo;
-	SINT iAlt=12;
-	SINT iCol1=0;
-	SINT iCol2=-1;
+	INT iAlt=12;
+	INT iCol1=0;
+	INT iCol2=-1;
 	BOOL fBold=FALSE;
 
 	// ----------------------------------------------------------------------------
@@ -856,7 +856,7 @@ static void TextProcessor(SINT hdlImage,CHAR *lpText)
 }
 
 
-void LPrint(HDC hdc,SINT x,SINT y,LONG col1,LONG col2,CHAR *lpFont,SINT iAlt,BOOL fBold,CHAR *lpString)
+void LPrint(HDC hdc,INT x,INT y,LONG col1,LONG col2,CHAR *lpFont,INT iAlt,BOOL fBold,CHAR *lpString)
 { 
 	HFONT hfont=NULL,hfontOld;
 

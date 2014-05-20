@@ -94,6 +94,7 @@ typedef struct {
 
 	FMAIL_ADDR	sFrom;
 	BYTE *		putfOrganization;
+	EH_LST		lstHeaderExtra;
 
 	FMAIL_ADDR	sTo;
 	FMAIL_ADDR	sCc;
@@ -104,9 +105,9 @@ typedef struct {
 	CHAR *		putfSubject;     // Soggetto
 	CHAR *		pSubjectEncoded; // New 2009 (Se non espressamente indicato fatto in automatico dal sistema)
 
-	INT		iMessLocation; // Dove si trova il messaggio da spedire (era iMessType)
+	INT			iMessLocation; // Dove si trova il messaggio da spedire (era iMessType)
 
-	INT		iMailEncoding; // 0=Automatico SE_BASE64, Quote Printable
+	INT			iMailEncoding; // 0=Automatico SE_BASE64, Quote Printable
 //	INT	iCharSet; // 0=Test Automatico oppure SE_UTF8
 	CHAR *		pContentType; // Es text/plain; charset=ISO-8859-15; format=flowed
 	CHAR *		pContentTransferEncoding;	// Es Content-Transfer-Encoding: 7bit
@@ -165,6 +166,7 @@ typedef struct {
 	CHAR *	lpMyServer;   // Chi sono
 
 	CHAR *	lpUSMessage;	// Puntatore al messaggio semplice non MIME
+	CHAR *	pszAutoSubmitted;
 
 	_DMI *lpMIME; // Puntatore a zona Mime per la lettura delle parti (FMIMEPARTMEMO)
 
@@ -245,7 +247,8 @@ typedef struct {
 	INT			POP3socket;
 	INT			SMTPsocket;
 	CHAR *		lpBufSend; // Send Buffer
-	CHAR *		lpBufRice; // Rice Buffer
+	CHAR *		pbBufRice; // Rice Buffer
+	INT			iBufRice;
 	INT			iSizeBuf;  // Dimensione del buffer di Send & Rice
 	INT			iMessages; // Numero dei messaggi
 	INT			iMessSize; // Dimensione dei messaggi
@@ -327,6 +330,7 @@ typedef enum {
 INT	ehMailToEx(EH_MAILTO * psMailTo,
 				EN_MAILSENDTYPE iType, // Se testo il messaggio viene preso in utf8
 				BYTE * putfEmailFrom,
+				BYTE * putfEmailReplyTo,
 				BYTE * putfEmailTo,
 				BYTE * putfEmailCC,
 				BYTE * putfEmailBCC,

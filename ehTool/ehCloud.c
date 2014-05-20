@@ -625,7 +625,7 @@ INT ehcFileUpdate(	UTF8 * pszCloudServer, // NULL = Ferra
 	
 	if (pszFileNames) arFilesRequest=ARCreate(pszFileNames,"|",NULL);
 	
-	if (!pszCloudServer) pszCloudServer="http://www.ferra.com/updates";
+	if (!pszCloudServer) pszCloudServer="http://cloud.ferra.com/updates";
 
 	//sprintf(szFileName,"%s\\%s.txt",sSetup.szTempFolder,pszFolder);
 	sprintf(szUrl,"%s/%s/",pszCloudServer,pszDirRemote);
@@ -662,7 +662,7 @@ INT ehcFileUpdate(	UTF8 * pszCloudServer, // NULL = Ferra
 		// Scarico i files
 		//
 		sprintf(szServ,"%s/",pszDirRemote); iCounter=0;
-		while (TRUE) {
+		while (true) {
 
 			EH_AR arFileInfo=NULL;
 			CHAR * pStart;
@@ -685,13 +685,16 @@ INT ehcFileUpdate(	UTF8 * pszCloudServer, // NULL = Ferra
 					if (strCaseStr(pFile,szServ)) { // Controllo che il folder sia giusto
 
 						CHAR * pszFileName=fileName(pFile); 
-						if (*pszFileName!='_') {
+						if (strEmpty(pszFileName)) { // Folder
+						
+						}
+						else if (*pszFileName!='_') {
 
 							//
 							// Controllo se devo acquisirlo
 							//
-							BOOL bLoad=TRUE;
-							sprintf(szUrl,"http://www.ferra.it%s",pFile);
+							BOOL bLoad=true;
+							sprintf(szUrl,"http://cloud.ferra.com%s",pFile);
 							sprintf(utfFileName,"%s" OS_DIR_SLASH "%s",pszDirLocal,pszFileName);
 
 							if (arFilesRequest) {
@@ -703,7 +706,7 @@ INT ehcFileUpdate(	UTF8 * pszCloudServer, // NULL = Ferra
 							
 								// Controllo la dimensione
 								SIZE_T tSize=fileSize(utfFileName);
-								if (tSize==atof(arFileInfo[2])) bLoad=FALSE; // L'indice era il sette
+								if (tSize==atof(arFileInfo[2])) bLoad=false; // L'indice era il sette
 							
 							}
 

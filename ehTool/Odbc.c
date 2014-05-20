@@ -783,7 +783,7 @@ BOOL odbc_fetch_row( EH_ODBC_RS pRes)
 	if (sqlReturn==SQL_ERROR) {
 
 		odbcGetDiagnostic(sqlReturn,pRes->hStmt,SQL_HANDLE_STMT,true);//,"x",pRes->hStmt,sqlReturn);
-		ehError();
+//		ehError();
 		//odbcError(pRes->psOdbcSection, "Fetch",0); 
 
 	}
@@ -1200,12 +1200,32 @@ EH_ODBC_RS  odbcQueryResultCreate(EH_ODBC_SECTION * psOdbcSection,INT iLimit)
 
 			case SQL_DECIMAL:  lpType="DECIMAL";  iTypeC=SQL_C_CHAR; iAdbType=_NUMBER; break;
 			case SQL_NUMERIC:  lpType="NUMERIC";  iTypeC=SQL_C_CHAR; iAdbType=_NUMBER; break;
-			case SQL_SMALLINT: lpType="SMALLINT"; iTypeC=SQL_C_CHAR; iAdbType=_INTEGER; break;
-			case SQL_INTEGER:  lpType="INTEGER";  iTypeC=SQL_C_CHAR; iAdbType=_INTEGER; break;
+			
+			case SQL_BIGINT: // Mha
+			case SQL_SMALLINT: lpType="SMALLINT"; iTypeC=SQL_C_CHAR; iAdbType=_INTEGER; 
+				break;
+
+			case SQL_TINYINT:
+			case SQL_INTEGER:  
+				lpType="INTEGER";  
+				iTypeC=SQL_C_CHAR; 
+				iAdbType=_INTEGER; 
+				break;
+
 			case SQL_REAL:	   lpType="REAL";     iTypeC=SQL_C_CHAR; iAdbType=_NUMBER; break;
 			case SQL_FLOAT:	   lpType="FLOAT";    iTypeC=SQL_C_CHAR; iAdbType=_NUMBER; break;
 			case SQL_DOUBLE:   lpType="DOUBLE";   iTypeC=SQL_C_CHAR; iAdbType=_NUMBER; break;
 			case SQL_BIT:	   lpType="BIT";      iTypeC=SQL_C_CHAR; iAdbType=_BOOL; break;
+/*
+#define SQL_LONGVARCHAR                         (-1)
+#define SQL_BINARY                              (-2)
+#define SQL_VARBINARY                           (-3)
+#define SQL_LONGVARBINARY                       (-4)
+#define SQL_BIGINT                              (-5)
+#define SQL_TINYINT                             (-6)
+#define SQL_BIT                                 (-7)
+*/
+
 			case SQL_LONGVARBINARY: 
 				lpType="BYNARY"; 
 				iTypeC=SQL_C_BINARY; 
@@ -1215,13 +1235,16 @@ EH_ODBC_RS  odbcQueryResultCreate(EH_ODBC_SECTION * psOdbcSection,INT iLimit)
 			
 			case -10: // odbc 5.1
 			case SQL_LONGVARCHAR: 
+			case 93: // Tempo
 				lpType="TEXT"; 
 				iTypeC=SQL_C_CHAR; 
 				iAdbType=_TEXT; 
 				uiColumnSize=65000;
 				break;
+
 			default:
-//				printf("qui");
+				//printf("qui");
+				ehError();
 				break;
 		}
 
@@ -1233,13 +1256,12 @@ EH_ODBC_RS  odbcQueryResultCreate(EH_ODBC_SECTION * psOdbcSection,INT iLimit)
 		pRes->arDict[i].iAdbType=iAdbType;
 		pRes->arDict[i].iSize=uiColumnSize;
 		pRes->arDict[i].arBuffer=ehAllocZero(uiColumnSize*pRes->iRowsLimit);
-		if (iTypeC==SQL_C_BINARY) 
+		if (iTypeC==SQL_C_BINARY||Nullable) // Version ODBC 5.x
 			pRes->arDict[i].arsLen=ehAllocZero(sizeof(SQLLEN)*pRes->iRowsLimit);
 			else 
 			pRes->arDict[i].arsLen=NULL;
-
-		if (!pRes->arDict[i].arBuffer) 
-			ehError();
+		if (!pRes->arDict[i].arsLen&&Nullable) ehError();
+		if (!pRes->arDict[i].arBuffer) ehError();
 
 	  // fprintf(stderr,"%d) pRes->arDict[i].lpBuffer=%x" CRLF,i,pRes->arDict[i].lpBuffer);
 
@@ -2006,7 +2028,7 @@ EH_LST odbcGetDiagnostic(SQLRETURN  sqlErr,HANDLE hStmt,SQLSMALLINT iType,BOOL b
 			if (rc2==SQL_NO_DATA) break;
 
 			// DisplayError(SqlState,NativeError,Msg,MsgLen);
-			lstPushf(lst,"NativeError=%d:%s",iNativeError,szMsg,iMsgLen);
+			lstPushf(lst,"%d:%s",iNativeError,szMsg,iMsgLen);
 			i++;
 		}
 	}

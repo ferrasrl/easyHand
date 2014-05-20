@@ -17,7 +17,7 @@
 #define TXB_SEP_ROW "\5"
 #define TXB_NULL "?nil?"
 
-static void _txbRowExport(INT iFields,S_FLD_INFO *arsField,S_TXB *psTxb,SQL_RS rsSet);
+static void _txbRowExport(INT iFields,S_FLD_INFO * arsField,EH_ARF arExclude,S_TXB *psTxb,SQL_RS rsSet);
 static CHAR * _getType(S_FLD_INFO * psFld);
 
 //
@@ -184,7 +184,11 @@ S_FLD_INFO * mysGetTableInfo(DYN_SECTION_FUNC CHAR * pszTable,_DMI * pdmiField,_
 			ehFreePtrs(1,&pszType);
 			
 			p=sql_ptr(rsSet,"Default");
-			if (!p) strcpy(sField.szDefault,"?nil?"); else strcpy(sField.szDefault,p);
+			if (!p) strcpy(sField.szDefault,"?nil?"); 
+			else 
+			{
+				strcpy(sField.szDefault,p);
+			}
 
 
 			strcpy(sField.szFieldBefore,szLastName);
@@ -321,46 +325,82 @@ EN_FLDTYPE DataTypeToadb_Type(EH_DATATYPE enType) {
 // mysTableExport()
 // Ritorna True se non riesce
 //
-BOOL mysTableExport(DYN_SECTION_FUNC CHAR * pszTable,UTF8 * utfFileDest,CHAR * pszWhere,BOOL bShowProgress, DWORD * pdwRecords) {
+BOOL mysTableExport(DYN_SECTION_FUNC 
+					CHAR *	pszTable,
+					UTF8 *	utfFileDest,
+					CHAR *	pszWhereOrder,
+					BOOL	bShowProgress, 
+					DWORD * pdwRecords,
+					CHAR *	pszFieldsExclude) {
 
 	DYN_SECTION_GLOBALPTR
 	_DMI dmiField=DMIRESET;
 	S_FLD_INFO * arsFld;
 	TXBFLD *	arsTxbFld;
 	S_TXB *		psTxb;
-	INT a;
+	INT a,b;
 	INT		iCount,iOffset,iMaxRecords,iBlock;
 	CHAR *	pszQueryFields=NULL;
 	SQL_RS rsSet;
 	DWORD iExport=0;
+	CHAR * pszWhere=NULL;
+	CHAR * pszOrder=NULL;
+	EH_AR	arExclude=NULL;
 
 	if (pdwRecords) * pdwRecords=0;
-	if (!mysGetTableInfo(DYN_SECTIONC pszTable,&dmiField,NULL)) { return TRUE;}	
+	if (!mysGetTableInfo(DYN_SECTIONC pszTable,&dmiField,NULL)) return true;
 	pszQueryFields=ehAlloc(dmiField.Num*50); *pszQueryFields=0;
+	
+	if (!strEmpty(pszFieldsExclude)) arExclude=ARFSplit(pszFieldsExclude,",");
+
 	arsFld=DMILock(&dmiField,NULL);
 	for (a=0;a<dmiField.Num;a++)
 	{
+		if (arExclude) {
+			if (ARIsIn(arExclude,arsFld[a].szName,true)) 
+				continue;
+		}
 		strAdd(pszQueryFields,arsFld[a].szName,",",false);
 	}
 
+
+
+	if (!strEmpty(pszWhereOrder)) {
+		CHAR * psz;	
+		pszWhere=strDup(pszWhereOrder);
+		psz=strCaseStr(pszWhere,"ORDER BY ");
+		if (psz) {
+			pszOrder=strDup(psz);
+			*psz=0;
+		}
+
+	}
 	//
 	// Creo il TXB
 	// Traduco le informazioni dei campi in tabella nell'array
 	//
 	arsTxbFld=ehAllocZero(sizeof(TXBFLD)*(dmiField.Num+1));
-	for (a=0;a<dmiField.Num;a++)
+	for (a=0,b=0;a<dmiField.Num;a++)
 	{
-		arsTxbFld[a].lpName=arsFld[a].szName;
-		arsTxbFld[a].iLen=arsFld[a].iSize;
-		arsTxbFld[a].enType=adb_TypeToDataType(arsFld[a].enFldType);
-		if (arsTxbFld[a].enType==_UNKNOW) ehExit("Field Type sconosciuto: %s",arsFld[a].szName);
 
-		switch (arsTxbFld[a].enType)
+		if (arExclude) {
+			if (ARIsIn(arExclude,arsFld[a].szName,true)) 
+				continue;
+		}
+
+		arsTxbFld[b].lpName=arsFld[a].szName;
+		arsTxbFld[b].iLen=arsFld[a].iSize;
+		arsTxbFld[b].enType=adb_TypeToDataType(arsFld[a].enFldType);
+
+		if (arsTxbFld[b].enType==_UNKNOW) ehExit("Field Type sconosciuto: %s",arsFld[a].szName);
+
+		switch (arsTxbFld[b].enType)
 		{
 			case _NUMBER : 
-			 arsTxbFld[a].iInfo=arsFld[a].iDecimal;
+			 arsTxbFld[b].iInfo=arsFld[a].iDecimal;
 			 break;
 		}
+		b++;
 	}
 
 	psTxb=txbCreate(utfFileDest,
@@ -376,27 +416,31 @@ BOOL mysTableExport(DYN_SECTION_FUNC CHAR * pszTable,UTF8 * utfFileDest,CHAR * p
 	//
 
 	if (!strEmpty(pszWhere)) {
+
 		iMaxRecords=sql_count(DYN_SECTIONC "%s WHERE %s",pszTable,pszWhere); 
 	
 	} else {
+
 		iMaxRecords=sql_count(DYN_SECTIONC pszTable); 
+
 	}
 	if (iMaxRecords<0) 
 		ehError();
 	iBlock=32000;
 
+	if (!pszOrder)  pszOrder=strDup("ORDER BY 1 ASC");
 	for (iOffset=0;iOffset<iMaxRecords;iOffset+=iBlock) {
 		iCount=iOffset;
 
 		// Prendo il blocco
 		//sql_query("SELECT * FROM %s LIMIT %d,%d",pszTable,iOffset,iBlock);
 		if (!strEmpty(pszWhere)) {
-			CHAR * pszOrder;
-			if (!strstr(pszWhere,"ORDER BY")) pszOrder="ORDER BY 1 ASC"; else pszOrder=""; 
+//			CHAR * pszOrder;
+//			if (!strstr(pszWhere,"ORDER BY")) pszOrder="ORDER BY 1 ASC"; else pszOrder=""; 
 			sql_query(DYN_SECTIONC "SELECT %s FROM %s WHERE %s %s LIMIT %d,%d",pszQueryFields,pszTable,pszWhere,pszOrder,iOffset,iBlock);
 		}
 		else {
-			sql_query(DYN_SECTIONC "SELECT %s FROM %s ORDER BY 1 ASC LIMIT %d,%d",pszQueryFields,pszTable,iOffset,iBlock);
+			sql_query(DYN_SECTIONC "SELECT %s FROM %s %s LIMIT %d,%d",pszQueryFields,pszTable,pszOrder,iOffset,iBlock);
 		}
 		printf("\rrichiedo a mySql da %d (%d records) [%d%%] ...     ",iOffset,iBlock,iOffset*100/iMaxRecords);
 		rsSet=sql_stored(DYN_SECTION);
@@ -407,7 +451,7 @@ BOOL mysTableExport(DYN_SECTION_FUNC CHAR * pszTable,UTF8 * utfFileDest,CHAR * p
 					printf("\r%s > %d (%d%%) ...        ",pszTable,iCount,iCount*100/iMaxRecords);
 				}
 			}
-			_txbRowExport(dmiField.Num,arsFld,psTxb,rsSet);
+			_txbRowExport(dmiField.Num,arsFld,arExclude,psTxb,rsSet);
 			iExport++;
 		}
 		fflush(psTxb->ch);
@@ -422,8 +466,10 @@ BOOL mysTableExport(DYN_SECTION_FUNC CHAR * pszTable,UTF8 * utfFileDest,CHAR * p
 	txbClose(psTxb);
 	DMIClose(&dmiField,"Field");
 	ehFree(pszQueryFields);
+	ehFreePtrs(2,&pszWhere,&pszOrder);
 	if (pdwRecords) * pdwRecords=iExport;
-	return FALSE;	
+	ehFreeNN(arExclude);
+	return false;	
 }
 
 //
@@ -652,7 +698,7 @@ BOOL mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWOR
 // _txbRowExport()
 //
 
-static void _txbRowExport(INT iFields,S_FLD_INFO *arsFld,S_TXB *psTxb,SQL_RS rsSet)
+static void _txbRowExport(INT iFields,S_FLD_INFO *arsFld,EH_AR arExclude,S_TXB *psTxb,SQL_RS rsSet)
 {
 
 	INT a;
@@ -666,6 +712,10 @@ static void _txbRowExport(INT iFields,S_FLD_INFO *arsFld,S_TXB *psTxb,SQL_RS rsS
 
 	for (a=0;a<iFields;a++)
 	{
+		if (arExclude) {
+			if (ARIsIn(arExclude,arsFld[a].szName,true)) continue;
+		}
+
 		pszValue=sql_ptr(rsSet,arsFld[a].szName);
 		if (pszValue) dValue=atof(pszValue); else dValue=0;
 
@@ -749,7 +799,7 @@ static EN_CHARTYPE _fldCollection(INT iFields,S_FLD_INFO * arsFld,CHAR * pszFiel
 	
 	INT a;
 	for (a=0;a<iFields;a++) {
-		if (!strcmp(arsFld[a].szName,pszField)) return arsFld[a].enEncoding;
+		if (!strCaseCmp(arsFld[a].szName,pszField)) return arsFld[a].enEncoding;
 	}
 	return ULT_CS_UNKNOW;
 }
@@ -758,7 +808,7 @@ static BOOL _fldNull(INT iFields,S_FLD_INFO * arsFld,CHAR * pszField) {
 	
 	INT a;
 	for (a=0;a<iFields;a++) {
-		if (!strcmp(arsFld[a].szName,pszField)) return arsFld[a].bIsNullable;
+		if (!strCaseCmp(arsFld[a].szName,pszField)) return arsFld[a].bIsNullable;
 	}
 	ehError();
 	return false;
@@ -769,7 +819,7 @@ static S_FLD_INFO * _fldInfo(INT iFields,S_FLD_INFO * arsFld,CHAR * pszField) {
 	
 	INT a;
 	for (a=0;a<iFields;a++) {
-		if (!strcmp(arsFld[a].szName,pszField)) return &arsFld[a];
+		if (!strCaseCmp(arsFld[a].szName,pszField)) return &arsFld[a];
 	}
 	return NULL;
 	
@@ -782,7 +832,8 @@ static void _addTxbFields(	BOOL bInsert,
 							INT iFields,		
 							S_FLD_INFO * arsFld,
 							// Dati srogente
-							S_TXB * psTxb)
+							S_TXB * psTxb,
+							EH_AR arExclude)
 {
 	INT k;
 	S_FLD_INFO * psFieldDest=NULL;
@@ -797,6 +848,11 @@ static void _addTxbFields(	BOOL bInsert,
 		CHAR * pString=NULL;
 		EN_CHARTYPE enFldEncoding;
 		EN_FLDTYPE enFldType=DataTypeToadb_Type(psTxb->lpFieldInfo[k].enType);
+
+		if (arExclude) {
+			if (ARIsIn(arExclude,psTxb->lpFieldInfo[k].lpName,true)) 
+				continue;
+		}
 
 		psFieldDest=_fldInfo(iFields,arsFld,psTxb->lpFieldInfo[k].lpName);
 		if (!psFieldDest) {
@@ -926,28 +982,28 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 					CHAR *	pszTableDest,
 					BOOL	bNotUpdate,
 					BOOL	bShowProgress,
-					EH_LST	lstErrors) {
+					EH_LST	lstErrors,
+					CHAR *  pszFieldsExclude) {
 
 	DYN_SECTION_GLOBALPTR
 	S_TXB *		psTxb;
-	INT	i,k;
+	INT		i,k;
 	CHAR *	pszFields=NULL;
-	CHAR * pszQuery;
-//	DWORD	dwMaxSize=1000000;
-	//CHAR	* pszBuffer=ehAllocZero(dwMaxSize+1);
+	CHAR *	pszQuery;
 	EH_LST	lstQuery=lstNew();
 	_DMI	dmiFieldDest=DMIRESET;
-	INT iFields; 
+	INT		iFields; 
 	S_FLD_INFO * arsFld;
 	S_FLD_INFO * psFieldDest;
-
+	EH_AR	arExclude=NULL;
+	
 	if (!mysGetTableInfo(DYN_SECTIONC pszTableDest,&dmiFieldDest,NULL)) 
 	{
 		lstDestroy(lstQuery); 
 		return true;
 	}	
 	arsFld=DMILock(&dmiFieldDest,NULL);
-	iFields=dmiFieldDest.Num;
+ 	iFields=dmiFieldDest.Num;
 
 	//
 	// Apro il txb
@@ -966,9 +1022,13 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 	//
 	// costruisco parte per nome campi della query - INSERT INTO (campi)
 	//
+	if (!strEmpty(pszFieldsExclude)) arExclude=ARFSplit(pszFieldsExclude,",");
 	pszFields=NULL;
 	for (k=0;k<psTxb->iFieldCount;k++)
 	{
+		if (arExclude) {
+			if (ARIsIn(arExclude,psTxb->lpFieldInfo[k].lpName,true)) continue;
+		}
 		psFieldDest=_fldInfo(iFields,arsFld,psTxb->lpFieldInfo[k].lpName);
 		if (!psFieldDest) {
 			if (bShowProgress) printf("Campo %s inesistente nella tabella di destinazione." CRLF,psTxb->lpFieldInfo[k].lpName);
@@ -1012,8 +1072,9 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 							// Dati destinazione
 						iFields,		
 						arsFld,
-							// Dati srogente
-						psTxb);
+							// Dati sorgente
+						psTxb,
+						arExclude);
 
 		lstPushf(lstQuery,")");
 
@@ -1026,7 +1087,8 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 							iFields,		
 							arsFld,
 								// Dati srogente
-							psTxb);
+							psTxb,
+							arExclude);
 		
 		}
 		pszQuery=lstToString(lstQuery,"","",""); 
@@ -1048,6 +1110,7 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 	printf("\r%s completed (100%%).",pszTableDest);
 	txbClose(psTxb);
 	DMIClose(&dmiFieldDest,"field");
+	if (arExclude) ehFree(arExclude);
 
 	return false;
 }
@@ -1136,6 +1199,11 @@ CHAR * _getType(S_FLD_INFO * psFld)
 			strcpy(szServ,"POINT"); 
 			break;
 
+		case ADB_TIMESTAMP:
+			strcpy(szServ,"TIMESTAMP"); 
+			break;
+
+
 		default:
 			ehAlert("Tipo di campo %d, non gestito",psFld->enFldType);
 			break;
@@ -1149,7 +1217,18 @@ CHAR * _getType(S_FLD_INFO * psFld)
 		if (!*psFld->szDefault)
 			strcat(szServ," DEFAULT \'\'");
 			else
-			strAppend(szServ," DEFAULT %s",psFld->szDefault);
+			{
+				switch (psFld->enFldType)
+				{		
+					case ADB_TIMESTAMP:
+						strAppend(szServ," DEFAULT '%s'",psFld->szDefault);
+						break;
+
+					default:
+						strAppend(szServ," DEFAULT %s",psFld->szDefault);
+						break;
+				}
+			}
 	}
 
 	if (strEmpty(psFld->szFieldBefore))
@@ -1164,7 +1243,7 @@ CHAR * _getType(S_FLD_INFO * psFld)
 }
 
 //
-//
+// mysFieldModify()
 //
 CHAR * mysFieldModify(EN_MESSAGE enMess,CHAR * pszTable,S_FLD_INFO * psFld) {
 
@@ -1693,7 +1772,7 @@ void mysSchemaSync(CHAR *	pszSchemaSource,
 	CHAR	szTableSource[500];
 	CHAR	szTableDest[500];
 	BOOL	bError;
-	CHAR *	putfFileTemp="c:\\comFerra\\fileTempDb.txb";
+	CHAR *	putfFileTemp="c:\\mvk\\fileTempDb.txb";
 	S_TBL_INFO * arsRef,* arsTarget;
 	
 	_DMI	dmiRef=DMIRESET;
@@ -1749,10 +1828,12 @@ void mysSchemaSync(CHAR *	pszSchemaSource,
 
 					// sprintf(szTableSource,"%s.%s",pszSchemaImport,pszTable);
 					if (strCaseCmp(szTableSource,szTableDest)) {
-						if (!mysTableExport(szTableSource,putfFileTemp,NULL,true,NULL)) {
-							mysTableImport(putfFileTemp,szTableDest,false,true,NULL);
+						if (!mysTableExport(szTableSource,putfFileTemp,NULL,true,NULL,NULL)) {
+							mysTableImport(putfFileTemp,szTableDest,false,true,NULL,NULL);
 						} else {
-							ehError();
+							//ehExit("mysSchemaSync:mysTableExport: %s:%s",szTableSource,putfFileTemp);
+							printf("\7:Attenzione %s non esiste nel dbase di importazione",szTableSource);
+							
 						}
 					}			
 

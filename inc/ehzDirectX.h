@@ -39,7 +39,7 @@ typedef struct {
 	HWND hWnd;	// Finestra create
 	S_DX_RESOURCE * pRes;	// Puntatore alle risorse condivise del directX
 	EH_OBJ * psObj;
-	void * (*funcNotify)(EH_OBJPARAMS);
+	LRESULT (*funcNotify)(EH_NOTIFYPARAMS);
 
 } EHZ_DIRECTX;
 

@@ -63,7 +63,8 @@ typedef enum {
 
 	PDA_TOP=0x0010,
 	PDA_MIDDLE=0x0020,
-	PDA_BOTTOM=0x0040
+	PDA_BOTTOM=0x0040,
+	PDA_BASELINE=0x0100
 
 } PWD_ALIGN;
 
@@ -77,7 +78,10 @@ typedef struct {
 	DWORD		dwWeight;
 	DWORD		dwItalic;
 	HFONT		hFont;			// Handle windows
+	
 	void	*	pVoid;			// Valore esterno (usato per pdf)
+	BOOL		bFontClone;
+	CHAR		szFontFullPath[500]; // File "fisico" del font	
 
 } PWD_FONT;
 
@@ -126,7 +130,7 @@ typedef struct {
 typedef struct {
 
 	HDC			hDC;
-	RECT		recObj;
+	RECTD		recObj;
 	PWD_ITEM *	psItem;
 
 //	void (*xyConvert)(INT cmd,void *);
@@ -195,8 +199,10 @@ typedef enum {
 	PUM_PT,		// 1/72
 	PUM_DTX,	// Dot fisici X (Reali sempre associati alla risoluzione del documento/device)
 	PUM_DTY,	// Dot fisici Y (Reali sempre associati alla risoluzione del documento/device)
-	PUM_DTXD,	// Dot fisici X (dinamico in base all'hDC)
-	PUM_DTYD	// Dot fisici Y (dinamico in base all'hDC)
+	PUM_DTXP,	// Dot fisici X (HDC Preview)
+	PUM_DTYP,	// Dot fisici Y (HDC Preview)
+	PUM_DTHDX,	// Dot fisici X in alta definizione (1000*DPI)
+	PUM_DTHDY,	// Dot fisici Y in alta definizione (1000*DPI)
 	/*
 
 	PUM_PHX=100,	// Trasforma UM > in Dot fisici "X" 
@@ -276,9 +282,13 @@ typedef struct {
 	CHAR *		lpSottoTitolo; // Sotto Titolo della stampa
 
 	BOOL		fLineVertField; // Flag di separazione campi con linea verticale
-	INT			iLineVertColor; // Colore linea verticale	
+//	INT			iLineVertColor; // Colore linea verticale	
 	BOOL		fLineHorzField; // Flag di separazione campi con linea orizzontale
-	PWD_COLOR	colLineHorzColor; // Colore linea orizzontale
+	PWD_COLOR	colLineHorz; // Colore linea orizzontale
+	PWD_COLOR	colLineVert; // Colore linea orizzontale
+	PWD_COLOR	colTitleBack;
+	PWD_COLOR	colTitleText;
+	
 	INT			iLineHorzStyle; // PS_SOLID
 	BOOL		bRowsDynamic;   // true/false se ci sono da gestire linee dinamiche
 
@@ -355,6 +365,8 @@ typedef struct {
 	EH_LST		lstPdfReport;
 #endif
 
+	PWD_ITEM *  psLastItemWrite;
+
 } EH_PWD; // Easyhand PowerDoc
 
 
@@ -412,8 +424,15 @@ typedef struct {
 
 typedef struct {
 
+	BOOL		bMultiline;
+	PWD_VAL		umX;
+	PWD_VAL		umY;
+
 	CHAR *		pszText;
 	CHAR *		pszFontFace; // NULL= Default	
+	BOOL		bFontFound;	// T/F se il font esiste
+	LOGFONTW	sLogFontw;
+
 	PWD_VAL		umCharWidth;
 	PWD_VAL		umCharHeight;
 	BOOL		fFix; // Larghezza fissa
@@ -434,10 +453,29 @@ typedef struct {
 	BOOL		bBaseLine;		// y è la baseline
 	
 	INT			idxFont;	// Indice del font usato in _sPower.dmiFont
-	
 
 } PDO_TEXT;
 
+typedef struct {
+
+
+	EH_LST		lstRow;
+	RECT		recDot;		//	Posizione in dot dell'area di stampa
+	SIZE		sizDot;		//	Dimensione in dot dell'area di stampa
+
+	RECT		recText;	//	Posizione in dot del testo
+	SIZE		sizText;	//	Dimensione in dot del testo
+
+	PWD_SIZE	sumText;	//  Dimensione del testo
+	PWD_RECT	rumText;	//  Rettangolo occupato dal testo
+
+	PDO_TEXT *	psText;
+	
+	INT			iCharHeight;
+	INT			iInterlinea;
+	
+
+} PWD_TXI;	// Text-Info
 
 typedef struct {
 //	RECT	rRect;
@@ -490,7 +528,10 @@ typedef struct {
 
 } PWD_FONT_RES;
 
-
+//
+// Utilita
+//
+void *		pwdGetObj(PWD_ITEM  * psDraw);
 
 //
 // API per la scrittura del documento
@@ -520,6 +561,8 @@ void		pwdLine(PWD_RECT *prumRect,PWD_COLOR colPen,PWD_VAL iWidth,INT iStyle);
 void		pwdRect(PWD_RECT *prumRect,PWD_COLOR colPen,PWD_COLOR colSolidBrush,PWD_VAL iWidth);
 void		pwdRectRound(PWD_RECT *prumRect,PWD_COLOR colPen,PWD_COLOR colSolidBrush,PWD_VAL lRoundWidth,PWD_VAL lRoundHeight,PWD_VAL iPenWidth);
 void		pwdRectEx(PWD_RECT *prumRect,PWD_COLOR colPen,PWD_VAL iPenWidth,INT iPenStyle,PWD_COLOR colBrush,INT iBrushStyle,PWD_VAL umRoundWidth,PWD_VAL umRoundHeight);
+void		pwdPath(EH_LST lstPath,PWD_COLOR colPen,PWD_VAL umWidth,INT iStyle,PWD_COLOR colBrush,INT iBrushStyle);
+void *		pwdPathFree(EH_LST lstPathReady,BOOL bDestroy);
 
 void		pwdText(PWD_VAL px,PWD_VAL py,PWD_COLOR colText,EH_TSTYLE enStyles,EN_DPL nAlign,CHAR *pszFont,PWD_VAL umHeight,CHAR *pszString);
 //void pwdTextLine(PWD_VAL px,PWD_VAL py,EH_COLOR colText,EH_TSTYLE enStyles,EN_DPL nAlign,CHAR *pszFont,PWD_VAL umHeight,CHAR *pszString); //INT px,INT py,INT Color,INT iStyles,EN_DPL iAlign,CHAR *lpFont,PWD_VAL umHeight,CHAR *pszStr);
@@ -527,6 +570,8 @@ void		pwdTextInRect(PWD_RECT *prum,PWD_COLOR colText,EH_TSTYLE enStyles,PWD_ALIG
 PWD_VAL		pwdTextInRectEx(PWD_RECT *prum,PWD_COLOR colText,EH_TSTYLE enStyles,PWD_ALIGN enAlign,CHAR *pszFont,PWD_VAL umCharHeight,PWD_VAL umInterLinea,CHAR *pszStr,BOOL bJustifyLastRow,PWD_VAL umExtraCharSpace,INT iMaxRows,INT *lpiRows);
 void		pwdTextRiemp(PWD_RECT *prum,PWD_COLOR colText,EH_TSTYLE enStyles,CHAR *lpFont,PWD_VAL umHeight,CHAR *pszStr,CHAR Riemp); // Non implementato
 void		pwdTextJs(PWD_VAL umX,PWD_VAL umY,CHAR * pszParams,CHAR *pszText);
+PWD_TXI *	pwdTextInfoCreate(PDO_TEXT * psText,PWD_RECT * pumRect);
+PWD_TXI *	pwdTextInfoDestroy(PWD_TXI * psTi);
 
 void		pwdImgCalc(PWD_SIZE *psSize,INT hImage);	// Utility
 void		pwdImage(PWD_VAL px,PWD_VAL py,PWD_SIZE *psumRect,INT hldImg,BOOL bStore); // LRHBitmap()
@@ -555,6 +600,9 @@ void		pwdMetaFile(PWD_POINT *	ppumPos,		// Posiziono il meta // 2013/2014
 
 
 //void pwdBitmap(PWD_VAL px,PWD_VAL py,PWD_SIZE *psumRect,INT iBitsPixel,HDC hdc,HBITMAP hBitmap,BOOL bDupBitmap); // new 2010
+
+
+
 
 #endif
 

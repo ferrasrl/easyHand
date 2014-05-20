@@ -11,14 +11,7 @@
 #include "/easyhand/inc/easyhand.h"
 #include "/easyhand/inc/powerDoc.h"
 #include "/easyhand/ehtool/imgutil.h"
-#include <math.h>
 
-
-// #define TRACE_MOUSE_PREVIEW	// Mostra la posizione in UM del mouse sul preview
-#define HD_DPI 30000.0 // Profondita HD in DPI per determinare le dimensioni in UM (2014)
-
-#define _DTXD (_sPd.bVirtual?PUM_DTXP:PUM_DTX)
-#define _DTYD (_sPd.bVirtual?PUM_DTYP:PUM_DTY)
 
 #ifdef EH_PDF 
 // /easyhand/extSource/libharu
@@ -171,22 +164,17 @@ static BOOL		_addItemMem(PWD_TE uType,PWD_RECT *prumObj,void *psObj,INT iSizeObj
 static void		_LItemReposition(void);
 
 
-typedef enum {
+void _fontPowerText(PDO_TEXT *	psText,
+					BOOL		bPrint,
+					double		x,
+					double		y,
 
-	PMA_MISURE,		// Misurazione
-	PMA_PREVIEW,	// Stampa in preview
-	PMA_PRINT,		// Stampa definitiva
-
-} EN_PMODE;	// Modalità di calcolo/stampa
-
-static	void	_fontPowerText( EN_PMODE	enMode,	
-								HDC			hdc,
-								PDO_TEXT *	psText,
-//								BOOL		bPrint,
-								PWD_TXI *	psTi); // new 2014
-								
-						//BOOL		bPreview
+					PWD_TXI *	psTxiFont,
+					HDC			hdc,
+					BOOL		bPreview
 					
+					);
+
 
 static S_FAC *	_fontPowerCreate(	HDC			hdc,
 									BOOL		bVirtual,	// T/F se devo calcolare in virtual (preview)
@@ -200,6 +188,7 @@ static void		_LTempWrite(void *pb,SIZE_T iLen);
 static void		_fontEnumeration(BOOL bFontAlloc);
 static BOOL     _fontFileSearch(PWD_FONT *psPwdFont, CHAR  *pszFontPath, BOOL * pbEmb);
 static LONG		_getNextNameValue(HKEY key, LPCTSTR pszSubkey, LPTSTR pszName, LPTSTR pszData);
+
 
 static EH_LST	_pathCreate(PDO_PATH * psPath);
 static void		_pathDestroy(EH_LST lstPath);
@@ -248,7 +237,7 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 	LONG l;
 	INT iAuto=0;
 	double dTotPerc=0;
-	PWD_FONT_RES * psFontRes=NULL;
+	PWD_FONT_RES * psFontRes;
 
 	INT iFieldPerRiga;
 
@@ -284,17 +273,17 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 			_sPower.iVer=0; // Default per compatibilità
 
 			_sPower.enLayStyle=PWD_PAGEFREE;	// Tipo di Layout
-			_sPower.enMisure=info;
+			_sPower.enMisure=(PWD_UM) info;
 			_sPower.fDate=FALSE;				// SI/NO Stampa della data
 			_sPower.lpDate="/";				// Formato data
 	
 			_sPower.fPag=FALSE;				// Stampa del numero di pagina
 			_sPower.iPagStyle=1;				// Formato numero di pagina
 
+			_sPower.colLineVert=pwdGray(0);//RGB(128,128,128));
 
 			_sPower.fLineHorzField=FALSE;//TRUE;		// Stampa separazioni orizzontali
-			_sPower.colLineVert=pwdGray(.8);//RGB(128,128,128));
-			_sPower.colLineHorz=pwdGray(.8);//RGB(128,128,128));
+			_sPower.colLineHorz=pwdGray(.6);//RGB(128,128,128));
 			_sPower.iLineHorzStyle=PS_SOLID;
 			_sPower.colTitleBack=pwdGray(.6);//RGB(128,128,128));
 			_sPower.colTitleText=PDC_WHITE;
@@ -307,7 +296,6 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 			_sPower.pszFontBodyDefault="Arial";//Times New Roman"; // Font del corpo
 
 			DMIReset(&_sPower.dmiFont);
-			_sPower.arsFont=NULL;
 			_sPower.lstFontRes=lstCreate(sizeof(PWD_FONT_RES));
 			pRet=&_sPower;
 			_sPd.bVirtual=false;
@@ -380,7 +368,7 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 			if (strEmpty(_sPower.pszDeviceDefine)&&sys.sPrintDlg.hDC) {
 					
 					_sPower.hdcPrinter=sys.sPrintDlg.hDC;
-					_sPower.pDevMode=GlobalLock(sys.sPrintDlg.hDevMode);
+					_sPower.pDevMode=(DEVMODE *) GlobalLock(sys.sPrintDlg.hDevMode);
 					_sPower.iOrientation=_sPower.pDevMode->dmOrientation;
 					GlobalUnlock(_sPower.pDevMode);
 
@@ -441,7 +429,7 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 							default: ehError();
 					
 					}
-					HPDF_Page_SetSize(psPage,iPdfPage,(sFormInfo.iOrientation==DMORIENT_PORTRAIT)?HPDF_PAGE_PORTRAIT:HPDF_PAGE_LANDSCAPE);
+					HPDF_Page_SetSize(psPage,(HPDF_PageSizes) iPdfPage,(sFormInfo.iOrientation==DMORIENT_PORTRAIT)?HPDF_PAGE_PORTRAIT:HPDF_PAGE_LANDSCAPE);
 					_sPower.sumPaper.cx=_sPower.sumPhysicalPage.cx=pwdUm(PUM_PT,HPDF_Page_GetWidth(psPage));
 					_sPower.sumPaper.cy=_sPower.sumPhysicalPage.cy=pwdUm(PUM_PT,HPDF_Page_GetHeight(psPage));
 					HPDF_Free(_sPd.pdfDoc);
@@ -555,7 +543,6 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 
 			// Libera le risorse impegnate
 			_freeResource(true);
-
 			//
 			// Rilascio font temporanei
 			//
@@ -1191,29 +1178,6 @@ void pwdSetEx(INT iCol,void * pValue,PWD_COLOR colText,PWD_COLOR colBack,EH_TSTY
 		sText.enAlign=enAlign;
 		sText.enStyles=enStyles;
 
-		switch (sText.enAlign&0xf) {
-		
-			case PDA_RIGHT:
-				sText.umX=rumChar.right;
-				sText.umY=rumChar.top;
-				break;
-
-			case PDA_CENTER:
-				sText.umX=rumChar.left+((rumChar.right-rumChar.left)/2);
-				sText.umY=rumChar.top;
-				break;
-
-
-			case PDA_LEFT:
-			default:
-				sText.umX=rumChar.left;
-				sText.umY=rumChar.top;
-				break;
-
-		
-		}
-		
-
 		switch (psFld->iTipo)
 		{
 			case ALFA: // Campo alfanumerico
@@ -1246,7 +1210,6 @@ void pwdSetEx(INT iCol,void * pValue,PWD_COLOR colText,PWD_COLOR colBack,EH_TSTY
 	//
 	{
 		_(sText);
-		sText.bMultiline=true;
 		memcpy(&rumChar,&rumRect,sizeof(PWD_RECT));
 		rumChar.left+=psFld->rumPadding.left;//_sPower.rFieldMargin.left;
 		rumChar.right-=psFld->rumPadding.right;
@@ -1271,8 +1234,6 @@ void pwdSetEx(INT iCol,void * pValue,PWD_COLOR colText,PWD_COLOR colBack,EH_TSTY
 			double umFieldBottom;
 			INT iRows;
 			PWD_VAL umTextHeight;
-			
-			sText.bMultiline=true;
 			sText.pszText=pszText;
 			umTextHeight=pwdGetTextInRectAlt(&rumChar,&sText,&iRows); // Altezza del testo in UM
 
@@ -1347,9 +1308,7 @@ BOOL pwdFontAdd(CHAR * pszNameFont, UTF8 * pszFileName,BOOL bAddInFile) {
 	PWD_FONT_RES sFont;
 
 	if (!strEmpty(pszFileName)) {
-
 		if (fontInstall(pszFileName,false)) return true;
-//		fontAddCollection(pszFileName); // GDI+
 	}
 	
 	_(sFont);
@@ -1366,29 +1325,6 @@ BOOL pwdFontAdd(CHAR * pszNameFont, UTF8 * pszFileName,BOOL bAddInFile) {
 // SERVICE FUNCTION FOR PRINTER                                                  |
 // -------------------------------------------------------------------------------
 
-
-//
-//  _pointToPixel() - Trasforma una coordinata Reale nel pixel HDC
-//
-static void _pointToPixel(PWD_VAL umX,
-						  PWD_VAL umY,
-						  double * piX,
-						  double * piY) {
-
-	double x,y;
-
-	if (_sPd.bVirtual) {
-		x=pwdUmTo(umX,PUM_DTXP); y=pwdUmTo(umY,PUM_DTXP);
-		x+=_sPd.recPreviewPage.left;
-		y+=_sPd.recPreviewPage.top;
-	}
-	else {
-		x=pwdUmTo(umX,PUM_DTX); y=pwdUmTo(umY,PUM_DTY);
-	}
-
-	*piX=x;	*piY=y;
-
-}
 
 #ifndef EH_CONSOLE
 static BOOL CALLBACK PrintDlgProc (HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -1434,7 +1370,25 @@ static LRESULT CALLBACK funcPreviewProcedure(HWND hWnd,UINT message,WPARAM wPara
 
 #define swapInt(a,b) {INT c=a; a=b; b=c;}
 
+//
+//  _pointToPixel() - Trasforma una coordinata Reale nel pixel HDC
+//
+static void _pointToPixel(PWD_VAL umX,
+						  PWD_VAL umY,
+						  double * piX,
+						  double * piY) {
 
+	double x,y;
+	x=pwdUmTo(umX,PUM_DTXD);	y=pwdUmTo(umY,PUM_DTYD);
+
+	if (_sPd.bVirtual) {
+		x+=_sPd.recPreviewPage.left;
+		y+=_sPd.recPreviewPage.top;
+	}
+
+	*piX=x;	*piY=y;
+
+}
 
 
 
@@ -1472,7 +1426,7 @@ static void _pagePaint(HDC hDC,INT nPage,RECT * recArea)
 							&sItemDraw.recObj.right,
 							&sItemDraw.recObj.bottom);
 			
-			rectToI(&recComp,&sItemDraw.recObj);
+			rectCopy(recComp,sItemDraw.recObj);
 			if (recComp.left>recComp.right) swapInt(recComp.left,recComp.right);
 			if (recComp.top>recComp.bottom) swapInt(recComp.top,recComp.bottom);
 
@@ -1760,13 +1714,13 @@ static void _previewSizeCalc(void)
 
 			// Calcolo dimensioni in percentuali sui punti fisici
 //			_sPd.sizPreviewPage.cx=(INT) (pwdUm(PUM_DTX,_sPower.sumPaper.cx)*(double) _sPd.iPageZoom/100);
-			_sPd.sizPreviewPage.cx=(INT) pwdUmTo((_sPower.sumPaper.cx*(double) _sPd.iPageZoom/100),PUM_DTXP);
+			_sPd.sizPreviewPage.cx=(INT) pwdUmTo((_sPower.sumPaper.cx*(double) _sPd.iPageZoom/100),PUM_DTXD);
 			_sPd.sizPreviewPage.cy=(INT) (_sPower.sumPaper.cy*(double) _sPd.sizPreviewPage.cx/_sPower.sumPaper.cx);
 			break;
 	}
 
 //	_sPd.dZoomPerc=(double) _sPd.sizPreviewPage.cx*100/pwdUm(PUM_DTX,_sPower.sumPaper.cx);
-	_sPd.dZoomPerc=(double) _sPd.sizPreviewPage.cx*100/pwdUmTo(_sPower.sumPaper.cx,PUM_DTXP);
+	_sPd.dZoomPerc=(double) _sPd.sizPreviewPage.cx*100/pwdUmTo(_sPower.sumPaper.cx,PUM_DTXD);
 	ehPrintd("Zoom: [%.2f]" CRLF,_sPd.dZoomPerc);//(INT) pwdUm(PUM_DTX,_sPower.sumPaper.cx));
 
 	// Calcolo dimensioni del workspace
@@ -2119,14 +2073,13 @@ static void _LdcBoxDotted(HDC hdc,INT x,INT y,INT x2,INT y2,LONG Color) {
 
 }
 
-
 void _dotToUm(INT xPos,INT yPos,PWD_POINT * pumPoint) {
 
 	xPos-=_sPd.recPreviewPage.left;
 	yPos-=_sPd.recPreviewPage.top;
-	pumPoint->x=pwdUm(_DTXD,xPos);
-	pumPoint->y=pwdUm(_DTYD,yPos);
-//	ehPrintd("(%d x %d) (%.2f,%2f)" CRLF,xPos,yPos,pumPoint->x,pumPoint->y);
+	pumPoint->x=pwdUm(PUM_DTXD,xPos);
+	pumPoint->y=pwdUm(PUM_DTYD,yPos);
+	ehPrintd("(%d x %d) (%.2f,%2f)" CRLF,xPos,yPos,pumPoint->x,pumPoint->y);
 
 }
 
@@ -2187,16 +2140,19 @@ static LRESULT CALLBACK funcPreviewProcedure(HWND hWnd,UINT message,WPARAM wPara
 
 
 	 case WM_MOUSEMOVE: 
-		 
-#if defined(TRACE_MOUSE_PREVIEW)
+//		  GetWindowRect(hWnd,&recArea);
+		//  WinMouse(LOWORD(lParam),_sPd.yBarra+HIWORD(lParam),0xFFFF);
 		 {
 			INT	xPos = GET_X_LPARAM(lParam); 
 			INT	yPos = GET_Y_LPARAM(lParam); 
 			PWD_POINT pumPoint;
 			_dotToUm(xPos,yPos,&pumPoint);
-			ehPrintd("x:%.3f y:%.3f" CRLF,pumPoint.x,pumPoint.y);
+			ehPrintd("(%d x %d) %d (%d)" CRLF,
+//				xPos-_sPd.recPreviewPage.left,
+//				yPos-_sPd.recPreviewPage.top,yPos-_sPd.ptOffset.y,_sPd.ptOffset.y);
+				xPos,
+				yPos,yPos-_sPd.ptOffset.y,_sPd.ptOffset.y);
 		  }
-#endif
 		  break;
 
 	 // Intercetto il mouse Wheel
@@ -2230,8 +2186,8 @@ static LRESULT CALLBACK funcPreviewProcedure(HWND hWnd,UINT message,WPARAM wPara
 
 				_sPd.iPageZoom=(INT) (_sPd.dZoomPerc+((_sPd.dZoomPerc/4)*(double) zDelta));
 				_previewSizeCalc();
-				xPos=(INT) pwdUmTo(pumMouse.x,_DTXD);
-				yPos=(INT) pwdUmTo(pumMouse.y,_DTYD);
+				xPos=(INT) pwdUmTo(pumMouse.x,PUM_DTXD);
+				yPos=(INT) pwdUmTo(pumMouse.y,PUM_DTYD);
 				
 				_(_sPd.ptOffset);
 				_sPd.ptOffset.x=xPos-ptDelta.x;
@@ -2308,10 +2264,10 @@ static LRESULT CALLBACK funcPreviewProcedure(HWND hWnd,UINT message,WPARAM wPara
 			if ((_sPower.rumMargin.left+_sPower.rumMargin.top+_sPower.rumMargin.right+_sPower.rumMargin.bottom)>0)
 			{
 				_LdcBoxDotted(	hdcDest,
-								(INT) pwdUmTo(_sPower.rumPage.left,_DTXD)+_sPd.recPreviewPage.left,
-								(INT) pwdUmTo(_sPower.rumPage.top,_DTYD)+_sPd.recPreviewPage.top,
-								(INT) pwdUmTo(_sPower.rumPage.right,_DTXD)+_sPd.recPreviewPage.left,
-								(INT) pwdUmTo(_sPower.rumPage.bottom,_DTYD)+_sPd.recPreviewPage.top,
+								(INT) pwdUmTo(_sPower.rumPage.left,PUM_DTXD)+_sPd.recPreviewPage.left,
+								(INT) pwdUmTo(_sPower.rumPage.top,PUM_DTYD)+_sPd.recPreviewPage.top,
+								(INT) pwdUmTo(_sPower.rumPage.right,PUM_DTXD)+_sPd.recPreviewPage.left,
+								(INT) pwdUmTo(_sPower.rumPage.bottom,PUM_DTYD)+_sPd.recPreviewPage.top,
  								sys.arsColor[2]);
 			}
 
@@ -3281,33 +3237,22 @@ PWD_VAL pwdUm(PWD_UM enUm,double dValore) {
 		
 //		case PUM_DTXD_TO_UM :
 		case PUM_DTX:
-				dInch=(dValore*1000)/(double) _sPower.sizDotPerInch.cx;
-				dValue=pwdUm(PUM_INCH,dInch)/1000;
+				dInch=dValore/(double) _sPower.sizDotPerInch.cx;
+				dValue=pwdUm(PUM_INCH,dInch);
 				break;
 
 		case PUM_DTY:
-				dInch=(dValore*1000)/(double) _sPower.sizDotPerInch.cy;
-				dValue=pwdUm(PUM_INCH,dInch)/1000;
+				dInch=dValore/(double) _sPower.sizDotPerInch.cy;
+				dValue=pwdUm(PUM_INCH,dInch);
 				break;
-
-		case PUM_DTHDX:
-				//dInch=(dValore)/(double) _sPower.sizDotPerInch.cx;
-				dValue=pwdUm(PUM_INCH,dValore/HD_DPI);
-				break;
-
-		case PUM_DTHDY:
-				//dInch=(dValore)/(double) _sPower.sizDotPerInch.cy;
-				dValue=pwdUm(PUM_INCH,dValore/HD_DPI);
-				break;
-
 
 		// Pixel del preview (to >) Um di misura powerDoc
-		case PUM_DTXP:
+		case PUM_DTXD:
 				// dValore:_sPd.sizPreviewPage.cx=x:_sPower.sumPaper.cx;
 				dValue=(_sPower.sumPaper.cx*dValore/_sPd.sizPreviewPage.cx);
 				break;
 
-		case PUM_DTYP:
+		case PUM_DTYD:
 				// dValore:_sPd.sizPreviewPage.cx=x:_sPower.sumPaper.cx;
 				dValue=(_sPower.sumPaper.cy*dValore/_sPd.sizPreviewPage.cy);
 				break;
@@ -3336,46 +3281,22 @@ double pwdUmTo(double dValore,PWD_UM enUmTo) {
 		// Calcolo i pollici e converti in UM
 		//
 		case PUM_DTX:
-				dValue=pwdUmTo(dValore*(double)_sPower.sizDotPerInch.cx*1000,PUM_INCH)/1000;
-				break;
-
-		case PUM_DTXP:
-				dValue=((double) _sPd.sizPreviewPage.cx*dValore/_sPower.sumPaper.cx);
-
-
-/*
+		case PUM_DTXD:// PUM_DTX:
 				if (_sPd.bVirtual&&enUmTo!=PUM_DTX)//PUM_DTX) // dValore:realx=x:virtualx
 					dValue=(_sPd.sizPreviewPage.cx*dValore/_sPower.sumPaper.cx);
 					else
 					dValue=pwdUmTo(dValore,PUM_INCH)*_sPower.sizDotPerInch.cx;
-					*/
 				break;
 		
-//		case _DTYD:
+//		case PUM_DTYD:
 //		case PUM_DTY:
-
 		case PUM_DTY:
-			dValue=pwdUmTo(dValore*(double)_sPower.sizDotPerInch.cy*1000,PUM_INCH)/1000;
-			break;
-
-
-		case PUM_DTYP://PUM_DTY:
-			dValue=((double) _sPd.sizPreviewPage.cy*dValore/_sPower.sumPaper.cy);
-			/*
+		case PUM_DTYD://PUM_DTY:
 				if (_sPd.bVirtual&&enUmTo!=PUM_DTY)//PUM_DTY) // dValore:realx=x:virtualx
 					dValue=(_sPd.sizPreviewPage.cy*dValore/_sPower.sumPaper.cy);
 					else
 					dValue=pwdUmTo(dValore,PUM_INCH)*_sPower.sizDotPerInch.cy;
-					*/
-			break;
-
-		case PUM_DTHDX: // High Definition
-			dValue=pwdUmTo(dValore*HD_DPI,PUM_INCH);
-			break;
-
-		case PUM_DTHDY:
-			dValue=pwdUmTo(dValore*HD_DPI,PUM_INCH);
-			break;
+				break;
 
 		//
 		// da UM > in Inch
@@ -3459,24 +3380,22 @@ void * pwdGetObj(PWD_ITEM * psItem) {
 static void _drawText(PWD_DRAW * psDraw)//BOOL Printer,HDC psDraw->hDC,PDO_CHAREX *Lex,CHAR *pText,RECT *lpRect)
 {
 	PDO_TEXT * psText=pwdGetObj(psDraw->psItem);
-	BOOL bDebug=false;
-
+	// S_FAC	*psFac;	
+//	INT iLen;
+//	UINT uFormat=DT_BOTTOM|DT_SINGLELINE|DT_NOCLIP;
+//	TEXTMETRIC sTM;
+//	RECT sRect,*psRect;
+//	INT iVertical,iVerticalOld;
 
 	if (strEmpty(psText->pszText)) return;
-	_fontPowerText(	_sPd.bVirtual?PMA_PREVIEW:PMA_PRINT,
-					psDraw->hDC,
-					psText, 
-//					true,
-					NULL);
-//					_sPd.bVirtual);
-/*
-	if (bDebug)
-	{
-		RECT recQuad;
-		rectToI(&recQuad,&psDraw->recObj);
-		dcRect(psDraw->hDC,&recQuad,RGB(255,0,0),-1,1); // per Debug
-	}
-	*/
+
+	_fontPowerText(	psText, 
+					true,
+					psDraw->recObj.left,
+					psDraw->recObj.top,
+					NULL,
+					psDraw->hDC,_sPd.bVirtual);
+					
 		/*
 	psFac=_fontPowerCreate(psDraw->hDC,_sPd.bVirtual,psText,false,&sTM); // [font] > Stampa
 	iLen=wcslen(psFac->pwcText);
@@ -3526,9 +3445,6 @@ static void _drawText(PWD_DRAW * psDraw)//BOOL Printer,HDC psDraw->hDC,PDO_CHARE
 	*/
 }
 
-
-
-
 /*
 
 	// Se esiste un range
@@ -3569,10 +3485,10 @@ static void _drawTextBox(PWD_DRAW * psDraw)// BOOL Printer,HDC psDraw->hDC,PDO_C
 	// Calcolo le grandezze fisiche
 	//
 	psText=psDraw->psObj;
-	iCharHeight=(INT) pwdUm(_DTYD,psText->umCharHeight);
-	iCharWidth=(INT) pwdUm(_DTXD,psText->umCharWidth);
+	iCharHeight=(INT) pwdUm(PUM_DTYD,psText->umCharHeight);
+	iCharWidth=(INT) pwdUm(PUM_DTXD,psText->umCharWidth);
 	if (iCharHeight<1) return;
-	iExtraCharSpace=(INT) pwdUm(_DTXD,psText->umExtraCharSpace);
+	iExtraCharSpace=(INT) pwdUm(PUM_DTXD,psText->umExtraCharSpace);
 
 	// Trovo testo e font
 	pszText=(BYTE *) psText; pszText+=sizeof(PDO_TEXT);
@@ -3630,14 +3546,11 @@ PWD_TXI * pwdTextInfoCreate(PDO_TEXT * psText,PWD_RECT * pumRect) {
 
 	psTi->lstRow=lstCreate(sizeof(WCHAR *));
 	psTi->psText=psText;
-
 	hdc=CreateCompatibleDC(0);
+	psFac=_fontPowerCreate(hdc,false,psTi->psText,true,NULL); // [font] NO PRINT
 
 	// Calcolo dimensioni in dot dell'area
 	if (pumRect) {
-
-		psFac=_fontPowerCreate(hdc,false,psTi->psText,true,NULL); // [font] NO PRINT
-
 		psTi->recDot.left=(INT) pwdUmTo(pumRect->left,PUM_DTX);
 		psTi->recDot.top=(INT) pwdUmTo(pumRect->top,PUM_DTY);
 		psTi->recDot.right=(INT) pwdUmTo(pumRect->right,PUM_DTX);
@@ -3645,6 +3558,10 @@ PWD_TXI * pwdTextInfoCreate(PDO_TEXT * psText,PWD_RECT * pumRect) {
 		sizeCalc(&psTi->sizDot,&psTi->recDot);
 		psTi->iCharHeight=(INT) pwdUm(psText->umCharHeight,PUM_DTY);
 		psTi->iInterlinea=(INT) pwdUm(psText->umInterlinea,PUM_DTY);
+	}
+
+
+	if (pumRect) {
 
 		//
 		// Spezzo le linee in base all'allineamento
@@ -3675,7 +3592,7 @@ PWD_TXI * pwdTextInfoCreate(PDO_TEXT * psText,PWD_RECT * pumRect) {
 			pwBegin=pwcText;
 			
 			// Trova la linea piu lunga che sta nel Rect
-			bCRLF=false;
+			bCRLF=FALSE;
 			do                       // until the line is known / 
 			{
 				pwEnd=pwcText;
@@ -3747,22 +3664,17 @@ PWD_TXI * pwdTextInfoCreate(PDO_TEXT * psText,PWD_RECT * pumRect) {
 
 		psTi->sumText.cx= pwdUm(PUM_DTX,psTi->sizText.cx);
 		psTi->sumText.cy= pwdUm(PUM_DTY,psTi->sizText.cy);
-		_LFontAmbientDestroy(psFac);
 	}
 	else {
 	
-		_fontPowerText(	PMA_MISURE,	// Chiedo la dimensione
-						hdc,
-						psText, 
-//						false,
-						psTi);
-//						hdc,false);
-
-
+		psTi->sumText.cx= psTi->sumText.cx; //pwdUm(PUM_DTX,psFac->sizText.cx);
+		psTi->sumText.cy= psTi->sumText.cy; //pwdUm(PUM_DTY,psFac->sizText.cy);
 	
 	}
- 	DeleteDC(hdc);
-	
+
+
+	_LFontAmbientDestroy(psFac);
+	DeleteDC(hdc);
 	return psTi;
 }
 
@@ -3772,10 +3684,8 @@ PWD_TXI * pwdTextInfoCreate(PDO_TEXT * psText,PWD_RECT * pumRect) {
 PWD_TXI * pwdTextInfoDestroy(PWD_TXI * psTi) {
 	
 	WCHAR * pwc;
-	if (psTi->lstRow) {
-		for (lstLoop(psTi->lstRow,pwc)) {
-			ehFreeNN(pwc);
-		}
+	for (lstLoop(psTi->lstRow,pwc)) {
+		ehFreeNN(pwc);
 	}
 
 	lstDestroy(psTi->lstRow);
@@ -3817,9 +3727,9 @@ void _drawTextBox(PWD_DRAW * psDraw)
 	// Calcolo le grandezze fisiche
 	//
 	hdc=psDraw->hDC;
-	iCharHeight=(INT) pwdUmTo(psText->umCharHeight,_DTYD);
-	iInterlinea=(INT) pwdUmTo(psText->umInterlinea,_DTYD);
-	iBodyAlt=(INT) pwdUmTo(psTi->sumText.cy,_DTYD);
+	iCharHeight=(INT) pwdUmTo(psText->umCharHeight,PUM_DTYD);
+	iInterlinea=(INT) pwdUmTo(psText->umInterlinea,PUM_DTYD);
+	iBodyAlt=(INT) pwdUmTo(psTi->sumText.cy,PUM_DTYD);
 	psFac=_fontPowerCreate(psDraw->hDC,_sPd.bVirtual,psText,false,&sTM); // [draw-box]
 	pwcText=psFac->pwcText;
 
@@ -4016,9 +3926,9 @@ static void _drawRect(PWD_DRAW *psDraw) {
 	RECT	recObjInt;
 
 
-	iPenWidth=(INT) pwdUmTo(psBox->sPenBrush.umPenWidth,_DTXD); //Box->iPenWidth;
-	sizRound.cx=(INT) pwdUmTo(psBox->sumRound.cx,_DTXD); 
-	sizRound.cy=(INT) pwdUmTo(psBox->sumRound.cy,_DTYD); 
+	iPenWidth=(INT) pwdUmTo(psBox->sPenBrush.umPenWidth,PUM_DTXD); //Box->iPenWidth;
+	sizRound.cx=(INT) pwdUmTo(psBox->sumRound.cx,PUM_DTXD); 
+	sizRound.cy=(INT) pwdUmTo(psBox->sumRound.cy,PUM_DTYD); 
 
 	rectToI(&recObjInt,&psDraw->recObj);
 	
@@ -4076,8 +3986,8 @@ static void _drawLine(PWD_DRAW *psDraw) {
 	INT iPenWidth;
 	PDO_BOXLINE *psBox=pwdGetObj(psDraw->psItem);
 
-	//iPenWidth=(INT) pwdUm(_DTXD,psBox->sPenBrush.umPenWidth); 
-	iPenWidth=(INT) pwdUmTo(psBox->sPenBrush.umPenWidth,_DTXD); //Box->iPenWidth;
+	//iPenWidth=(INT) pwdUm(PUM_DTXD,psBox->sPenBrush.umPenWidth); 
+	iPenWidth=(INT) pwdUmTo(psBox->sPenBrush.umPenWidth,PUM_DTXD); //Box->iPenWidth;
 
 	if (iPenWidth>1)
 	{
@@ -4112,25 +4022,20 @@ static void _drawPath(PWD_DRAW * psDraw) {
 	INT		iPenWidth;
 	HPEN	hPen=0,hPenOld;
 	HBRUSH	hBrush,hBrushOld;
-	BOOL	bBrushFree=false;
-	BOOL	bPenFree=false;
+	BOOL	bBrushFree;
 	EH_LST  lstPath;
 
-	iPenWidth=(INT) pwdUmTo(psPath->sPenBrush.umPenWidth,_DTXD); //Box->iPenWidth;
+	iPenWidth=(INT) pwdUmTo(psPath->sPenBrush.umPenWidth,PUM_DTXD); //Box->iPenWidth;
 
 	//
 	// Seleziono la penna (se ho colore e spessore
 	//
-	if (!psPath->sPenBrush.colPen.dAlpha||!psPath->sPenBrush.umPenWidth)
+	if (!psPath->sPenBrush.colPen.dAlpha&&psPath->sPenBrush.umPenWidth)
 	{
-		//hPen=CreatePen(psPath->sPenBrush.iPenStyle, iPenWidth, psPath->sPenBrush.colPen.ehColor); // era 1
-		hPen=GetStockObject(NULL_PEN);
-		bPenFree=false;
+		hPen=CreatePen(psPath->sPenBrush.iPenStyle, iPenWidth, psPath->sPenBrush.colPen.ehColor); // era 1
 	}
 	else {
-
 		hPen=CreatePen(psPath->sPenBrush.iPenStyle, iPenWidth, psPath->sPenBrush.colPen.ehColor); // era 1
-		bPenFree=true;
 	}
 
 	//
@@ -4210,14 +4115,13 @@ static void _drawPath(PWD_DRAW * psDraw) {
 	_pathDestroy(lstPath);
 	EndPath(psDraw->hDC);
 
-	if (bBrushFree&&bPenFree)
+	if (bBrushFree)
 		StrokeAndFillPath(psDraw->hDC);
-	else if (bPenFree)
+		else
 		StrokePath(psDraw->hDC);
-	else if (bBrushFree)
-		FillPath(psDraw->hDC);
+	
 
-	if (bPenFree)	DeleteObject(hPen);		// Cancella la penna usata
+	if (hPen)	DeleteObject(hPen);		// Cancella la penna usata
 	if (bBrushFree) DeleteObject(hBrush);	// Cancella il pennello usato
 
 }
@@ -4643,99 +4547,6 @@ void pwdRectRound(PWD_RECT *prumRect,PWD_COLOR colPen,PWD_COLOR colSolidBrush,PW
 }
 
 //
-// _fontControl() - Controllo del font
-//
-
-static int CALLBACK _EnumFontFamiliesExProc( ENUMLOGFONTEXW * psLogFont, NEWTEXTMETRICEX *lpntme, int FontType, LPARAM lParam )
-{ 
-    //int far * aiFontCount = (int far *) aFontCount; 
-	EH_LST lst=(EH_LST) lParam;
-//	CHAR szName[300];
-
-	if (FontType & TRUETYPE_FONTTYPE) {
-//		_(sFont);
-		//strcpy(szName,psLogFont->elfLogFont.lfFaceName);
-
-//		sFont.enStyle=(psLogFont->elfLogFont.lfItalic?STYLE_ITALIC:0)|((psLogFont->elfLogFont.lfWeight>400)?STYLE_BOLD:0);
-//		if (strstr(szName," Bold")) sFont.enStyle|=STYLE_BOLD;
-		lstPush(lst,&psLogFont->elfLogFont);//&sFont);
-	}
-
-	return true;
-//    UNREFERENCED_PARAMETER( lplf ); 
-  //  UNREFERENCED_PARAMETER( lpntm ); 
-} 
-
-static BOOL _fontSearch(PDO_TEXT * psText,LOGFONTW * psDest) {
-
-	EH_LST lst=lstCreate(sizeof(LOGFONTW));
-	LOGFONTW * psLf=NULL;
-	WCHAR * pwcFontFace;
-	HDC hdc;
-	INT a=0;
-	BOOL bFound=FALSE;
-
-	hdc=CreateCompatibleDC(0);
-	pwcFontFace=utfToWcs(psText->pszFontFace?psText->pszFontFace:_sPower.pszFontBodyDefault);
-	EnumFontsW(hdc,  pwcFontFace, (FONTENUMPROCW) _EnumFontFamiliesExProc, (LPARAM) lst);
-	DeleteDC(hdc);
-	ehFree(pwcFontFace);
-	
-	if (!psText->dwWeight) {
-
-		psText->dwWeight=FW_NORMAL;
-		if (psText->enStyles&STYLE_BOLD) psText->dwWeight=FW_BOLD;
-	
-	}
-	if (psText->enStyles&STYLE_ITALIC) psText->dwItalic=true;
-
-	if (lst->iLength) {
-
-		bFound=true;
-
-		if (lst->iLength>1) {
-			
-			for (lstLoop(lst,psLf)) {
-/*
-							DEFAULT_CHARSET, // Tipo di codepage vedi CreateFont (0=Ansi)
-							//				  FERRA_OUTPRECISION, // Output precision
-							OUT_DEVICE_PRECIS,//OUT_DEFAULT_PRECIS, // Output precision
-							0, // Clipping Precision
-							PROOF_QUALITY,//DEFAULT_QUALITY,//PROOF_QUALITY, // Qualità di stampa (DEFAULT,DRAFT ecc...)
-							VARIABLE_PITCH,//DEFAULT_PITCH,//FIXED_PITCH, // Pitch & Family (???)*/
-
-				if (//psLf->lfCharSet==DEFAULT_CHARSET&&
-					//psLf->lfOutPrecision==OUT_DEVICE_PRECIS&&
-					//psLf->lfQuality==PROOF_QUALITY&&
-					//psLf->lfPitchAndFamily==VARIABLE_PITCH&&
-					psLf->lfWeight==psText->dwWeight&&
-					psLf->lfItalic==psText->dwItalic) {
-					
-						break;
-				}
-			
-//				printf("%d) %S" CRLF,a++,psLf->lfFaceName);
-
-			}
-
-			if (!psLf) psLf=lstGet(lst,0); // Non trovato, becco il primo
-
-
-		} else {
-
-			psLf=lstGet(lst,0);
-		
-		}
-	}
-	if (psDest&&psLf) memcpy(psDest,psLf,sizeof(LOGFONTW));
-	lstDestroy(lst);
-
-	return bFound;
-
-}
-
-
-//
 // pwdText() - Disegna un testo
 //
 void pwdText(PWD_VAL	umX,
@@ -4749,53 +4560,38 @@ void pwdText(PWD_VAL	umX,
 
 {
 
-	PDO_TEXT	sObj;
-	
-//	PWD_RECT sumRect;
-//	PWD_SIZE sumSize;
-	PWD_TXI sTi;
-//	S_FAC *psFac;
-//	HDC hdc;
+	PDO_TEXT sObj;
+	PWD_RECT sumRect;
+	PWD_SIZE sumSize;
+	S_FAC *psFac;
+	HDC hdc;
 	
 	if (strEmpty(pszStr)) return; 
 
 	_(sObj);
-//	_(sumRect);
-	sObj.umX=umX; 
-	sObj.umY=umY;
+	_(sumRect);
+	sumRect.left=umX; sumRect.top=umY;
 	sObj.colText=colText;
 	sObj.enStyles=enStyles;
 	sObj.enAlign=enAlign;
 	sObj.pszFontFace=pszFont;
 
-	sObj.bFontFound=_fontSearch(&sObj,&sObj.sLogFontw);
-	if (!sObj.bFontFound)
-	{	
-		printf("(*) Font not found" CRLF);
-		return;
-	}
+	//
+	// Controllo del font
+	//
+
+
+
+
 	if (umCharHeight>0) sObj.umCharHeight=umCharHeight; else sObj.umCharHeight=_sPower.umRowHeight;
 	sObj.pszText=pszStr;
 
-	_fontPowerText(	PMA_MISURE,
-					NULL,
-					&sObj, 
-					//false,
-					&sTi);
-					//NULL,
-					//false);
-
-	_addItem(PDT_TEXT,&sTi.rumText,&sObj,sizeof(sObj));
-
-	//DeleteDC(hdc);
-
-	// Da vedere
-	// Calcolo in base ai DPI della dimensione dell'oggetto
-/*
+	// Calcolo in base ai DPI la dimensione dell'oggetto
 	hdc=CreateCompatibleDC(0);
 	psFac=_fontPowerCreate(hdc,false,&sObj,false,NULL); // [font] NO PRINT
-	sumSize.cx=psFac->sumText.cx; // pwdUm(PUM_DTX,psFac->sizText.cx);
-	sumSize.cy=psFac->sumText.cy; // pwdUm(PUM_DTY,psFac->sizText.cy);
+
+	sumSize.cx=psFac->sumText.cx;//pwdUm(PUM_DTX,psFac->sizText.cx);
+	sumSize.cy=psFac->sumText.cy;//pwdUm(PUM_DTY,psFac->sizText.cy);
 	DeleteDC(hdc);
  	switch (sObj.enAlign) {
 
@@ -4816,7 +4612,6 @@ void pwdText(PWD_VAL	umX,
 	
 	_addItem(PDT_TEXT,&sumRect,&sObj,sizeof(sObj));
 	_LFontAmbientDestroy(psFac);
-	*/
 
 }
 
@@ -4835,25 +4630,23 @@ void pwdTextInRect(PWD_RECT *prum,
 				   CHAR *pszStr,
 				   BOOL bJustifyLastRow)
 {
-	PDO_TEXT sText;
+	PDO_TEXT sObj;
 	
 	if (strEmpty(pszStr)) return; 
 
-	_(sText);
+	_(sObj);
 	
-	sText.bMultiline=true;
-	sText.colText=colText;
-	sText.enStyles=enStyles;
-	sText.enAlign=enAlign;
-	sText.pszFontFace=pszFont;
-	if (umCharHeight>0) sText.umCharHeight=umCharHeight; else sText.umCharHeight=_sPower.umRowHeight;
-	sText.pszText=pszStr;
+	sObj.colText=colText;
+	sObj.enStyles=enStyles;
+	sObj.enAlign=enAlign;
+	sObj.pszFontFace=pszFont;
+	if (umCharHeight>0) sObj.umCharHeight=umCharHeight; else sObj.umCharHeight=_sPower.umRowHeight;
+	sObj.pszText=pszStr;
 
-	sText.umInterlinea=umInterLinea;
-	sText.bJustifyLast=bJustifyLastRow;
+	sObj.umInterlinea=umInterLinea;
+	sObj.bJustifyLast=bJustifyLastRow;
 
-	_addItem(PDT_TEXTBOX,prum,&sText,sizeof(sText));
-
+	_addItem(PDT_TEXTBOX,prum,&sObj,sizeof(sObj));
 }
 
 //
@@ -4872,28 +4665,27 @@ PWD_VAL pwdTextInRectEx(PWD_RECT *	prum,
 						INT			iMaxRows,
 						INT *		lpiRows)
 {
-	PDO_TEXT sText;
+	PDO_TEXT sObj;
 	
 	if (strEmpty(pszStr)) return 0; 
 
-	_(sText);
+	_(sObj);
 	
-	sText.bMultiline=true;
-	sText.colText=colText;
-	sText.enStyles=enStyles;
-	sText.enAlign=enAlign;
-	sText.pszFontFace=pszFont;
-	if (umCharHeight>0) sText.umCharHeight=umCharHeight; else sText.umCharHeight=_sPower.umRowHeight;
-	sText.pszText=pszStr;
+	sObj.colText=colText;
+	sObj.enStyles=enStyles;
+	sObj.enAlign=enAlign;
+	sObj.pszFontFace=pszFont;
+	if (umCharHeight>0) sObj.umCharHeight=umCharHeight; else sObj.umCharHeight=_sPower.umRowHeight;
+	sObj.pszText=pszStr;
 
-	sText.umInterlinea=umInterLinea;
-	sText.umExtraCharSpace=umExtraCharSpace;
-	sText.bJustifyLast=bJustifyLastRow;
-	sText.iMaxRows=iMaxRows;
+	sObj.umInterlinea=umInterLinea;
+	sObj.umExtraCharSpace=umExtraCharSpace;
+	sObj.bJustifyLast=bJustifyLastRow;
+	sObj.iMaxRows=iMaxRows;
 
-	_addItem(PDT_TEXTBOX,prum,&sText,sizeof(sText));
+	_addItem(PDT_TEXTBOX,prum,&sObj,sizeof(sObj));
 	
-	return pwdGetTextInRectAlt(prum,&sText,lpiRows);
+	return pwdGetTextInRectAlt(prum,&sObj,lpiRows);
 }
 
 //
@@ -4901,7 +4693,7 @@ PWD_VAL pwdTextInRectEx(PWD_RECT *	prum,
 //
 void pwdTextJs(PWD_VAL umX,PWD_VAL umY,CHAR * pszJsParams,CHAR *pszText) 
 {
-	PDO_TEXT sText;
+	PDO_TEXT sObj;
 	PWD_RECT sumRect;
 	PWD_SIZE sumSize;
 	PWD_VAL umCharHeight;
@@ -4918,24 +4710,22 @@ void pwdTextJs(PWD_VAL umX,PWD_VAL umY,CHAR * pszJsParams,CHAR *pszText)
 	if (strEmpty(pszText)) return; 
 	psJs=jsonCreate(pszJsParams); if (!psJs) ehError();
 
-	_(sText);
+	_(sObj);
 	_(sumRect);
-	sText.umX=umX;
-	sText.umY=umY;
 	sumRect.left=umX; sumRect.top=umY;
-	sText.pszText=pszText;
+	sObj.pszText=pszText;
 
-	psz=jsonGet(psJs,"color"); if (psz) sText.colText=pwdColor(colorWeb(psz));
+	psz=jsonGet(psJs,"color"); if (psz) sObj.colText=pwdColor(colorWeb(psz));
 	
 	//
 	// Stili
 	//
 	psz=jsonGet(psJs,"style"); if (psz) enStyles=atoi(psz);
-	psz=jsonGet(psJs,"italic"); if (psz) {if (!strCmp(psz,"true")) enStyles|=STYLE_ITALIC; else sText.dwItalic=atoi(psz);}
-	psz=jsonGet(psJs,"underline"); if (psz) {if (!strCmp(psz,"true")) enStyles|=STYLE_UNDERLINE; else sText.dwUnderline=atoi(psz);}
-	sText.enStyles=enStyles;
+	psz=jsonGet(psJs,"italic"); if (psz) {if (!strCmp(psz,"true")) enStyles|=STYLE_ITALIC; else sObj.dwItalic=atoi(psz);}
+	psz=jsonGet(psJs,"underline"); if (psz) {if (!strCmp(psz,"true")) enStyles|=STYLE_UNDERLINE; else sObj.dwUnderline=atoi(psz);}
+	sObj.enStyles=enStyles;
 
-	psz=jsonGet(psJs,"weight"); if (psz) sText.dwWeight=atoi(psz);
+	psz=jsonGet(psJs,"weight"); if (psz) sObj.dwWeight=atoi(psz);
 		
 	//
 	// Allineamento
@@ -4951,36 +4741,36 @@ void pwdTextJs(PWD_VAL umX,PWD_VAL umY,CHAR * pszJsParams,CHAR *pszText)
 	else if (!strCmp(psz,"middle"))  enAlign|=PDA_MIDDLE;
 	else if (!strCmp(psz,"bottom"))  enAlign|=PDA_BOTTOM;
 
-	sText.enAlign=enAlign;
+	sObj.enAlign=enAlign;
 
 	// Font
 	psz=jsonGet(psJs,"fontface"); if (psz) pszFontFace=psz;
-	sText.pszFontFace=pszFontFace; if (strEmpty(sText.pszFontFace)) ehError();
+	sObj.pszFontFace=pszFontFace; if (strEmpty(sObj.pszFontFace)) ehError();
 
 	// Altezza
 	psz=jsonGet(psJs,"height"); if (psz) umCharHeight=atof(psz);
-	if (umCharHeight!=0) sText.umCharHeight=umCharHeight; else sText.umCharHeight=_sPower.umRowHeight;
+	if (umCharHeight!=0) sObj.umCharHeight=umCharHeight; else sObj.umCharHeight=_sPower.umRowHeight;
 
 	// Larghezza del carattere
-	psz=jsonGet(psJs,"width"); if (psz) sText.umCharWidth=atof(psz);
+	psz=jsonGet(psJs,"width"); if (psz) sObj.umCharWidth=atof(psz);
 
 	// Spaces
-	psz=jsonGet(psJs,"charspace"); if (psz) sText.umExtraCharSpace=atof(psz);
+	psz=jsonGet(psJs,"charspace"); if (psz) sObj.umExtraCharSpace=atof(psz);
 
 
 	// Calcolo in base ai DPI la dimensione dell'oggetto
 	hdc=CreateCompatibleDC(0);
-	psFac=_fontPowerCreate(hdc,false,&sText,false,&sTm); // [font] NO PRINT
+	psFac=_fontPowerCreate(hdc,false,&sObj,false,&sTm); // [font] NO PRINT
 	sumSize.cx=psFac->sumText.cx;//pwdUm(PUM_DTX,psFac->sizText.cx);
 	sumSize.cy=psFac->sumText.cy;//pwdUm(PUM_DTY,psFac->sizText.cy);
 	
 	psz=jsonGet(psJs,"baseline"); if (psz) bBaseLine=atoi(psz);
 	if (bBaseLine) {
 	//	sumRect.top-=pwdUm(PUM_DTY,sTm.tmAscent);
-		sText.enAlign|=PDA_BASELINE;
+		sObj.enAlign|=PDA_BASELINE;
 	}
 	DeleteDC(hdc);
- 	switch (sText.enAlign) {
+ 	switch (sObj.enAlign) {
 
 		case PDA_LEFT:
 			break;
@@ -4998,7 +4788,7 @@ void pwdTextJs(PWD_VAL umX,PWD_VAL umY,CHAR * pszJsParams,CHAR *pszText)
 	sumRect.right=sumRect.left+sumSize.cx;
 	sumRect.bottom=sumRect.top+sumSize.cy;
 	
-	_addItem(PDT_TEXT,&sumRect,&sText,sizeof(sText));
+	_addItem(PDT_TEXT,&sumRect,&sObj,sizeof(sObj));
 	_LFontAmbientDestroy(psFac);
 	jsonDestroy(psJs);
 
@@ -5353,7 +5143,6 @@ PWD_VAL pwdGetTextInRectAlt(PWD_RECT * pumRect,PDO_TEXT * psText,INT * lpiRows) 
 	if (lpiRows) * lpiRows=psTi->lstRow->iLength;
 	cyRet=psTi->sumText.cy;
 	pwdTextInfoDestroy(psTi);
-
 /*
 	//
 	// ATTENZIONE
@@ -5365,16 +5154,16 @@ PWD_VAL pwdGetTextInRectAlt(PWD_RECT * pumRect,PDO_TEXT * psText,INT * lpiRows) 
 	hdc=CreateCompatibleDC(0);
 
 	psFac=_fontPowerCreate(hdc,psText,false,NULL);
-	recArea.left=(INT) pwdUm(_DTXD,prRect->left);
-	recArea.right=(INT) pwdUm(_DTXD,prRect->right);
-	recArea.top=(INT) pwdUm(_DTXD,prRect->top);
-	recArea.bottom=(INT) pwdUm(_DTXD,prRect->bottom);
+	recArea.left=(INT) pwdUm(PUM_DTXD,prRect->left);
+	recArea.right=(INT) pwdUm(PUM_DTXD,prRect->right);
+	recArea.top=(INT) pwdUm(PUM_DTXD,prRect->top);
+	recArea.bottom=(INT) pwdUm(PUM_DTXD,prRect->bottom);
 
 	y=_textInRect(hdc,&recArea,psText,psFac->pwcText,FALSE,lpiRows);//,INT iMaxRows);
 
 	_LFontAmbientDestroy(psFac);
 	DeleteDC(hdc);
-	if (!y) //y=(INT) pwdUm(_DTYD,psText->umCharHeight);
+	if (!y) //y=(INT) pwdUm(PUM_DTYD,psText->umCharHeight);
 		y=_textInRect(hdc,&recArea,psText,L" ",FALSE,lpiRows);//,INT iMaxRows);
 	cyRet=pwdUm(PUM_DTYD_TO_UM ,y);
 	*/
@@ -5382,316 +5171,64 @@ PWD_VAL pwdGetTextInRectAlt(PWD_RECT * pumRect,PDO_TEXT * psText,INT * lpiRows) 
 }
 
 //
-// _fontPowerText() > Calcola (le dimensioni) e Stampa font/testo
+// _fontPowerText() > Stampa o ritorna dati su un font/testo
 //
-void _fontPowerText(EN_PMODE	enMode,	
+void _fontPowerText(PDO_TEXT *	psText,
+					BOOL		bPrint,
+					double		x,
+					double		y,
+
+					PWD_TXI *	psTxiFont,
 					HDC			hdc,
-					PDO_TEXT *	psText,
-//					BOOL		bPrint,
-					PWD_TXI *	psTi)
-//					BOOL		bPreview
-					 
-{
+					BOOL		bPreview
+					
+					) {
 
-	WCHAR * pwcFontFace, * pwcText;
-	INT	 iCharHeight,iCharWidth,iExtraSpace;
-	SIZE	sizText;
-	INT iLen;
-//	LOGFONTW sLogFont;
-	HFONT hFont,hOldFont;
-	
-	BOOL bDcDelete=false;
-	TEXTMETRIC sTextMetrics;
-	PWD_UM	enDpiX,enDpiY; // Tipo di conversione
-
-	switch (enMode) {
-	
-		case PMA_MISURE:
-			enDpiX=PUM_DTHDX; enDpiY=PUM_DTHDY;
-			break;
-	
-		case PMA_PREVIEW:
-			enDpiX=_DTXD; enDpiY=_DTYD;
-			break;
-
-		case PMA_PRINT:
-			enDpiX=PUM_DTX; enDpiY=PUM_DTY;
-			break;
-
-	}
-
-	if (!hdc) {hdc=CreateCompatibleDC(0); bDcDelete=true;}
+	WCHAR * pwcFontFamily, * pwcText;
+	double dCharHeight,dCharWidth,dExtraSpace;
 
 	// Trovo testo e font
-	if (!strEmpty(psText->pszFontFace)) pwcFontFace=_strTextDecode(psText->pszFontFace); else pwcFontFace=_strTextDecode(_sPower.pszFontBodyDefault);
+	if (!strEmpty(psText->pszFontFace)) pwcFontFamily=_strTextDecode(psText->pszFontFace); else pwcFontFamily=_strTextDecode(_sPower.pszFontBodyDefault);
 	
 	// Testo
-	pwcText=_strTextDecode(psText->pszText); iLen=wcslen(pwcText);
+	pwcText=_strTextDecode(psText->pszText);
+//	iTextLen=wcslen(psFac->pwcText);
 
 	//
-	// Trasformo x/y e dimensioni del testo in punti sulla base della densità del DIP
+	// Calcolo le grandezze fisiche
 	//
+	dCharHeight=pwdUmTo(psText->umCharHeight,bPreview?PUM_DTYD:PUM_DTY);
+	dCharWidth=pwdUmTo(psText->umCharWidth,bPreview?PUM_DTXD:PUM_DTX);
+	dExtraSpace=pwdUmTo(psText->umExtraCharSpace,bPreview?PUM_DTXD:PUM_DTX);
+	if (dCharHeight!=0) {
 
-	iCharHeight=(INT) numRound(pwdUmTo(psText->umCharHeight,enDpiY),0,true);
-	iCharWidth=(INT) numRound(pwdUmTo(psText->umCharWidth,enDpiX),0,true);	 // <-- Non gestito
-	iExtraSpace=(INT) numRound(pwdUmTo(psText->umExtraCharSpace,enDpiX),0,true); // <-- Non gestito 
+		if (bPrint) {
+
+			POINTD pt;
+			pt.x=x; pt.y=y;
+			dcFontText(	hdc,
+						pwcText,	
+						&pt,
+
+						pwcFontFamily,
+						dCharHeight,
+						psText->enStyles,
+
+						NULL);
+		
+		}
+
 	
-	//	if (iCharHeight==0) return psFac;
+	}
 
-	//
-	// Stampa il testp
-	//
-	if (psText->enAlign&DPL_HEIGHT_TYPO) iCharHeight=-iCharHeight;
+	ehFreePtrs(2,&pwcText,&pwcFontFamily);
 
-	hFont=CreateFontW(	
-							iCharHeight,	// Altezza del carattere
-							iCharWidth,		// Larghezza del carattere (0=Default)
-							0,				// Angolo di rotazione x 10
-							0,				// Angolo di orientamento bo ???
-
-							(psText->enStyles&STYLE_BOLD)?FW_BOLD:psText->dwWeight,//_sPower.fBold;//sys.fFontBold;
-							(psText->enStyles&STYLE_ITALIC)?1:psText->dwItalic,//_sPower.fItalic;//sys.fFontItalic;
-							(psText->enStyles&STYLE_UNDERLINE)?1:psText->dwUnderline,//_sPower.fUnderLine;//sys.fFontItalic;					 
-
-							0, // Flag StrikeOut  ON/OFF
-							DEFAULT_CHARSET, // Tipo di codepage vedi CreateFont (0=Ansi)
-							//				  FERRA_OUTPRECISION, // Output precision
-							OUT_DEVICE_PRECIS,//OUT_DEFAULT_PRECIS, // Output precision
-							0, // Clipping Precision
-							PROOF_QUALITY,//DEFAULT_QUALITY,//PROOF_QUALITY, // Qualità di stampa (DEFAULT,DRAFT ecc...)
-							VARIABLE_PITCH,//DEFAULT_PITCH,//FIXED_PITCH, // Pitch & Family (???)
-							//0,
-							//"Arial"); // Nome del font
-							pwcFontFace); // Nome del font "Courier New"
-
-
-	//
-	// Allineamento
-	//
-
-	hOldFont=SelectObject(hdc, hFont);
-	SetMapMode(hdc, MM_TEXT);
-	SetTextCharacterExtra(hdc,iExtraSpace);//1); // <--- Cambiato nel 2009
-	SetTextJustification(hdc,0,0);
-
-	//
-	// Calcolo le grandezze fisiche in UM
-	//
-	switch (enMode) {
-	
-		case PMA_MISURE:
-
-			//
-			// a. Testo Su una linea
-			//
-			if (!psText->bMultiline) {
-
-				double py=psText->umY;
-
-				GetTextExtentPoint32W(hdc, pwcText, iLen,&sizText);
-				psTi->sumText.cx= pwdUm(enDpiX,sizText.cx);
-				psTi->sumText.cy= pwdUm(enDpiY,sizText.cy);
-
-				// Calcolare spostamento in asse Y
-				if (psText->enAlign&DPL_HEIGHT_TYPO) {
-				
-					GetTextMetrics(hdc,&sTextMetrics);
-					py-=pwdUm(enDpiY,sTextMetrics.tmAscent);
-
-				}
-
-				switch (psText->enAlign&0xF)
-				{
-					case PDA_LEFT: 
-						psTi->rumText.left=psText->umX;
-						psTi->rumText.top=py;
-						psTi->rumText.right=psTi->rumText.left+psTi->sumText.cx;
-						psTi->rumText.bottom=psTi->rumText.top+psTi->sumText.cy;
-						break;
-
-					case PDA_RIGHT: 
-						psTi->rumText.right=psText->umX;
-						psTi->rumText.top=py;
-						psTi->rumText.left=psTi->rumText.right-psTi->sumText.cx;
-						psTi->rumText.bottom=psTi->rumText.top+psTi->sumText.cy;
-						break;
-
-					case PDA_CENTER: 
-						psTi->rumText.left=psText->umX-psTi->sumText.cx/2;
-						psTi->rumText.top=py;
-						psTi->rumText.right=psTi->rumText.left+psTi->sumText.cx;
-						psTi->rumText.bottom=psTi->rumText.top+psTi->sumText.cy;
-						break;
-
-					default:
-						ehError();
-				}	
-
-			}
-			//
-			// b. Misura del Testo in un rettangolo (multiline)
-			//
-			else  {
-
-				ehError();
-
-			}
-			break;
-
-
-		/*
-
-				pt.x=psText->umX;
-				pt.y=psText->umY;
-				dcFontText(	hdc,
-							pwcText,	
-							&pt, // Colore non indicato
-							0,
-
-							&psText->sLogFontw,
-							pwcFontFamily,
-							psText->umCharHeight,	// Altezza in un di misura
-							psText->enStyles,
-							psText->enAlign,
-
-							&sizText,
-							&recText);
-				if (psTi) {
-
-					memset(psTi,0,sizeof(PWD_TXI));
-
-					//
-					// Ritorno in unità di misura
-					//
-					psTi->sumText.cx= sizText.cx; // pwdUm(bPreview?_DTXD:PUM_DTX,sizText.cx); // psFac->sumText.cx; //pwdUm(PUM_DTX,psFac->sizText.cx);
-					psTi->sumText.cy= sizText.cy; // pwdUm(bPreview?_DTYD:PUM_DTY,sizText.cy); // psFac->sumText.cy; //pwdUm(PUM_DTY,psFac->sizText.cy);
-					psTi->rumText.left= recText.left;
-					psTi->rumText.top= recText.top;
-					psTi->rumText.right= recText.right;
-					psTi->rumText.bottom= recText.bottom;
-
-				}
-		*/
-	
-		case PMA_PREVIEW:
-		case PMA_PRINT:
-			{
-				RECT	sRect;
-				POINTD	pt;
-				INT		iVertical;
-				UINT	uOld;
-
-				SetBkMode(hdc,TRANSPARENT); 
-				SetTextColor(hdc,psText->colText.ehColor);
-
-				// Stampa
-				_pointToPixel(psText->umX,psText->umY,&pt.x,&pt.y);
-
-				//
-				// a. Testo Su una linea
-				//
-				if (!psText->bMultiline) {
-					
-					UINT uMode=0;
-
-					switch (psText->enAlign&0xf)
-					{
-						case PDA_JUSTIFY:
-						case PDA_LEFT: 
-							uMode|=TA_LEFT; 
-							break;
-
-						case PDA_RIGHT: 
-							uMode|=TA_RIGHT; 
-							break;
-
-						case PDA_CENTER: 
-							uMode|=TA_CENTER; 
-							break;
-					}
-
-					uMode|=TA_TOP;
-					if (psText->enAlign&PDA_TOP) uMode|=TA_TOP;
-					else if (psText->enAlign&PDA_BOTTOM) uMode|=TA_BOTTOM;
-					else if (psText->enAlign&PDA_BASELINE) uMode|=TA_BASELINE;
-
-					uOld=SetTextAlign(hdc,uMode);
-					TextOutW(hdc, (INT) pt.x, (INT) pt.y, pwcText, iLen);
-
-					SetTextAlign(hdc,uOld);
-
- 				} else {
-
-				//
-				// b. Multiline
-				//
-					UINT	uFormat=DT_BOTTOM|DT_SINGLELINE|DT_NOCLIP;
-
-					switch (psText->enAlign&0xf) {
-
-						case PDA_LEFT: 
-							uFormat|=DT_LEFT; 
-							break;
-
-						case PDA_RIGHT:
-							uFormat|=DT_RIGHT; 
-							break;
-
-						case PDA_CENTER: 
-							uFormat|=DT_CENTER; 
-							break;
-					
-					}
-					
-					iVertical=TA_TOP;
-					if (psText->enAlign&PDA_TOP) iVertical=TA_TOP;
-					else if (psText->enAlign&PDA_BOTTOM) iVertical=TA_BOTTOM;
-					else if (psText->enAlign&PDA_BASELINE) iVertical=TA_BASELINE;
-
-			/*
-					if (psText->bBaseLine) {
-						rectCopy(sRect,psDraw->recObj);
-						sRect.top-=sTM.tmAscent;
-						sRect.bottom-=sTM.tmAscent;
-						psRect=&sRect;
-					} 
-					else {
-						psRect=&psDraw->recObj;
-					}
-					*/
-				// 	dcRect(psDraw->hDC,&psDraw->recObj,RGB(255,0,0),-1,1); // per Debug
-
-					sRect.left=(INT) floor(pt.x);
-					sRect.top=(INT) floor(pt.y);
-					
-					sRect.right=sRect.left+10000; // Devo avere le dimensioni
-					sRect.bottom=sRect.top+10000;
-
-					uOld=SetTextAlign(hdc,iVertical);
-					DrawTextW(	hdc,
-								pwcText,iLen,
-								&sRect,//&psDraw->recObj,
-								uFormat);
-
-					// _textInRect(psDraw->hDC,&psDraw->recObj,psText,psFac->pwcText,TRUE,&iRows);
-					SetTextAlign(hdc,uOld);
-				}
-				break;
-			}
-	}		
-	ehFreePtrs(2,&pwcText,&pwcFontFace);
-
-	SelectObject(hdc, hOldFont);
-	DeleteObject(hFont);
-
-	if (bDcDelete) 
-		DeleteDC(hdc);
 
 }
 
 
 //
-// _fontPowerCreate()
+// _LFontAmbientBuilder()
 //
 static S_FAC * _fontPowerCreate(HDC hdc,
 								BOOL bVirtual,
@@ -5717,9 +5254,9 @@ static S_FAC * _fontPowerCreate(HDC hdc,
 	//
 	// Calcolo le grandezze fisiche
 	//
-	iCharHeight=(INT) pwdUmTo(psText->umCharHeight,bVirtual?_DTYD:PUM_DTY);
-	iCharWidth=(INT) pwdUmTo(psText->umCharWidth,bVirtual?_DTXD:PUM_DTX);
-	iExtraSpace=(INT) pwdUmTo(psText->umExtraCharSpace,bVirtual?_DTXD:PUM_DTX);
+	iCharHeight=(INT) pwdUmTo(psText->umCharHeight,bVirtual?PUM_DTYD:PUM_DTY);
+	iCharWidth=(INT) pwdUmTo(psText->umCharWidth,bVirtual?PUM_DTXD:PUM_DTX);
+	iExtraSpace=(INT) pwdUmTo(psText->umExtraCharSpace,bVirtual?PUM_DTXD:PUM_DTX);
 	if (iCharHeight==0) return psFac;
 
 	
@@ -6373,7 +5910,7 @@ static void _pdfSetFont(HPDF_Page psPage,
 		if ((psText->enAlign&DPL_HEIGHT_TYPO)) 
 			{
 	 			dFontAltCalc=dFontAlt;
-				// *pdBaseLineOffset=drBaseLine;
+				*pdBaseLineOffset=dFontAlt;
 			}
 			else
 			{
@@ -6383,13 +5920,9 @@ static void _pdfSetFont(HPDF_Page psPage,
 
 				// Calcolo la "baseline" (ritorno la parte discendente)
 				// dDescent:1000=x:dFontAltCalc;
-				// drBaseLine=(HPDF_REAL) ((dFontAltCalc*dDescent)/1000);
-				
-			}
-
-		drBaseLine=(HPDF_REAL) ((dFontAltCalc*dDescent)/1000);
-		*pdBaseLineOffset=drBaseLine;
-
+				drBaseLine=(HPDF_REAL) ((dFontAltCalc*dDescent)/1000);
+				*pdBaseLineOffset=drBaseLine;
+		}
 
 	if (!_sPower.iVer) {
 		hStatus=HPDF_Page_SetFontAndSize(	psPage, 
@@ -6497,7 +6030,7 @@ static void _pointToReal(	PWD_SIZE	sumPage,
 							HPDF_REAL	*	piY) {
 /*
 	INT x,y;
-	x=(INT) pwdUm(_DTXD,umX);	y=(INT) pwdUm(_DTYD,umY);
+	x=(INT) pwdUm(PUM_DTXD,umX);	y=(INT) pwdUm(PUM_DTYD,umY);
 
 	if (_sPd.bVirtual) {
 		x+=_sPd.recPreviewPage.left;
@@ -6749,15 +6282,16 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 		psPage = HPDF_AddPage (_sPd.pdfDoc);
 		HPDF_Page_SetHeight (psPage, (HPDF_REAL) sumPage.cy);
 		HPDF_Page_SetWidth (psPage, (HPDF_REAL) sumPage.cx);
+//		if (!strCmp(pszPdfEncode,"UTF-8")) HPDF_UseUnicodeEncodings(_sPd.pdfDoc);
 		HPDF_SetCurrentEncoder(_sPd.pdfDoc, pszPdfEncode);
 		HPDF_Page_SetTextRenderingMode(psPage,HPDF_FILL);
+		//HPDF_SetPageMode(_sPd.pdfDoc, HPDF_PAGE_MODE_USE_OUTLINE);
 		_(sItemDraw);
 
 		for (a=_sPd.ariPageIndex[nPage];a<_sPd.nItems;a++) 
 		{
 			HPDF_RECT pdfRect;
 			HPDF_SIZE pdfSize;
-			HPDF_POINT pdfPoint;
 
 			if (_sPd.arsItem[a]->iPage!=(nPage+1)) break;
 
@@ -6802,11 +6336,18 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 					psText=pwdGetObj(sItemDraw.psItem);
 					if (strEmpty(psText->pszText)) break;	
 
-					pwcText=_strTextDecode(psText->pszText);  pszText=_pdfStrDecode(pwcText); ehFree(pwcText);
+					pwcText=_strTextDecode(psText->pszText);
+					pszText = _pdfStrDecode(pwcText);
+					ehFree(pwcText);
 
 					HPDF_Page_BeginText(psPage); 
+					
 					_pdfSetFont(	psPage,psText,
+									//_arsPdfFont[psText->idxFont],
+									//_sPower.arsFont[psText->idxFont].pVoid,
+									//pwdUmTo(psText->umCharHeight,PUM_PT),
 									&dBaseLineOffset);
+
 
 					_pdfColorFill(psPage,&psText->colText);
 					HPDF_Page_SetCharSpace(psPage, (HPDF_REAL) pwdUmTo(psText->umExtraCharSpace,PUM_PT));
@@ -6814,7 +6355,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 					drValue = HPDF_Page_TextWidth (psPage, pszText); // Calcolo Larghezza del testo
 
 					//drValue = HPDF_Page_TextWidth (psPage, psText->pszText);
-					switch (psText->enAlign&0xf)
+					switch (psText->enAlign)
 					{
 						case PDA_RIGHT:
 //								rumArea.left=rumArea.right-drValue;
@@ -6830,27 +6371,11 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 						case PDA_JUSTIFY:
 								break;
 					}
-
-					_pointToReal(sumPage,
-						 psText->umX,
-						 psText->umY,
-						 &pdfPoint.x,
-						 &pdfPoint.y);
-
-					if (psText->enAlign&PDA_BASELINE) {
-					
-
-
-					} else {
-					
-						pdfPoint.y = pdfRect.bottom + (HPDF_REAL) (dBaseLineOffset);
-
-					}
-					
+					yPos= (HPDF_REAL) (pdfRect.bottom+dBaseLineOffset);
 					if (psText->enAlign&DPL_HEIGHT_TYPO) yPos=(HPDF_REAL) (pdfRect.top);
 					HPDF_Page_MoveTextPos(psPage,
-								pdfPoint.x,
-								pdfPoint.y); // + perché va SU !
+								(HPDF_REAL) pdfRect.left,
+								yPos); // + perché va SU !
 					HPDF_Page_ShowText(psPage,pszText);
 					HPDF_Page_EndText(psPage);
 

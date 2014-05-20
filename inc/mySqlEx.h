@@ -54,14 +54,14 @@ typedef struct {
 
 S_TBL_INFO * mysGetSchema(DYN_SECTION_FUNC CHAR * pszSchema,_DMI * pdmiSchema);
 S_FLD_INFO * mysGetTableInfo(DYN_SECTION_FUNC CHAR * pszTable,_DMI * pdmiField,_DMI * pdmiIndex);
-BOOL	mysTableExport(DYN_SECTION_FUNC CHAR * pszTable,UTF8 * utfFileDest,CHAR * pszWhere,BOOL bShowProgress, DWORD * pdwRecords);
-BOOL	mysTableImport(DYN_SECTION_FUNC UTF8 * pszFileSource,CHAR * pszTableDest,BOOL bNotUpdate, BOOL bShowProgress,EH_LST	lstErrors);
+BOOL		mysTableExport(DYN_SECTION_FUNC CHAR * pszTable,UTF8 * utfFileDest,CHAR * pszWhere,BOOL bShowProgress, DWORD * pdwRecords,CHAR * pszFieldsExclude);
+BOOL		mysTableImport(DYN_SECTION_FUNC UTF8 * pszFileSource,CHAR * pszTableDest,BOOL bNotUpdate, BOOL bShowProgress,EH_LST	lstErrors,CHAR * pszFieldsExclude);
 //CHAR *	mysFieldQuery(CHAR * pszTable,EN_MESSAGE enMess,S_FLD_INFO * psFld);
-INT		mysFieldSearch(_DMI * pdmiFld,CHAR * pszName);
-INT		mysTableSearch(_DMI * pdmiTbl,CHAR * pszName);
-CHAR *	mysFieldModify(EN_MESSAGE enMess,CHAR * pszTable,S_FLD_INFO * psFld);
+INT			mysFieldSearch(_DMI * pdmiFld,CHAR * pszName);
+INT			mysTableSearch(_DMI * pdmiTbl,CHAR * pszName);
+CHAR *		mysFieldModify(EN_MESSAGE enMess,CHAR * pszTable,S_FLD_INFO * psFld);
 
-BOOL	mysTableSync(S_MYSQL_SECTION * psecSource,CHAR * pszTableSource,
+BOOL		mysTableSync(S_MYSQL_SECTION * psecSource,CHAR * pszTableSource,
 					 S_MYSQL_SECTION * psecDest,CHAR * pszTableDest,
 					 CHAR *		pszCode,
 					 CHAR *		pszWhere,
@@ -70,7 +70,7 @@ BOOL	mysTableSync(S_MYSQL_SECTION * psecSource,CHAR * pszTableSource,
 					 INT		iBlockRecord,
 					 BOOL		bShowProgress,
 					 BOOL		bOperatorAsk); 
-BOOL	mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWORD * pdwUpdate);
+BOOL		mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWORD * pdwUpdate);
 
 void	 mysSchemaSync(	CHAR *	pszSchemaSource,
 						CHAR *	pszSchemaTarget,

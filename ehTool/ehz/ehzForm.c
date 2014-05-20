@@ -3037,6 +3037,10 @@ LRESULT CALLBACK _funcTextField(HWND hWnd,UINT message,WPARAM wParam,LPARAM lPar
 		case WM_KILLFOCUS:
 
 //			if (psIptInfo->psForm->BlurNotify&&psIptInfo->psForm->arBlurNotify)
+			// In uscita dal programma, arrivo con il dato vuoto
+			if (!psFld) break;
+			if (!psFld->pszName) break;
+
 			if (psIptInfo->psForm->arBlurNotify)
 			{
 				if (ARIsIn(psIptInfo->psForm->arBlurNotify,psFld->pszName,FALSE)) 

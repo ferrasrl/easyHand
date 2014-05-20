@@ -2087,9 +2087,9 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 	if (psUlt->fLogWrite) 
 	{
 		CHAR szDestFolder[500];
-		sprintf(szDestFolder,"c:\\Comferra\\Ult\\Logs");
+		sprintf(szDestFolder,"c:\\mvk\\Ult\\Logs");
 		if (!fileCheck(szDestFolder)) CreateDirectory(szDestFolder,NULL);
-		sprintf(psUlt->szLogFile,"c:\\Comferra\\Ult\\Logs\\Log_%s.txt",dtNow());
+		sprintf(psUlt->szLogFile,"c:\\mvk\\Ult\\Logs\\Log_%s.txt",dtNow());
 		_ultLogOpen(psUlt);
 	}
 
@@ -3008,7 +3008,7 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 	
 	// ehLogWrite("%s",szFileTarget);
 	//ch=fopen(szNewName,"wb"); if (!ch) ehExit("_ultFileBuilder: Write [%s] err:%d",szNewName,osGetError());
-	// if (bFileTarget) fileStrWrite("c:\\COMFerra\\ULT\\LastFile.log",lpMemo);
+	// if (bFileTarget) fileStrWrite("c:\\mvk\\ULT\\LastFile.log",lpMemo);
 
 	iCount=0;
 	while (TRUE)

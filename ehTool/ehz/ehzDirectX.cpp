@@ -5,6 +5,14 @@
 //   |										by Ferrà Srl 2011
 //   -----------------------------------------------------------
 
+
+//
+// Aggiungere include nel progetto:
+// C/C++ > Generale > Aggiungere > Directory di inclusione aggiuntive > 
+// "C:\Program Files (x86)\Windows Kits\8.0\Include\shared";"C:\Program Files (x86)\Windows Kits\8.0\Include\um"
+//
+// Linker > Generale > Directory Librerie Aggiuntive
+// "C:\Program Files (x86)\Windows Kits\8.0\Lib\win8\um\x86"
 #include "/easyhand/inc/easyhand.h"
 #include "/easyhand/inc/ehzDirectX.h"
 #include "/easyhand/ehtool/imgutil.h"
@@ -105,7 +113,7 @@ static void _dxFreeResource(BOOL bMode) {
 	SafeRelease(&_dx.sRes.piDWriteFactory);
 	DMIClose(&_dx.dmiImg,"dxImage");
 
-	_dx.bReady=FALSE;
+	_dx.bReady=false;
 
 }
 
@@ -148,19 +156,24 @@ void * ehzDirectX(struct OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 			break;
 
 		case WS_DESTROY:
-			if (psDx->funcNotify) psDx->funcNotify(psDx->psObj,WS_DESTROY,0,NULL);
+			// EH_OBJ * pObj,BOOL * pbReturn, EN_EXT_NOTIFY enMode, HWND hWnd, UINT message, LONG wParam, LONG lParam
+//			if (psDx->funcNotify) psDx->funcNotify(psDx->psObj,WS_DESTROY,0,NULL);
+			if (psDx->funcNotify) psDx->funcNotify(psDx->psObj,NULL,EXT_CALL,NULL,WS_DESTROY,0,0);
 			SafeRelease(&_dx.sRes.piRender);
+			_dxFreeResource(false);
 			DestroyWindow(objCalled->hWnd);
 			ehFreePtr(&objCalled->pOther);
+			
 			break;
 
 		case WS_DO: // Spostamento / Ridimensionamento
 			MoveWindow(objCalled->hWnd,psExt->px+relwx,psExt->py+relwy,psExt->lx,psExt->ly,TRUE);
 			break;
 
-		case WS_EXTFUNZ:
-			psDx->funcNotify=(void * (*)(EH_OBJPARAMS)) ptr;
-			if (psDx->funcNotify) psDx->funcNotify(psDx->psObj,WS_CREATE,0,NULL);
+		case WS_EXTNOTIFY:
+			psDx->funcNotify=(LRESULT (*)(EH_NOTIFYPARAMS)) ptr;
+//			if (psDx->funcNotify) psDx->funcNotify(psDx->psObj,WS_CREATE,0,NULL);
+			if (psDx->funcNotify) psDx->funcNotify(psDx->psObj,NULL,EXT_CALL,NULL,WS_CREATE,0,0);
 			break;
 
 		case WS_REALSET: 
@@ -235,7 +248,9 @@ LRESULT CALLBACK _funcDirectXControl(HWND hWnd,UINT message,WPARAM wParam,LPARAM
 		case WM_PAINT:
 
 			if (psDx->funcNotify) {
-				psDx->funcNotify(psDx->psObj,WS_DISPLAY,0,NULL);
+				//psDx->funcNotify(psDx->psObj,WS_DISPLAY,0,NULL);
+				psDx->funcNotify(psDx->psObj,NULL,EXT_CALL,NULL,WS_DISPLAY,0,0);
+				
 				if (_dx.bValidate) 
 					ValidateRect(hWnd, NULL);
 				return 0;
@@ -247,7 +262,9 @@ LRESULT CALLBACK _funcDirectXControl(HWND hWnd,UINT message,WPARAM wParam,LPARAM
 			{
 				UINT width = LOWORD(lParam);
 				UINT height = HIWORD(lParam);
-				if (psDx->funcNotify) psDx->funcNotify(psDx->psObj,WS_SIZE,lParam,NULL);
+				if (psDx->funcNotify) 
+					// psDx->funcNotify(psDx->psObj,WS_SIZE,lParam,NULL);
+					psDx->funcNotify(psDx->psObj,NULL,EXT_CALL,NULL,WS_SIZE,lParam,NULL);
 				if (_dx.sRes.piRender) _dx.sRes.piRender->Resize(D2D1::SizeU(width, height));
 			}
 			break;
@@ -286,8 +303,10 @@ LRESULT CALLBACK _funcDirectXControl(HWND hWnd,UINT message,WPARAM wParam,LPARAM
 			sEvent.hWnd=hWnd;
 			sEvent.sPoint.x=psDx->psObj->sClientCursor.x=LOWORD(lParam);
 			sEvent.sPoint.y=psDx->psObj->sClientCursor.y=HIWORD(lParam);
-			psDx->funcNotify(psDx->psObj,WS_EVENT,0,&sEvent);			  
-			//return 0;
+			//psDx->funcNotify(psDx->psObj,WS_EVENT,0,&sEvent);			  
+			psDx->funcNotify(psDx->psObj,NULL,EXT_CALL,NULL,WS_EVENT,0,(LONG) &sEvent);			  
+			
+			
 			break;
 
 		case WM_MOUSEWHEEL:
@@ -303,7 +322,8 @@ LRESULT CALLBACK _funcDirectXControl(HWND hWnd,UINT message,WPARAM wParam,LPARAM
 			sEvent.sPoint.y= GET_Y_LPARAM(lParam);
 			sEvent.dwParam=(DWORD) wParam;
 			sEvent.iParam=zDelta;
-			psDx->funcNotify(psDx->psObj,WS_EVENT,0,&sEvent);
+			//psDx->funcNotify(psDx->psObj,WS_EVENT,0,&sEvent);
+			psDx->funcNotify(psDx->psObj,NULL,EXT_CALL,NULL,WS_EVENT,0,(LONG) &sEvent);
 	//		if (zDelta<0) {sEvent.iEvent=EE_MOUSEWHEELDOWN; EhEvent(WS_ADD,0,&sEvent);} //MouseWheelManager(WS_ADD,IN_MW_DOWN);
 	//		if (zDelta>0) {sEvent.iEvent=EE_MOUSEWHEELUP; EhEvent(WS_ADD,0,&sEvent);} //MouseWheelManager(WS_ADD,IN_MW_UP);
 		}
@@ -405,7 +425,12 @@ BOOL dxGetBitmap(S_DX_IMAGE * psImage) {
 															NULL,
 															&psImage->pBitmap
 															);
-		if (SUCCEEDED(hr)) bRet=FALSE;
+		if (SUCCEEDED(hr)) 
+			bRet=false;
+#ifdef _DEBUG
+		else 
+			printf("error");
+#endif
 		break;
 
 	}	
@@ -461,6 +486,7 @@ S_DX_IMAGE * dxImageFromFile(	S_DX_IMAGE * psImage,
 		printf("> %s non esiste",utfFileName); 
 	}
 
+	// Libero questi due valori non necessari
 	SafeRelease(&psImage->pDecoder);
 	SafeRelease(&psImage->piSource);
 
@@ -531,9 +557,7 @@ S_DX_IMAGE * dxImageFromResource(	S_DX_IMAGE * psImage,
 {
 
 	IWICStream * pStream = NULL;
-	//S_DX_IMAGE * psImage=(S_DX_IMAGE *) ehAllocZero(sizeof(S_DX_IMAGE));
 
-//	IWICBitmapDecoder * pDecoder=NULL;
 	HRSRC	imageResHandle = NULL;
 	HGLOBAL imageResDataHandle = NULL;
 	void *	pImageFile = NULL;
@@ -572,9 +596,9 @@ S_DX_IMAGE * dxImageFromResource(	S_DX_IMAGE * psImage,
 
 		// Create a decoder for the stream.
 		hr = _dx.sRes.piWicImageFactory->CreateDecoderFromStream(		pStream,
-														NULL,
-														WICDecodeMetadataCacheOnLoad,
-														&psImage->pDecoder); 
+																		NULL,
+																		WICDecodeMetadataCacheOnLoad,
+																		&psImage->pDecoder); 
 		if (!SUCCEEDED(hr)) break;
 
 		psImage->sizDest.cx=destinationWidth;
@@ -584,8 +608,10 @@ S_DX_IMAGE * dxImageFromResource(	S_DX_IMAGE * psImage,
 		break;
 	}
 
+	// Libero questi due valori non necessari
 	SafeRelease(&psImage->pDecoder);
 	SafeRelease(&psImage->piSource);
+
 	SafeRelease(&pStream);
     return psImage;
 }
@@ -678,9 +704,11 @@ S_DX_IMAGE * dxImageFromResource(	S_DX_IMAGE * psImage,
 void dxImageFree(S_DX_IMAGE * psImage,BOOL bFree) {
 
 	if (!psImage) return;
+//	if (!strEmpty(psImage->szName)) {
 	SafeRelease(&psImage->piSource);
 	SafeRelease(&psImage->pDecoder);
 	SafeRelease(&psImage->pBitmap);
+//	}
 	if (bFree) ehFree(psImage);
 	
 }

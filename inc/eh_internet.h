@@ -22,7 +22,8 @@ typedef enum
 	WTE_SSL_RECV, // Errore durante la ricezione in SSL
 	WTE_SOCKET_CREATE,	// Errore in creazione del socket
 	WTE_SOCKET_ERROR, //
-	WTE_SSL_SEND_ERROR, //
+	WTE_SEND_ERROR, //
+	WTE_SSL_SEND_ERROR,
 	WTE_SSL_AUTH_ERROR, // SSL authentication failed in tcp_connect(): check password, key file, and ca file
 	WTE_SSL_NEW_ERROR,
 	WTE_SSL_TIMEOUT,

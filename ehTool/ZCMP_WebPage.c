@@ -2401,7 +2401,8 @@ long _ieNavigatePage(EH_WEBPAGE *psWebPage, CHAR * pszWebPage,SINT iParam)
 		myURL.vt = VT_BSTR;
 		pwcUrl=strToWcs(pszWebPage);
 		myURL.bstrVal = SysAllocString(pwcUrl);
-		GlobalFree(pwcUrl);
+		ehFree(pwcUrl);
+		//GlobalFree(pwcUrl);
 
 		if (!myURL.bstrVal) return(-6);
 		psWebPage->sIe.piWebBrowser2->lpVtbl->Navigate2(psWebPage->sIe.piWebBrowser2, &myURL, 0, 0, 0, 0);
