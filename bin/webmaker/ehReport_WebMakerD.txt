@@ -1,0 +1,255 @@
+EasyHand
+Windows 5.3.00
+------------------------------------
+Info  : DMI:R1 Pos:0,Hdl:-1,Num:0 {.\JM_OdbcBuilder.c (line:2060)}
+Memory status -----------------
+Process memory set: 15.97 Mb
+Uso 15 di max 100 celle.
+Heap memory LMO: 3.20 Kb
+
+  0 - *AllocCtrl         M_MOVEABLE :     16.00 Kb | hdl: 2b000c
+  1 - _core                  M_HEAP :      1.02 Kb | hdl:    0
+  3 - BMP->ICONE             M_HEAP :      1.06 Kb | hdl:    0
+  4 - IPTBUF                 M_HEAP :       512 b  | hdl:    0
+  5 - Lic:System32           M_HEAP :     14.71 Kb | hdl:    0
+  6 - *WIN                   M_HEAP :     24.36 Kb | hdl:    0
+  7 - *OBJS                M_LOCKED :      5.88 Kb | Hdl: 2b0024
+  8 - *IDARRAY               M_HEAP :      2.00 Kb | hdl:    0
+  9 - *IPT                   M_HEAP :      1.48 Kb | hdl:    0
+ 10 - *MGZ                   M_HEAP :      2.80 Kb | hdl:    0
+ 11 - *HMZ                 M_LOCKED :      2.40 Kb | Hdl: 2b002c
+ 12 - Serial               M_LOCKED :      2.04 Kb | Hdl: 2b0034
+ 13 - Lic:Service32          M_HEAP :     67.62 Kb | hdl:    0
+ 14 - *ICONE               M_LOCKED :      8.71 Kb | Hdl: 2b003c
+ 15 - OBJPASS                M_HEAP :       512 b  | hdl:    0
+
+Totale M_HDLFREE    :         0 b 
+Totale M_HEAP       :    119.30 Kb
+Totale M_MOVEABLE   :     16.00 Kb
+Totale Generale     :    135.30 Kb
+
+Memorie non liberate: 85
+0000: eh_kernel.c, #3006 | 3000b:                              
+0001: Odbc.c, #65 | 8192b: ð­ºð­ºð­ºð­ºð­ºð­ºð­ºð        
+0002: eh_font.c, #136 | 8b: à~œ                           
+0003: eh_array.c, #70 | 3b: 16                            
+0004: eh_font.c, #136 | 24b: òœ                           
+0005: eh_array.c, #70 | 2b: 7                             
+0006: eh_array.c, #70 | 2b: 9                             
+0007: eh_array.c, #70 | 3b: 11                            
+0008: eh_array.c, #70 | 3b: 13                            
+0009: eh_array.c, #70 | 3b: 14                            
+0010: eh_font.c, #136 | 8b:  „œ                           
+0011: eh_array.c, #70 | 3b: 20                            
+0012: eh_font.c, #136 | 8b: à„œ                           
+0013: eh_array.c, #70 | 3b: 19                            
+0014: eh_font.c, #136 | 16b: (…œ                           
+0015: eh_array.c, #70 | 3b: 13                            
+0016: eh_array.c, #70 | 3b: 16                            
+0017: eh_array.c, #70 | 3b: 20                            
+0018: eh_font.c, #136 | 16b: °…œ                           
+0019: eh_array.c, #70 | 3b: 16                            
+0020: eh_array.c, #70 | 3b: 20                            
+0021: eh_array.c, #70 | 3b: 25                            
+0022: eh_font.c, #136 | 28b: H†œ                           
+0023: eh_array.c, #70 | 3b: 13                            
+0024: eh_array.c, #70 | 3b: 16                            
+0025: eh_array.c, #70 | 3b: 19                            
+0026: eh_array.c, #70 | 3b: 21                            
+0027: eh_array.c, #70 | 3b: 27                            
+0028: eh_array.c, #70 | 3b: 35                            
+0029: eh_font.c, #136 | 28b: °õœ                           
+0030: eh_array.c, #70 | 3b: 16                            
+0031: eh_array.c, #70 | 3b: 20                            
+0032: eh_array.c, #70 | 3b: 23                            
+0033: eh_array.c, #70 | 3b: 27                            
+0034: eh_array.c, #70 | 3b: 33                            
+0035: eh_array.c, #70 | 3b: 43                            
+0036: eh_font.c, #136 | 24b:  öœ                           
+0037: eh_array.c, #70 | 2b: 8                             
+0038: eh_array.c, #70 | 3b: 10                            
+0039: eh_array.c, #70 | 3b: 11                            
+0040: eh_array.c, #70 | 3b: 10                            
+0041: eh_array.c, #70 | 3b: 11                            
+0042: eh_font.c, #136 | 8b: `÷œ                           
+0043: eh_array.c, #70 | 3b: 15                            
+0044: eh_font.c, #143 | 1400b:                               
+0045: eh_font.c, #148 | 7b: VGASYS                        
+0046: eh_font.c, #258 | 7b: Tahoma                        
+0047: eh_font.c, #258 | 7b: Tahoma                        
+0048: eh_array.c, #539 | 48b: @½                            
+0049: eh_array.c, #132 | 45b: .  2. -1.ASK     . 24.Selezio
+0050: eh_array.c, #132 | 57b: .  2. -1.FHD     . 24.Madiven
+0051: eh_array.c, #132 | 43b: .  2. -1.FHD     . 24.my4in (
+0052: eh_array.c, #132 | 43b: .  2. -1.FHD     . 24.myaba (
+0053: eh_array.c, #132 | 55b: .  2. -1.FHD     . 24.myadopt
+0054: eh_array.c, #132 | 45b: .  2. -1.FHD     . 24.mybook 
+0055: eh_array.c, #132 | 51b: .  2. -1.FHD     . 24.mycoses
+0056: eh_array.c, #132 | 55b: .  2. -1.FHD     . 24.mydance
+0057: eh_array.c, #132 | 47b: .  2. -1.FHD     . 24.myferra
+0058: eh_array.c, #132 | 47b: .  2. -1.FHD     . 24.myforti
+0059: eh_array.c, #132 | 41b: .  2. -1.FHD     . 24.mygp (M
+0060: eh_array.c, #132 | 59b: .  2. -1.FHD     . 24.mymadiv
+0061: eh_array.c, #132 | 49b: .  2. -1.FHD     . 24.mymarei
+0062: eh_array.c, #132 | 49b: .  2. -1.FHD     . 24.mymarin
+0063: eh_array.c, #132 | 41b: .  2. -1.FHD     . 24.mymb (M
+0064: eh_array.c, #132 | 49b: .  2. -1.FHD     . 24.mymbsta
+0065: eh_array.c, #132 | 43b: .  2. -1.FHD     . 24.mymbx (
+0066: eh_array.c, #132 | 51b: .  2. -1.FHD     . 24.mymedix
+0067: eh_array.c, #132 | 51b: .  2. -1.FHD     . 24.mymusic
+0068: eh_array.c, #132 | 47b: .  2. -1.FHD     . 24.myranzi
+0069: eh_array.c, #132 | 57b: .  2. -1.FHD     . 24.mysangu
+0070: eh_array.c, #132 | 41b: .  2. -1.FHD     . 24.dbND (P
+0071: eh_array.c, #130 | 96b: ˜¼                            
+0072: eh_array.c, #132 | 45b: .  2. -1.FHD     . 24.demodat
+0073: eh_array.c, #130 | 8b: x½                            
+0074: eh_array.c, #132 | 48b: §  2§ -1§ASK     § 24§Selezio
+0075: eh_array.c, #539 | 46b: $É                            
+0076: eh_array.c, #539 | 188b: @Ó                            
+0077: eh_array.c, #539 | 30b: Ì                            
+0078: eh_array.c, #132 | 41b: WEBMAKERPATH=w:\inetpub\wwwroo
+0079: eh_array.c, #132 | 40b: WEBMAKERURL=http://192.168.1.7
+0080: eh_array.c, #130 | 16b: PÉ                            
+0081: eh_array.c, #132 | 24b: LASTSCHEMA=MAVE_DAT.PR_       
+0082: JMTangoUtility.c, #37 | 1000000b: <?xml version="1.0" encoding="
+0083: JM_OdbcBuilder.c, #2251 | 131070b: ð­ºð­ºð­ºð­ºð­ºð­ºð­ºð        
+0084: JM_OdbcBuilder.c, #2252 | 65535b: ð­ºð­ºð­ºð­ºð­ºð­ºð­ºð        
+Totale memoria non liberata: 1211175
+
+.STATUS WINDOWS
+windows : 1 [30]
+
+.STATUS OGGETTI
+Aree -object- : 1 [30]
+  0 N.Obj: 25 (ALO_Hdl   7)
+
+.STATUS KEYINPUT
+Aree -input- : 1 [31]
+
+.STATUS MGZ (Mouse Graphic Zone) 
+Aree abilitate : 1 [50]
+
+.STATUS HMZ (Help Mouse Zone) 
+Aree abilitate : 0 [100]
+
+.STATUS FTIME (Funzioni Temporali) 
+Attive : 2 [9]
+  0 _LFlatLook (0ms) 
+
+.STATUS DELLE ICONE
+Numero icone : 114 [121]
+  1) CANE      hdl= 13 offset  64374 size=  3252 grp:-1 Lic:Service32
+  2) CART01    hdl= 13 offset  62722 size=  1652 grp:-1 Lic:Service32
+  3) CART03    hdl= 13 offset  61280 size=  1442 grp:-1 Lic:Service32
+  4) CART04    hdl= 13 offset  59838 size=  1442 grp:-1 Lic:Service32
+  5) CART05    hdl= 13 offset  59306 size=   532 grp:-1 Lic:Service32
+  6) CART06    hdl= 13 offset  58774 size=   532 grp:-1 Lic:Service32
+  7) CART07    hdl= 13 offset  58242 size=   532 grp:-1 Lic:Service32
+  8) CART08    hdl= 13 offset  57710 size=   532 grp:-1 Lic:Service32
+  9) CART09    hdl= 13 offset  57178 size=   532 grp:-1 Lic:Service32
+ 10) CART10    hdl= 13 offset  56646 size=   532 grp:-1 Lic:Service32
+ 11) CART11    hdl= 13 offset  56114 size=   532 grp:-1 Lic:Service32
+ 12) CART12    hdl= 13 offset  53982 size=  2132 grp:-1 Lic:Service32
+ 13) CART14    hdl= 13 offset  51850 size=  2132 grp:-1 Lic:Service32
+ 14) CART15    hdl= 13 offset  51318 size=   532 grp:-1 Lic:Service32
+ 15) CART16    hdl= 13 offset  50786 size=   532 grp:-1 Lic:Service32
+ 16) CART2A    hdl= 13 offset  49344 size=  1442 grp:-1 Lic:Service32
+ 17) CART2B    hdl= 13 offset  47902 size=  1442 grp:-1 Lic:Service32
+ 18) CESTINO   hdl= 13 offset  45770 size=  2132 grp:-1 Lic:Service32
+ 19) CLEX      hdl=  5 offset  14202 size=   512 grp:-1 Lic:System32
+ 20) CLEX2     hdl=  5 offset  13690 size=   512 grp:-1 Lic:System32
+ 21) CLIP2     hdl= 13 offset  45618 size=   152 grp:-1 Lic:Service32
+ 22) DELIPT    hdl= 13 offset  45086 size=   532 grp:-1 Lic:Service32
+ 23) DRIVECD   hdl= 13 offset  44878 size=   208 grp:-1 Lic:Service32
+ 24) DRIVEFD   hdl= 13 offset  44670 size=   208 grp:-1 Lic:Service32
+ 25) DRIVEHD   hdl= 13 offset  44462 size=   208 grp:-1 Lic:Service32
+ 26) DRIVENT   hdl= 13 offset  44254 size=   208 grp:-1 Lic:Service32
+ 27) ESCI      hdl= 13 offset  41912 size=  2342 grp:-1 Lic:Service32
+ 28) FABMASK2  hdl= 13 offset  38384 size=  3528 grp:-1 Lic:Service32
+ 29) FACTORY   hdl= 13 offset  37852 size=   532 grp:-1 Lic:Service32
+ 30) FLAG      hdl= 13 offset  37730 size=   122 grp:-1 Lic:Service32
+ 31) FLGOFF    hdl= 13 offset  37608 size=   122 grp:-1 Lic:Service32
+ 32) FLGON     hdl= 13 offset  37486 size=   122 grp:-1 Lic:Service32
+ 33) FOTO      hdl= 13 offset  36954 size=   532 grp:-1 Lic:Service32
+ 34) FR1       hdl= 13 offset  36874 size=    80 grp:-1 Lic:Service32
+ 35) FR2       hdl= 13 offset  36794 size=    80 grp:-1 Lic:Service32
+ 36) FR3       hdl= 13 offset  36714 size=    80 grp:-1 Lic:Service32
+ 37) FR4       hdl= 13 offset  36634 size=    80 grp:-1 Lic:Service32
+ 38) FRDN      hdl= 13 offset  36502 size=   132 grp:-1 Lic:Service32
+ 39) FRDX      hdl= 13 offset  36370 size=   132 grp:-1 Lic:Service32
+ 40) FRECCIA   hdl=  5 offset  13528 size=   162 grp:-1 Lic:System32
+ 41) FRSX      hdl= 13 offset  36238 size=   132 grp:-1 Lic:Service32
+ 42) FRUP      hdl= 13 offset  36106 size=   132 grp:-1 Lic:Service32
+ 43) ICOERR    hdl= 13 offset  34454 size=  1652 grp:-1 Lic:Service32
+ 44) ILPT0     hdl= 13 offset  33922 size=   532 grp:-1 Lic:Service32
+ 45) ILPT1     hdl= 13 offset  33390 size=   532 grp:-1 Lic:Service32
+ 46) ILPT2     hdl= 13 offset  32858 size=   532 grp:-1 Lic:Service32
+ 47) ILPT3     hdl= 13 offset  32326 size=   532 grp:-1 Lic:Service32
+ 48) ILPT4     hdl= 13 offset  31794 size=   532 grp:-1 Lic:Service32
+ 49) ILPT5     hdl= 13 offset  31262 size=   532 grp:-1 Lic:Service32
+ 50) LI1       hdl= 13 offset  31176 size=    86 grp:-1 Lic:Service32
+ 51) LOGOF1    hdl= 13 offset  26230 size=  4946 grp:-1 Lic:Service32
+ 52) LOGOF2    hdl= 13 offset  22418 size=  3812 grp:-1 Lic:Service32
+ 53) MANO1     hdl= 13 offset  22130 size=   288 grp:-1 Lic:Service32
+ 54) MANO2     hdl= 13 offset  21842 size=   288 grp:-1 Lic:Service32
+ 55) MARK0     hdl=  5 offset  12544 size=   984 grp:-1 Lic:System32
+ 56) MARK0B    hdl=  5 offset  11560 size=   984 grp:-1 Lic:System32
+ 57) MARK1     hdl=  5 offset  10576 size=   984 grp:-1 Lic:System32
+ 58) MARK1B    hdl=  5 offset   9592 size=   984 grp:-1 Lic:System32
+ 59) MATIT     hdl=  5 offset   9304 size=   288 grp:-1 Lic:System32
+ 60) MENO      hdl= 13 offset  21762 size=    80 grp:-1 Lic:Service32
+ 61) MKEY1     hdl=  5 offset   9142 size=   162 grp:-1 Lic:System32
+ 62) MKEY1B    hdl=  5 offset   8980 size=   162 grp:-1 Lic:System32
+ 63) MKEY1L    hdl=  5 offset   8818 size=   162 grp:-1 Lic:System32
+ 64) MKEY2     hdl=  5 offset   8656 size=   162 grp:-1 Lic:System32
+ 65) MKEY2B    hdl=  5 offset   8494 size=   162 grp:-1 Lic:System32
+ 66) MKEY2L    hdl=  5 offset   8332 size=   162 grp:-1 Lic:System32
+ 67) MKEY3     hdl=  5 offset   8160 size=   172 grp:-1 Lic:System32
+ 68) MKEY4     hdl=  5 offset   7988 size=   172 grp:-1 Lic:System32
+ 69) MKEY5     hdl=  5 offset   7826 size=   162 grp:-1 Lic:System32
+ 70) MKEY5B    hdl=  5 offset   7664 size=   162 grp:-1 Lic:System32
+ 71) MKEY5L    hdl=  5 offset   7502 size=   162 grp:-1 Lic:System32
+ 72) MKEY6     hdl=  5 offset   7340 size=   162 grp:-1 Lic:System32
+ 73) MKEY6B    hdl=  5 offset   7178 size=   162 grp:-1 Lic:System32
+ 74) MKEY6L    hdl=  5 offset   7016 size=   162 grp:-1 Lic:System32
+ 75) MKEY7     hdl=  5 offset   6854 size=   162 grp:-1 Lic:System32
+ 76) MKEY7B    hdl=  5 offset   6692 size=   162 grp:-1 Lic:System32
+ 77) MKEY7L    hdl=  5 offset   6530 size=   162 grp:-1 Lic:System32
+ 78) MKEY8     hdl=  5 offset   6388 size=   142 grp:-1 Lic:System32
+ 79) MKEY9     hdl=  5 offset   6246 size=   142 grp:-1 Lic:System32
+ 80) MOVE      hdl=  5 offset   6064 size=   182 grp:-1 Lic:System32
+ 81) MS01      hdl=  5 offset   5902 size=   162 grp:-1 Lic:System32
+ 82) MS02      hdl=  5 offset   5750 size=   152 grp:-1 Lic:System32
+ 83) MS03      hdl=  5 offset   5558 size=   192 grp:-1 Lic:System32
+ 84) MS04      hdl=  5 offset   5296 size=   262 grp:-1 Lic:System32
+ 85) MS05      hdl=  5 offset   4944 size=   352 grp:-1 Lic:System32
+ 86) MS06      hdl=  5 offset   4544 size=   400 grp:-1 Lic:System32
+ 87) MS10      hdl=  5 offset   4352 size=   192 grp:-1 Lic:System32
+ 88) MS20      hdl=  5 offset   4020 size=   332 grp:-1 Lic:System32
+ 89) MS21      hdl=  5 offset   3688 size=   332 grp:-1 Lic:System32
+ 90) MSLENTE   hdl=  5 offset   3320 size=   368 grp:-1 Lic:System32
+ 91) MSLENTE2  hdl=  5 offset   2952 size=   368 grp:-1 Lic:System32
+ 92) OSCURA1   hdl= 13 offset  21410 size=   352 grp:-1 Lic:Service32
+ 93) PAPER     hdl= 13 offset  20618 size=   792 grp:-1 Lic:Service32
+ 94) PAPERA    hdl= 13 offset  20426 size=   192 grp:-1 Lic:Service32
+ 95) PAPERB    hdl= 13 offset  20234 size=   192 grp:-1 Lic:Service32
+ 96) PAPERC    hdl= 13 offset  20042 size=   192 grp:-1 Lic:Service32
+ 97) PAPERD    hdl= 13 offset  19850 size=   192 grp:-1 Lic:Service32
+ 98) PATH1     hdl= 13 offset  19708 size=   142 grp:-1 Lic:Service32
+ 99) PATH2     hdl= 13 offset  19500 size=   208 grp:-1 Lic:Service32
+100) PATH3     hdl= 13 offset  19358 size=   142 grp:-1 Lic:Service32
+101) PIU       hdl= 13 offset  19278 size=    80 grp:-1 Lic:Service32
+102) PRNLOC    hdl= 13 offset  19086 size=   192 grp:-1 Lic:Service32
+103) PRNNET    hdl= 13 offset  18798 size=   288 grp:-1 Lic:Service32
+104) RADIO0    hdl=  5 offset   1968 size=   984 grp:-1 Lic:System32
+105) RADIO0B   hdl=  5 offset    984 size=   984 grp:-1 Lic:System32
+106) RADIO1    hdl=  5 offset      0 size=   984 grp:-1 Lic:System32
+107) SALVA     hdl= 13 offset  14366 size=  4432 grp:-1 Lic:Service32
+108) STAMPA    hdl= 13 offset  13834 size=   532 grp:-1 Lic:Service32
+109) TRATTO    hdl= 13 offset  13706 size=   128 grp:-1 Lic:Service32
+110) TRATTOB   hdl= 13 offset  13578 size=   128 grp:-1 Lic:Service32
+111) TRATTOD   hdl= 13 offset  13496 size=    82 grp:-1 Lic:Service32
+112) TRNODO0   hdl= 13 offset  13394 size=   102 grp:-1 Lic:Service32
+113) TRNODO1   hdl= 13 offset  13292 size=   102 grp:-1 Lic:Service32
+114) WSER      hdl= 13 offset      0 size= 13292 grp:-1 Lic:Service32
+

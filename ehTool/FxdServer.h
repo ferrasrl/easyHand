@@ -58,9 +58,10 @@ typedef enum {
 typedef struct {
 
 	EN_SQL_PLATFORM enSqlPlatform; // Piattaforma usata per il dbase SQL
-	BYTE *	pszSqlAlternateName; // Nome della tabella SQL
-	BYTE *	pTableComments;
-	CHAR *	pszLocalFile; // Usato con il btrieve (nome del file locale bti)
+	CHAR *	pszSqlAlternateName; // Nome della tabella SQL
+	CHAR *	pszTableComments;
+	CHAR *	pszLocalFile;		// Usato con il btrieve (nome del file locale bti)
+	CHAR *	pszPresetAutoinc;	// Usato per determinare l'inzio dell'autoinc
 
 } FXD_TAB_INFO;
 

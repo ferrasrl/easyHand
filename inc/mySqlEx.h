@@ -29,7 +29,7 @@ typedef struct {
 	INT			iSize; // Grandezza in byte
 	INT			iDecimal; // Numero decimali 
 	BOOL		bCaseInsensible; // Solo per le lettere
-	//BYTE * lpCharSet;
+	
 	EN_CHARTYPE enEncoding;
 	//INT iNullMode;	// 0=Not nullable (default) 1=Null 2=Default full (0 oppure '') 
 	BOOL		bIsNullable;
@@ -39,6 +39,7 @@ typedef struct {
 	BOOL		bTouch:1;	// Riservato
 
 } S_FLD_INFO;
+
 
 typedef struct {
 
@@ -52,10 +53,30 @@ typedef struct {
 } S_IDX_INFO;
 
 
+typedef struct {
+	
+	CHAR *		pszName;
+	BOOL		bNotExist;	// Non esiste nella destinazione
+	BOOL		bInsert;	// T/F se siamo in insert
+	CHAR *		pszSep;		// Separatore tra campi
+
+	CHAR *		pszValue;
+	EN_FLDTYPE	enFldType;
+	EH_LST		lstQuery;
+	
+
+	BOOL		bError;		// Da valorizzare se il record non va memorizzato
+	
+	
+	// Parametri liberi
+	void	*	pVoid;
+
+} S_FLD_EXT;
+
 S_TBL_INFO * mysGetSchema(DYN_SECTION_FUNC CHAR * pszSchema,_DMI * pdmiSchema);
 S_FLD_INFO * mysGetTableInfo(DYN_SECTION_FUNC CHAR * pszTable,_DMI * pdmiField,_DMI * pdmiIndex);
-BOOL		mysTableExport(DYN_SECTION_FUNC CHAR * pszTable,UTF8 * utfFileDest,CHAR * pszWhere,BOOL bShowProgress, DWORD * pdwRecords,CHAR * pszFieldsExclude);
-BOOL		mysTableImport(DYN_SECTION_FUNC UTF8 * pszFileSource,CHAR * pszTableDest,BOOL bNotUpdate, BOOL bShowProgress,EH_LST	lstErrors,CHAR * pszFieldsExclude);
+BOOL		mysTableExport(DYN_SECTION_FUNC CHAR * pszTable,UTF8 * utfFileDest,CHAR * pszWhere,BOOL bShowProgress, DWORD * pdwRecords,CHAR * pszFieldsExclude,BOOL (*funcExt)(EH_SRVPARAMS));
+BOOL		mysTableImport(DYN_SECTION_FUNC UTF8 * pszFileSource,CHAR * pszTableDest,BOOL bNotUpdate, BOOL bShowProgress,EH_LST	lstErrors,CHAR * pszFieldsExclude,BOOL (*funcExt)(EH_SRVPARAMS));
 //CHAR *	mysFieldQuery(CHAR * pszTable,EN_MESSAGE enMess,S_FLD_INFO * psFld);
 INT			mysFieldSearch(_DMI * pdmiFld,CHAR * pszName);
 INT			mysTableSearch(_DMI * pdmiTbl,CHAR * pszName);

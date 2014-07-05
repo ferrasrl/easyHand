@@ -331,7 +331,8 @@ BOOL mysTableExport(DYN_SECTION_FUNC
 					CHAR *	pszWhereOrder,
 					BOOL	bShowProgress, 
 					DWORD * pdwRecords,
-					CHAR *	pszFieldsExclude) {
+					CHAR *	pszFieldsExclude,
+					BOOL	(*funcExt)(EH_SRVPARAMS)) {
 
 	DYN_SECTION_GLOBALPTR
 	_DMI dmiField=DMIRESET;
@@ -826,21 +827,26 @@ static S_FLD_INFO * _fldInfo(INT iFields,S_FLD_INFO * arsFld,CHAR * pszField) {
 }
 
 
-static void _addTxbFields(	BOOL bInsert,
+static BOOL _addTxbFields(	BOOL bInsert,
 							EH_LST lstQuery,
+
 							// Dati destinazione
 							INT iFields,		
 							S_FLD_INFO * arsFld,
+
 							// Dati srogente
 							S_TXB * psTxb,
-							EH_AR arExclude)
+							EH_AR arExclude,
+							BOOL (*funcExt)(EH_SRVPARAMS)
+							)
 {
 	INT k;
 	S_FLD_INFO * psFieldDest=NULL;
 	CHAR *	pE="";
-//	CHAR	szServ[800];
 	CHAR	szFormat[200];
 	BOOL	bFree=false;
+	BOOL	bNotAssign=false;
+	BOOL	bError=false;
 
 	for (k=0;k<psTxb->iFieldCount;k++)
 	{
@@ -854,8 +860,30 @@ static void _addTxbFields(	BOOL bInsert,
 				continue;
 		}
 
+		//
+		// Richiedo se il campo è da saltare
+		//
+		if (funcExt) {
+			if (funcExt(WS_CHECK,0,psTxb->lpFieldInfo[k].lpName)) continue;
+		}
+
 		psFieldDest=_fldInfo(iFields,arsFld,psTxb->lpFieldInfo[k].lpName);
 		if (!psFieldDest) {
+
+			if (funcExt) {
+				S_FLD_EXT sExt;
+				_(sExt);
+				sExt.pszName=psTxb->lpFieldInfo[k].lpName;
+				sExt.pszValue=txbFldPtr(psTxb,psTxb->lpFieldInfo[k].lpName);
+				sExt.enFldType=enFldType;
+				sExt.lstQuery=lstQuery;
+				sExt.pVoid=psTxb;						// Parametro
+				sExt.bNotExist=true;
+				sExt.bInsert=bInsert;
+				sExt.pszSep=pE;
+				funcExt(WS_REALSET,0,&sExt);
+				if (sExt.bError) {bError=true; break;}
+			}
 			continue;
 		}
 
@@ -863,115 +891,133 @@ static void _addTxbFields(	BOOL bInsert,
 		if (!bInsert) 
 			lstPushf(lstQuery,"%s=",psFieldDest->szName);//arsFld[k].szName);
 
-		switch (enFldType)
-		{
-			case ADB_NUME : 
-			case ADB_COBD : 
-			case ADB_COBN : 
-			case ADB_FLOAT:
-				sprintf(szFormat,"%%.%df",psTxb->lpFieldInfo[k].iInfo);
-				lstPushf(lstQuery,szFormat,txbFldNume(psTxb,psTxb->lpFieldInfo[k].lpName));
-				break;
+		bNotAssign=false;
+		if (funcExt) {
 
-			case ADB_BOOL :
-			case ADB_INT  : 
-			case ADB_INT32: 
-			case ADB_AINC:
-				lstPushf(lstQuery,"%d",txbFldInt(psTxb,psTxb->lpFieldInfo[k].lpName));
-				break;
+			S_FLD_EXT sExt;
+			_(sExt);
+			sExt.pszName=psFieldDest->szName;
+			sExt.pszValue=txbFldPtr(psTxb,psTxb->lpFieldInfo[k].lpName);
+			sExt.enFldType=enFldType;
+			sExt.lstQuery=lstQuery;
+			sExt.pVoid=psTxb;						// Parametro
+			bNotAssign=funcExt(WS_REALSET,0,&sExt);
+			if (sExt.bError) {bError=true; break;}
 
-			case ADB_ALFA:
-			case ADB_DATA:
-			case ADB_BLOB:
-			case ADB_TIMESTAMP:
-
-				pTxb=txbFldPtr(psTxb,psTxb->lpFieldInfo[k].lpName);
-				if (!strCmp(pTxb,TXB_NULL)) 
-					pTxb=NULL;
-
-				//
-				// Se non è nullable
-				//
-				if (!_fldNull(iFields,arsFld,psTxb->lpFieldInfo[k].lpName)) pTxb=strEver(pTxb);
-
-				// Controllo se il campo ha un parametro di CharSet UTF8 
-				enFldEncoding=_fldCollection(iFields,arsFld,psTxb->lpFieldInfo[k].lpName);
-				bFree=FALSE;
-
-				if (!pTxb) pString=strDup("NULL");
-				else {
-					
-					switch (enFldEncoding)
-					{
-						default:
-						case ULT_CS_LATIN1:
-							pString=strEncodeEx(1,pTxb,2,SE_UTF8,SE_SQLSTR);
-							break;
-
-						case ULT_CS_UTF8:
-							pString=strEncode(pTxb,SE_SQLSTR,NULL);
-							break;
-					}
-				}
-				lstPush(lstQuery,pString);
-				ehFree(pString);
-				break;
-
-		case ADB_BINARY:
-		case ADB_POINT:
-		case ADB_GEOMETRY:
-
-			pTxb=txbFldPtr(psTxb,psTxb->lpFieldInfo[k].lpName);
-
-			// Campo NULL
-			if (!strCmp(pTxb,TXB_NULL)) {
-
-
-				if (!_fldNull(iFields,arsFld,psTxb->lpFieldInfo[k].lpName)) {
-
-					switch (enFldType)
-					{
-						case ADB_POINT:
-						case ADB_GEOMETRY:
-							lstPushf(lstQuery,"GeomFromText('Point(0 0)')");
-							break;
-
-						case ADB_BINARY:
-							lstPushf(lstQuery,"X'0'");
-							break;
-					}
-
-				} 
-				else {
-
-					lstPushf(lstQuery,"NULL");
-				
-				}
-				
-				// Campo binario con encodin B64
-			} else if (!strBegin(pTxb,"?B64?")) {
-
-				SIZE_T sizRet;
-				BYTE * pb;
-				CHAR * pszHex;
-
-				pb=base64Decode(pTxb+5,&sizRet);
-				pszHex=hexEncode(pb,sizRet);
-
-				lstPush(lstQuery,"X'");
-				lstPush(lstQuery,pszHex);
-				lstPush(lstQuery,"'");
-
-				ehFreePtrs(2,&pb,&pszHex);
-			}
-			break;
-		default:
-			ehError();
-			break;
 		}
 
+		if (!bNotAssign) {
+
+			switch (enFldType)
+			{
+				case ADB_NUME : 
+				case ADB_COBD : 
+				case ADB_COBN : 
+				case ADB_FLOAT:
+					sprintf(szFormat,"%%.%df",psTxb->lpFieldInfo[k].iInfo);
+					lstPushf(lstQuery,szFormat,txbFldNume(psTxb,psTxb->lpFieldInfo[k].lpName));
+					break;
+
+				case ADB_BOOL :
+				case ADB_INT  : 
+				case ADB_INT32: 
+				case ADB_AINC:
+					lstPushf(lstQuery,"%d",txbFldInt(psTxb,psTxb->lpFieldInfo[k].lpName));
+					break;
+
+				case ADB_ALFA:
+				case ADB_DATA:
+				case ADB_BLOB:
+				case ADB_TIMESTAMP:
+
+					pTxb=txbFldPtr(psTxb,psTxb->lpFieldInfo[k].lpName);
+					if (!strCmp(pTxb,TXB_NULL)) 
+						pTxb=NULL;
+
+					//
+					// Se non è nullable
+					//
+					if (!_fldNull(iFields,arsFld,psTxb->lpFieldInfo[k].lpName)) pTxb=strEver(pTxb);
+
+					// Controllo se il campo ha un parametro di CharSet UTF8 
+					enFldEncoding=_fldCollection(iFields,arsFld,psTxb->lpFieldInfo[k].lpName);
+					bFree=FALSE;
+
+					if (!pTxb) pString=strDup("NULL");
+					else {
+						
+						switch (enFldEncoding)
+						{
+							default:
+							case ULT_CS_LATIN1:
+								pString=strEncodeEx(1,pTxb,2,SE_UTF8,SE_SQLSTR);
+								break;
+
+							case ULT_CS_UTF8:
+								pString=strEncode(pTxb,SE_SQLSTR,NULL);
+								break;
+						}
+					}
+					lstPush(lstQuery,pString);
+					ehFree(pString);
+					break;
+
+			case ADB_BINARY:
+			case ADB_POINT:
+			case ADB_GEOMETRY:
+
+				pTxb=txbFldPtr(psTxb,psTxb->lpFieldInfo[k].lpName);
+
+				// Campo NULL
+				if (!strCmp(pTxb,TXB_NULL)) {
+
+
+					if (!_fldNull(iFields,arsFld,psTxb->lpFieldInfo[k].lpName)) {
+
+						switch (enFldType)
+						{
+							case ADB_POINT:
+							case ADB_GEOMETRY:
+								lstPushf(lstQuery,"GeomFromText('Point(0 0)')");
+								break;
+
+							case ADB_BINARY:
+								lstPushf(lstQuery,"X'0'");
+								break;
+						}
+
+					} 
+					else {
+
+						lstPushf(lstQuery,"NULL");
+					
+					}
+					
+					// Campo binario con encodin B64
+				} else if (!strBegin(pTxb,"?B64?")) {
+
+					SIZE_T sizRet;
+					BYTE * pb;
+					CHAR * pszHex;
+
+					pb=base64Decode(pTxb+5,&sizRet);
+					pszHex=hexEncode(pb,sizRet);
+
+					lstPush(lstQuery,"X'");
+					lstPush(lstQuery,pszHex);
+					lstPush(lstQuery,"'");
+
+					ehFreePtrs(2,&pb,&pszHex);
+				}
+				break;
+			default:
+				ehError();
+				break;
+			}
+		}
 		pE=",";
 	}
+	return bError;
 }
 
 //
@@ -983,12 +1029,13 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 					BOOL	bNotUpdate,
 					BOOL	bShowProgress,
 					EH_LST	lstErrors,
-					CHAR *  pszFieldsExclude) {
+					CHAR *  pszFieldsExclude,
+					BOOL	(*funcExt)(EH_SRVPARAMS)) {
 
 	DYN_SECTION_GLOBALPTR
 	S_TXB *		psTxb;
 	INT		i,k;
-	CHAR *	pszFields=NULL;
+//	CHAR *	pszFields=NULL;
 	CHAR *	pszQuery;
 	EH_LST	lstQuery=lstNew();
 	_DMI	dmiFieldDest=DMIRESET;
@@ -996,6 +1043,9 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 	S_FLD_INFO * arsFld;
 	S_FLD_INFO * psFieldDest;
 	EH_AR	arExclude=NULL;
+	BOOL	bError;
+	EH_LST	lstFields;
+	CHAR * pszFieldList;
 	
 	if (!mysGetTableInfo(DYN_SECTIONC pszTableDest,&dmiFieldDest,NULL)) 
 	{
@@ -1020,10 +1070,11 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 	psTxb->iCharDecoding=ULT_CS_UTF8; // Richiedo conversione in UTF8
 
 	//
-	// costruisco parte per nome campi della query - INSERT INTO (campi)
+	// Costruisco parte per nome campi della query - INSERT INTO (campi)
 	//
 	if (!strEmpty(pszFieldsExclude)) arExclude=ARFSplit(pszFieldsExclude,",");
-	pszFields=NULL;
+	//pszFields=NULL;
+	lstFields=lstNew();
 	for (k=0;k<psTxb->iFieldCount;k++)
 	{
 		if (arExclude) {
@@ -1031,15 +1082,34 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 		}
 		psFieldDest=_fldInfo(iFields,arsFld,psTxb->lpFieldInfo[k].lpName);
 		if (!psFieldDest) {
+
+			if (funcExt) {
+				S_FLD_EXT sExt;
+				_(sExt);
+				sExt.pszName=psTxb->lpFieldInfo[k].lpName;
+				sExt.pszValue="";
+				sExt.enFldType=0;
+				sExt.lstQuery=lstFields;
+				sExt.pVoid=psTxb;						// Parametro
+				sExt.bNotExist=true;
+				funcExt(WS_ADD,0,&sExt); // Elenco in insert
+				if (sExt.bError) {bError=true; break;}
+			}
+
 			if (bShowProgress) printf("Campo %s inesistente nella tabella di destinazione." CRLF,psTxb->lpFieldInfo[k].lpName);
 			continue;
 		}
+		lstPush(lstFields,psTxb->lpFieldInfo[k].lpName);
+		/*
 		if (!pszFields) strAssign(&pszFields,psTxb->lpFieldInfo[k].lpName);
 		else {
 			strCat(&pszFields,",");			
 			strCat(&pszFields,psTxb->lpFieldInfo[k].lpName);
 		}
+		*/
 	}
+	pszFieldList=lstToString(lstFields,",","","");
+	lstDestroy(lstFields);
 
 	//
 	// valori per colonne
@@ -1056,7 +1126,7 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 
 		lstPush(lstQuery,pszTableDest);
 		lstPush(lstQuery," (");
-		lstPush(lstQuery,pszFields);
+		lstPush(lstQuery,pszFieldList); // <- Elenco campi in insert
 		lstPush(lstQuery,") VALUES (");
 
 		if (bShowProgress) {
@@ -1066,46 +1136,50 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 		}
 
 		txbRealGet(psTxb,i);
-		
-		_addTxbFields(	true,
+		bError=false;		
+		bError=_addTxbFields(	true,
 						lstQuery,
 							// Dati destinazione
 						iFields,		
 						arsFld,
 							// Dati sorgente
 						psTxb,
-						arExclude);
+						arExclude,
+						funcExt);
 
 		lstPushf(lstQuery,")");
 
-		if (!bNotUpdate) {
+		if (!bNotUpdate&&!bError) {
 		
 			lstPush(lstQuery," ON DUPLICATE KEY UPDATE ");
-			_addTxbFields(	false,
+			bError=_addTxbFields(	false,
 							lstQuery,
 								// Dati destinazione
 							iFields,		
 							arsFld,
 								// Dati srogente
 							psTxb,
-							arExclude);
+							arExclude,
+							funcExt);
 		
 		}
 		pszQuery=lstToString(lstQuery,"","",""); 
-		if (mys_query(DYN_SECTIONC pszQuery)) {
-			CHAR * psz=mys_QueryLastError(DYN_SECTIONC pszQuery);
-			if (lstErrors) {
-				lstPush(lstErrors,psz);
+		if (!bError) {
+			if (mys_query(DYN_SECTIONC pszQuery)) {
+				CHAR * psz=mys_QueryLastError(DYN_SECTIONC pszQuery);
+				if (lstErrors) {
+					lstPush(lstErrors,psz);
+				}
+				else ehExit("mysTableImport(): %s",psz);
+	//			ehFree(psz);
+				//lstErrors
 			}
-			else ehExit("mysTableImport(): %s",psz);
-//			ehFree(psz);
-			//lstErrors
 		}
 		ehFree(pszQuery);
 
 	}
 //	ehFree(pszBuffer);
-	ehFree(pszFields);
+	ehFree(pszFieldList);
 	lstDestroy(lstQuery);
 	printf("\r%s completed (100%%).",pszTableDest);
 	txbClose(psTxb);
@@ -1828,8 +1902,8 @@ void mysSchemaSync(CHAR *	pszSchemaSource,
 
 					// sprintf(szTableSource,"%s.%s",pszSchemaImport,pszTable);
 					if (strCaseCmp(szTableSource,szTableDest)) {
-						if (!mysTableExport(szTableSource,putfFileTemp,NULL,true,NULL,NULL)) {
-							mysTableImport(putfFileTemp,szTableDest,false,true,NULL,NULL);
+						if (!mysTableExport(szTableSource,putfFileTemp,NULL,true,NULL,NULL,NULL)) {
+							mysTableImport(putfFileTemp,szTableDest,false,true,NULL,NULL,NULL);
 						} else {
 							//ehExit("mysSchemaSync:mysTableExport: %s:%s",szTableSource,putfFileTemp);
 							printf("\7:Attenzione %s non esiste nel dbase di importazione",szTableSource);

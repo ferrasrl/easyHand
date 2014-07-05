@@ -1,0 +1,286 @@
+EasyHand
+Windows 5.3.00
+------------------------------------
+Info  : font_len errore 
+Memory status -----------------
+Process memory set: 40.15 Mb
+Uso 28 di max 100 celle.
+Heap memory LMO: 3.20 Kb
+
+  0 - _core                  M_HEAP :      1.02 Kb | hdl:    0
+  2 - BMP->ICONE             M_HEAP :      1.06 Kb | hdl:    0
+  3 - Lic:CREA_EX        M_MOVEABLE :      1.66 Kb | hdl: 2030014
+  4 - Lic:System32           M_HEAP :     14.71 Kb | hdl:    0
+  5 - *WIN                   M_HEAP :     23.52 Kb | hdl:    0
+  6 - *IDARRAY               M_HEAP :      2.00 Kb | hdl:    0
+  7 - *MGZ                   M_HEAP :      3.20 Kb | hdl:    0
+  8 - *HMZ                 M_LOCKED :      2.40 Kb | Hdl: 203001c
+  9 - Serial               M_LOCKED :      3.08 Kb | Hdl: 2030024
+ 10 - *ADB                   M_HEAP :       704 b  | hdl:    0
+ 11 - RE-sSetup.dmiLi    M_MOVEABLE :     52.00 Kb | hdl: 203002c
+ 12 - Lic:Service32          M_HEAP :     67.62 Kb | hdl:    0
+ 13 - Lic:CREA             M_LOCKED :     32.94 Kb | Hdl: 2030044
+ 14 - *ICONE               M_LOCKED :     17.13 Kb | Hdl: 203004c
+ 15 - Lic:DosSystem      M_MOVEABLE :      3.30 Kb | hdl: 2030054
+ 16 - WToolBar             M_LOCKED :       512 b  | Hdl: 2030094
+ 17 - WToolBar             M_LOCKED :       512 b  | Hdl: 203009c
+ 18 - AREA OGT             M_LOCKED :    306.00 Kb | Hdl: 20300a4
+ 19 - dbList             M_MOVEABLE :     31.60 Kb | hdl: 20300bc
+ 20 - FhdTable             M_LOCKED :    960.00 Kb | Hdl: 20300c4
+ 21 - OBJPASS                M_HEAP :       512 b  | hdl:    0
+ 22 - clipBranch         M_MOVEABLE :      9.60 Kb | hdl: 20300cc
+ 23 - dmiField           M_MOVEABLE :      1.72 Kb | hdl: 20300ec
+ 24 - CLIP_FIELDS        M_MOVEABLE :       512 b  | hdl: 20300d4
+ 25 - dmiSelect          M_MOVEABLE :     10.40 Kb | hdl: 20300f4
+ 26 - OBJPASS                M_HEAP :       512 b  | hdl:    0
+ 27 - SQD_DICT               M_HEAP :      1.64 Kb | hdl:    0
+ 28 - MESS_BUFFER            M_HEAP :       512 b  | hdl:    0
+
+Totale M_HDLFREE    :         0 b 
+Totale M_HEAP       :    120.22 Kb
+Totale M_MOVEABLE   :    110.80 Kb
+Totale Generale     :    231.02 Kb
+
+.STATUS WINDOWS
+windows : 3 [30]
+  0 <Crea> pos=  0, 42 (lx=1936,ly=1056)
+   .SaveBit	: No
+   .funcWinParam: Si
+   Clip Numero=0
+  1 <dBase Manager> pos=  0, 42 (lx=1936,ly=1056)
+   .SaveBit	: No
+   .funcWinParam: No
+   Clip Numero=0
+
+.STATUS MGZ (Mouse Graphic Zone) 
+Aree abilitate : 0 [50]
+
+.STATUS HMZ (Help Mouse Zone) 
+Aree abilitate : 0 [100]
+
+.STATUS FTIME (Funzioni Temporali) 
+Attive : 3 [9]
+  0 _LFlatLook (0ms) 
+  1 ??? (1ms) 
+
+.STATUS DELLE ICONE
+Numero icone : 218 [238]
+  1) AL1       hdl= 13 offset  32476 size=   464 grp:2 Lic:CREA
+  2) AL2       hdl= 13 offset  32012 size=   464 grp:2 Lic:CREA
+  3) AL3       hdl= 13 offset  31548 size=   464 grp:2 Lic:CREA
+  4) AL4       hdl= 13 offset  31096 size=   452 grp:2 Lic:CREA
+  5) AL5       hdl= 13 offset  30644 size=   452 grp:2 Lic:CREA
+  6) AL6       hdl= 13 offset  30192 size=   452 grp:2 Lic:CREA
+  7) ALL       hdl= 13 offset  29560 size=   632 grp:2 Lic:CREA
+  8) AMAFIX    hdl= 13 offset  29492 size=    68 grp:2 Lic:CREA
+  9) ARROW01   hdl= 13 offset  29360 size=   132 grp:2 Lic:CREA
+ 10) BOX1      hdl= 13 offset  28728 size=   632 grp:2 Lic:CREA
+ 11) BOX2      hdl= 13 offset  28096 size=   632 grp:2 Lic:CREA
+ 12) BOX32     hdl= 13 offset  27464 size=   632 grp:2 Lic:CREA
+ 13) BOX32P    hdl= 13 offset  26832 size=   632 grp:2 Lic:CREA
+ 14) BOX32S    hdl= 13 offset  26200 size=   632 grp:2 Lic:CREA
+ 15) CANE      hdl= 12 offset  64374 size=  3252 grp:-1 Lic:Service32
+ 16) CART01    hdl= 12 offset  62722 size=  1652 grp:-1 Lic:Service32
+ 17) CART03    hdl= 12 offset  61280 size=  1442 grp:-1 Lic:Service32
+ 18) CART04    hdl= 12 offset  59838 size=  1442 grp:-1 Lic:Service32
+ 19) CART05    hdl= 12 offset  59306 size=   532 grp:-1 Lic:Service32
+ 20) CART06    hdl= 12 offset  58774 size=   532 grp:-1 Lic:Service32
+ 21) CART07    hdl= 12 offset  58242 size=   532 grp:-1 Lic:Service32
+ 22) CART08    hdl= 12 offset  57710 size=   532 grp:-1 Lic:Service32
+ 23) CART09    hdl= 12 offset  57178 size=   532 grp:-1 Lic:Service32
+ 24) CART10    hdl= 12 offset  56646 size=   532 grp:-1 Lic:Service32
+ 25) CART11    hdl= 12 offset  56114 size=   532 grp:-1 Lic:Service32
+ 26) CART12    hdl= 12 offset  53982 size=  2132 grp:-1 Lic:Service32
+ 27) CART14    hdl= 12 offset  51850 size=  2132 grp:-1 Lic:Service32
+ 28) CART15    hdl= 12 offset  51318 size=   532 grp:-1 Lic:Service32
+ 29) CART16    hdl= 12 offset  50786 size=   532 grp:-1 Lic:Service32
+ 30) CART2A    hdl= 12 offset  49344 size=  1442 grp:-1 Lic:Service32
+ 31) CART2B    hdl= 12 offset  47902 size=  1442 grp:-1 Lic:Service32
+ 32) CESTINO   hdl= 12 offset  45770 size=  2132 grp:-1 Lic:Service32
+ 33) CLEX      hdl=  4 offset  14202 size=   512 grp:-1 Lic:System32
+ 34) CLEX2     hdl=  4 offset  13690 size=   512 grp:-1 Lic:System32
+ 35) CLIP2     hdl= 12 offset  45618 size=   152 grp:-1 Lic:Service32
+ 36) COPIA     hdl= 13 offset  25568 size=   632 grp:2 Lic:CREA
+ 37) CREA4     hdl= 13 offset  23616 size=  1952 grp:2 Lic:CREA
+ 38) CREAH1    hdl= 13 offset  23188 size=   428 grp:2 Lic:CREA
+ 39) CREAREV   hdl= 13 offset  22788 size=   400 grp:2 Lic:CREA
+ 40) CREAREV2  hdl= 13 offset  22388 size=   400 grp:2 Lic:CREA
+ 41) CROSS     hdl=  3 offset   1364 size=   304 grp:2 Lic:CREA_EX
+ 42) CROSS2    hdl=  3 offset   1044 size=   320 grp:2 Lic:CREA_EX
+ 43) DELIPT    hdl= 12 offset  45086 size=   532 grp:-1 Lic:Service32
+ 44) DIR1      hdl= 13 offset  22226 size=   162 grp:2 Lic:CREA
+ 45) DIR2      hdl= 13 offset  22064 size=   162 grp:2 Lic:CREA
+ 46) DIR3      hdl= 13 offset  21902 size=   162 grp:2 Lic:CREA
+ 47) DIR4      hdl= 13 offset  21740 size=   162 grp:2 Lic:CREA
+ 48) DRIVECD   hdl= 12 offset  44878 size=   208 grp:-1 Lic:Service32
+ 49) DRIVEFD   hdl= 12 offset  44670 size=   208 grp:-1 Lic:Service32
+ 50) DRIVEHD   hdl= 12 offset  44462 size=   208 grp:-1 Lic:Service32
+ 51) DRIVENT   hdl= 12 offset  44254 size=   208 grp:-1 Lic:Service32
+ 52) ESCI      hdl= 12 offset  41912 size=  2342 grp:-1 Lic:Service32
+ 53) FABMASK2  hdl= 12 offset  38384 size=  3528 grp:-1 Lic:Service32
+ 54) FACTORY   hdl= 12 offset  37852 size=   532 grp:-1 Lic:Service32
+ 55) FHD       hdl= 13 offset  20908 size=   832 grp:2 Lic:CREA
+ 56) FHDTAB    hdl= 13 offset  20076 size=   832 grp:2 Lic:CREA
+ 57) FILL      hdl= 13 offset  19444 size=   632 grp:2 Lic:CREA
+ 58) FILLMASK  hdl= 13 offset  18812 size=   632 grp:2 Lic:CREA
+ 59) FLAG      hdl= 12 offset  37730 size=   122 grp:-1 Lic:Service32
+ 60) FLGOFF    hdl= 12 offset  37608 size=   122 grp:-1 Lic:Service32
+ 61) FLGON     hdl= 12 offset  37486 size=   122 grp:-1 Lic:Service32
+ 62) FOTO      hdl= 12 offset  36954 size=   532 grp:-1 Lic:Service32
+ 63) FR1       hdl= 12 offset  36874 size=    80 grp:-1 Lic:Service32
+ 64) FR2       hdl= 12 offset  36794 size=    80 grp:-1 Lic:Service32
+ 65) FR3       hdl= 12 offset  36714 size=    80 grp:-1 Lic:Service32
+ 66) FR4       hdl= 12 offset  36634 size=    80 grp:-1 Lic:Service32
+ 67) FRDN      hdl= 12 offset  36502 size=   132 grp:-1 Lic:Service32
+ 68) FRDX      hdl= 12 offset  36370 size=   132 grp:-1 Lic:Service32
+ 69) FRECCIA   hdl=  4 offset  13528 size=   162 grp:-1 Lic:System32
+ 70) FRSX      hdl= 12 offset  36238 size=   132 grp:-1 Lic:Service32
+ 71) FRUP      hdl= 12 offset  36106 size=   132 grp:-1 Lic:Service32
+ 72) GOMMAS    hdl= 13 offset  18180 size=   632 grp:2 Lic:CREA
+ 73) IC0C      hdl= 13 offset  17780 size=   400 grp:2 Lic:CREA
+ 74) IC1       hdl= 13 offset  17380 size=   400 grp:2 Lic:CREA
+ 75) IC10      hdl= 13 offset  16980 size=   400 grp:2 Lic:CREA
+ 76) IC11      hdl= 13 offset  16580 size=   400 grp:2 Lic:CREA
+ 77) IC13      hdl= 13 offset  16180 size=   400 grp:2 Lic:CREA
+ 78) IC14      hdl= 13 offset  15780 size=   400 grp:2 Lic:CREA
+ 79) IC15      hdl= 13 offset  15380 size=   400 grp:2 Lic:CREA
+ 80) IC19      hdl= 13 offset  14980 size=   400 grp:2 Lic:CREA
+ 81) IC2       hdl= 13 offset  14580 size=   400 grp:2 Lic:CREA
+ 82) IC20      hdl= 13 offset  14180 size=   400 grp:2 Lic:CREA
+ 83) IC21      hdl= 13 offset  13780 size=   400 grp:2 Lic:CREA
+ 84) IC22      hdl= 13 offset  13380 size=   400 grp:2 Lic:CREA
+ 85) IC23      hdl= 13 offset  12980 size=   400 grp:2 Lic:CREA
+ 86) IC24      hdl= 13 offset  12580 size=   400 grp:2 Lic:CREA
+ 87) IC3       hdl= 13 offset  12180 size=   400 grp:2 Lic:CREA
+ 88) IC4       hdl= 13 offset  11780 size=   400 grp:2 Lic:CREA
+ 89) IC5       hdl= 13 offset  11380 size=   400 grp:2 Lic:CREA
+ 90) IC7       hdl= 13 offset  10980 size=   400 grp:2 Lic:CREA
+ 91) IC8       hdl= 13 offset  10580 size=   400 grp:2 Lic:CREA
+ 92) IC81      hdl= 13 offset  10180 size=   400 grp:2 Lic:CREA
+ 93) IC82      hdl= 13 offset   9780 size=   400 grp:2 Lic:CREA
+ 94) IC84      hdl= 13 offset   9588 size=   192 grp:2 Lic:CREA
+ 95) IC87      hdl= 13 offset   9188 size=   400 grp:2 Lic:CREA
+ 96) IC88      hdl= 13 offset   8788 size=   400 grp:2 Lic:CREA
+ 97) IC90      hdl= 13 offset   8388 size=   400 grp:2 Lic:CREA
+ 98) ICINF     hdl= 13 offset   7896 size=   492 grp:2 Lic:CREA
+ 99) ICOERR    hdl= 12 offset  34454 size=  1652 grp:-1 Lic:Service32
+100) ICTEXT    hdl=  3 offset    934 size=   110 grp:2 Lic:CREA_EX
+101) ICZONA    hdl= 13 offset   7496 size=   400 grp:2 Lic:CREA
+102) ICZONAW   hdl= 13 offset   7096 size=   400 grp:2 Lic:CREA
+103) ILPT0     hdl= 12 offset  33922 size=   532 grp:-1 Lic:Service32
+104) ILPT1     hdl= 12 offset  33390 size=   532 grp:-1 Lic:Service32
+105) ILPT2     hdl= 12 offset  32858 size=   532 grp:-1 Lic:Service32
+106) ILPT3     hdl= 12 offset  32326 size=   532 grp:-1 Lic:Service32
+107) ILPT4     hdl= 12 offset  31794 size=   532 grp:-1 Lic:Service32
+108) ILPT5     hdl= 12 offset  31262 size=   532 grp:-1 Lic:Service32
+109) INCOLLA   hdl= 13 offset   6464 size=   632 grp:2 Lic:CREA
+110) INDI01    hdl= 13 offset   6408 size=    56 grp:2 Lic:CREA
+111) INDI02    hdl= 13 offset   6352 size=    56 grp:2 Lic:CREA
+112) KEYDN0    hdl= 15 offset   3250 size=    50 grp:2 Lic:DosSystem
+113) KEYDN1    hdl= 15 offset   3188 size=    62 grp:2 Lic:DosSystem
+114) KEYDN2    hdl= 15 offset   3138 size=    50 grp:2 Lic:DosSystem
+115) KEYUP0    hdl= 15 offset   3088 size=    50 grp:2 Lic:DosSystem
+116) KEYUP1    hdl= 15 offset   3038 size=    50 grp:2 Lic:DosSystem
+117) KEYUP2    hdl= 15 offset   2982 size=    56 grp:2 Lic:DosSystem
+118) KEYUP3    hdl= 15 offset   2926 size=    56 grp:2 Lic:DosSystem
+119) LI1       hdl= 12 offset  31176 size=    86 grp:-1 Lic:Service32
+120) LINEA     hdl= 13 offset   5720 size=   632 grp:2 Lic:CREA
+121) LINEA2    hdl= 13 offset   5088 size=   632 grp:2 Lic:CREA
+122) LOGOF1    hdl= 12 offset  26230 size=  4946 grp:-1 Lic:Service32
+123) LOGOF2    hdl= 12 offset  22418 size=  3812 grp:-1 Lic:Service32
+124) MANO1     hdl= 12 offset  22130 size=   288 grp:-1 Lic:Service32
+125) MANO2     hdl= 12 offset  21842 size=   288 grp:-1 Lic:Service32
+126) MARK0     hdl=  4 offset  12544 size=   984 grp:-1 Lic:System32
+127) MARK0B    hdl=  4 offset  11560 size=   984 grp:-1 Lic:System32
+128) MARK0L    hdl= 15 offset   2622 size=   304 grp:2 Lic:DosSystem
+129) MARK1     hdl=  4 offset  10576 size=   984 grp:-1 Lic:System32
+130) MARK1B    hdl=  4 offset   9592 size=   984 grp:-1 Lic:System32
+131) MARK1L    hdl= 15 offset   2318 size=   304 grp:2 Lic:DosSystem
+132) MATIT     hdl=  4 offset   9304 size=   288 grp:-1 Lic:System32
+133) MENO      hdl= 12 offset  21762 size=    80 grp:-1 Lic:Service32
+134) MKCREA    hdl= 13 offset   4688 size=   400 grp:2 Lic:CREA
+135) MKEY1     hdl=  4 offset   9142 size=   162 grp:-1 Lic:System32
+136) MKEY1B    hdl=  4 offset   8980 size=   162 grp:-1 Lic:System32
+137) MKEY1L    hdl=  4 offset   8818 size=   162 grp:-1 Lic:System32
+138) MKEY2     hdl=  4 offset   8656 size=   162 grp:-1 Lic:System32
+139) MKEY2B    hdl=  4 offset   8494 size=   162 grp:-1 Lic:System32
+140) MKEY2L    hdl=  4 offset   8332 size=   162 grp:-1 Lic:System32
+141) MKEY3     hdl=  4 offset   8160 size=   172 grp:-1 Lic:System32
+142) MKEY4     hdl=  4 offset   7988 size=   172 grp:-1 Lic:System32
+143) MKEY5     hdl=  4 offset   7826 size=   162 grp:-1 Lic:System32
+144) MKEY5B    hdl=  4 offset   7664 size=   162 grp:-1 Lic:System32
+145) MKEY5L    hdl=  4 offset   7502 size=   162 grp:-1 Lic:System32
+146) MKEY6     hdl=  4 offset   7340 size=   162 grp:-1 Lic:System32
+147) MKEY6B    hdl=  4 offset   7178 size=   162 grp:-1 Lic:System32
+148) MKEY6L    hdl=  4 offset   7016 size=   162 grp:-1 Lic:System32
+149) MKEY7     hdl=  4 offset   6854 size=   162 grp:-1 Lic:System32
+150) MKEY7B    hdl=  4 offset   6692 size=   162 grp:-1 Lic:System32
+151) MKEY7L    hdl=  4 offset   6530 size=   162 grp:-1 Lic:System32
+152) MKEY8     hdl=  4 offset   6388 size=   142 grp:-1 Lic:System32
+153) MKEY9     hdl=  4 offset   6246 size=   142 grp:-1 Lic:System32
+154) MOVE      hdl=  4 offset   6064 size=   182 grp:-1 Lic:System32
+155) MOVEO     hdl=  3 offset    652 size=   282 grp:2 Lic:CREA_EX
+156) MOVEV     hdl=  3 offset    320 size=   332 grp:2 Lic:CREA_EX
+157) MS01      hdl=  4 offset   5902 size=   162 grp:-1 Lic:System32
+158) MS02      hdl=  4 offset   5750 size=   152 grp:-1 Lic:System32
+159) MS03      hdl=  4 offset   5558 size=   192 grp:-1 Lic:System32
+160) MS04      hdl=  4 offset   5296 size=   262 grp:-1 Lic:System32
+161) MS05      hdl=  4 offset   4944 size=   352 grp:-1 Lic:System32
+162) MS06      hdl=  4 offset   4544 size=   400 grp:-1 Lic:System32
+163) MS10      hdl=  4 offset   4352 size=   192 grp:-1 Lic:System32
+164) MS20      hdl=  4 offset   4020 size=   332 grp:-1 Lic:System32
+165) MS21      hdl=  4 offset   3688 size=   332 grp:-1 Lic:System32
+166) MSICONE   hdl=  3 offset      0 size=   320 grp:2 Lic:CREA_EX
+167) MSLENTE   hdl=  4 offset   3320 size=   368 grp:-1 Lic:System32
+168) MSLENTE2  hdl=  4 offset   2952 size=   368 grp:-1 Lic:System32
+169) NONE      hdl= 13 offset   4056 size=   632 grp:2 Lic:CREA
+170) OSCURA1   hdl= 12 offset  21410 size=   352 grp:-1 Lic:Service32
+171) PAPER     hdl= 12 offset  20618 size=   792 grp:-1 Lic:Service32
+172) PAPERA    hdl= 12 offset  20426 size=   192 grp:-1 Lic:Service32
+173) PAPERB    hdl= 12 offset  20234 size=   192 grp:-1 Lic:Service32
+174) PAPERC    hdl= 12 offset  20042 size=   192 grp:-1 Lic:Service32
+175) PAPERD    hdl= 12 offset  19850 size=   192 grp:-1 Lic:Service32
+176) PATH1     hdl= 12 offset  19708 size=   142 grp:-1 Lic:Service32
+177) PATH2     hdl= 12 offset  19500 size=   208 grp:-1 Lic:Service32
+178) PATH3     hdl= 12 offset  19358 size=   142 grp:-1 Lic:Service32
+179) PENNA     hdl= 13 offset   3424 size=   632 grp:2 Lic:CREA
+180) PENNELLO  hdl= 13 offset   2792 size=   632 grp:2 Lic:CREA
+181) PIU       hdl= 12 offset  19278 size=    80 grp:-1 Lic:Service32
+182) PRNLOC    hdl= 12 offset  19086 size=   192 grp:-1 Lic:Service32
+183) PRNNET    hdl= 12 offset  18798 size=   288 grp:-1 Lic:Service32
+184) RADIO0    hdl=  4 offset   1968 size=   984 grp:-1 Lic:System32
+185) RADIO0B   hdl=  4 offset    984 size=   984 grp:-1 Lic:System32
+186) RADIO0L   hdl= 15 offset   2014 size=   304 grp:2 Lic:DosSystem
+187) RADIO1    hdl=  4 offset      0 size=   984 grp:-1 Lic:System32
+188) RADIO1L   hdl= 15 offset   1710 size=   304 grp:2 Lic:DosSystem
+189) SALVA     hdl= 12 offset  14366 size=  4432 grp:-1 Lic:Service32
+190) STAMPA    hdl= 12 offset  13834 size=   532 grp:-1 Lic:Service32
+191) TOOLBAR2  hdl= 13 offset   2600 size=   192 grp:2 Lic:CREA
+192) TOOLBAR3  hdl= 13 offset   2408 size=   192 grp:2 Lic:CREA
+193) TOOLBAR4  hdl= 13 offset   2216 size=   192 grp:2 Lic:CREA
+194) TOOLBAR6  hdl= 13 offset   2024 size=   192 grp:2 Lic:CREA
+195) TOOLBAR8  hdl= 13 offset   1688 size=   336 grp:2 Lic:CREA
+196) TOOLBAR9  hdl= 13 offset   1352 size=   336 grp:2 Lic:CREA
+197) TOOLBARP  hdl= 13 offset    824 size=   336 grp:2 Lic:CREA
+198) TOOLBR10  hdl= 13 offset   1160 size=   192 grp:2 Lic:CREA
+199) TRATTO    hdl= 12 offset  13706 size=   128 grp:-1 Lic:Service32
+200) TRATTOB   hdl= 12 offset  13578 size=   128 grp:-1 Lic:Service32
+201) TRATTOD   hdl= 12 offset  13496 size=    82 grp:-1 Lic:Service32
+202) TRNODO0   hdl= 12 offset  13394 size=   102 grp:-1 Lic:Service32
+203) TRNODO1   hdl= 12 offset  13292 size=   102 grp:-1 Lic:Service32
+204) WIN0      hdl= 15 offset   1428 size=   282 grp:2 Lic:DosSystem
+205) WIN0C     hdl= 15 offset   1146 size=   282 grp:2 Lic:DosSystem
+206) WIN1      hdl= 15 offset    864 size=   282 grp:2 Lic:DosSystem
+207) WIN1C     hdl= 15 offset    592 size=   272 grp:2 Lic:DosSystem
+208) WIN2      hdl= 15 offset    518 size=    74 grp:2 Lic:DosSystem
+209) WIN2C     hdl= 15 offset    444 size=    74 grp:2 Lic:DosSystem
+210) WIN3      hdl= 15 offset    370 size=    74 grp:2 Lic:DosSystem
+211) WIN3C     hdl= 15 offset    296 size=    74 grp:2 Lic:DosSystem
+212) WIN4      hdl= 15 offset    222 size=    74 grp:2 Lic:DosSystem
+213) WIN4C     hdl= 15 offset    148 size=    74 grp:2 Lic:DosSystem
+214) WIN5      hdl= 15 offset     74 size=    74 grp:2 Lic:DosSystem
+215) WIN5C     hdl= 15 offset      0 size=    74 grp:2 Lic:DosSystem
+216) WRITMASK  hdl= 13 offset    192 size=   632 grp:2 Lic:CREA
+217) WSER      hdl= 12 offset      0 size= 13292 grp:-1 Lic:Service32
+218) X-TRASP   hdl= 13 offset      0 size=   192 grp:2 Lic:CREA
+

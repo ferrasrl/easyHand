@@ -1489,7 +1489,7 @@ static BOOL _fileScanAdd(EH_ULT * psUlt,S_SOURCE *psSource);
 //
 BOOL ultExtEnable(CHAR *lpExt)
 {
-	CHAR *lpEstensioniPossibili="|.taf|.tcf|.inc|.html|.htm|.txt|.cfm|.php|.asp|.xml|.xsd|.js|.css|.strings|";
+	CHAR *lpEstensioniPossibili="|.taf|.tcf|.inc|.html|.htm|.txt|.cfm|.php|.asp|.xml|.xsd|.js|.css|.strings|.config|";
 	CHAR szServ[20];
 	sprintf(szServ,"|%s|",lpExt);
 	if (strstr(lpEstensioniPossibili,lpExt)) return TRUE; else return FALSE;
@@ -2087,9 +2087,9 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 	if (psUlt->fLogWrite) 
 	{
 		CHAR szDestFolder[500];
-		sprintf(szDestFolder,"c:\\mvk\\Ult\\Logs");
+		sprintf(szDestFolder,"c:\\comFerra\\Ult\\Logs");
 		if (!fileCheck(szDestFolder)) CreateDirectory(szDestFolder,NULL);
-		sprintf(psUlt->szLogFile,"c:\\mvk\\Ult\\Logs\\Log_%s.txt",dtNow());
+		sprintf(psUlt->szLogFile,"c:\\comFerra\\Ult\\Logs\\Log_%s.txt",dtNow());
 		_ultLogOpen(psUlt);
 	}
 
@@ -3008,7 +3008,7 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 	
 	// ehLogWrite("%s",szFileTarget);
 	//ch=fopen(szNewName,"wb"); if (!ch) ehExit("_ultFileBuilder: Write [%s] err:%d",szNewName,osGetError());
-	// if (bFileTarget) fileStrWrite("c:\\mvk\\ULT\\LastFile.log",lpMemo);
+	// if (bFileTarget) fileStrWrite("c:\\comFerra\\ULT\\LastFile.log",lpMemo);
 
 	iCount=0;
 	while (TRUE)
@@ -3067,7 +3067,7 @@ FINE:
 // ultMultiFileBuilder()
 // 
 BOOL ultMultiFileBuilder(EH_ULT	*	psUlt,	
-						 CHAR *		lpFolderBase, // Il folder dove si trovano le cartelle in lingua Es. c:\inetpub\wwwroot\mondialbroker
+						 CHAR *		lpFolderBase, // Il folder dove si trovano le cartelle in lingua Es. c:\inetpub\wwwroot\yacht4web
 						 CHAR *		lpIsoLang,	 // Prefisso della lingua interessata
 						 WCHAR *	pwcFileList, // Elenco dei file da rielaborare separati da virgola
 						 INT *		lpiFileMissing,

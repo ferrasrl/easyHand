@@ -1597,7 +1597,8 @@ static void FHD_TableDecode(CHAR *lpCode,FXD_TAB_INFO *psTable)//CHAR **lpLocalF
 	p2=p+1; p=strstr(p2,"|");  if (p==NULL) return; else *p=0; // FQL Tipo
 	psTable->enSqlPlatform=atoi(p2);
 	strAssign(&psTable->pszSqlAlternateName,p+1);
-	psTable->pTableComments=strDup("");
+	psTable->pszTableComments=strDup("");
+	psTable->pszPresetAutoinc=strDup("");
 }
 
 static void FHD_TableEncode(CHAR *lpCode,FXD_TAB_INFO *psTable)//CHAR *lpLocalFile,SINT iFql,CHAR *lpSQLTableName)
@@ -1735,16 +1736,21 @@ void fxdPropertyBuilder(FXD_ELEMENT *pElement,SINT iType,BOOL bAllocInfo)
 
 	switch (iType)
 	{
-		case FHD_FOLDER: pElement->psFolderInfo=ehAllocZero(sizeof(FXD_FOL_INFO)); break;
+		case FHD_FOLDER: 
+			pElement->psFolderInfo=ehAllocZero(sizeof(FXD_FOL_INFO)); 
+			break;
+
 		case FHD_TABLE: 
 			pElement->psTableInfo=ehAllocZero(sizeof(FXD_TAB_INFO)); 
 			if (bAllocInfo)
 			{
 				pElement->psTableInfo->pszLocalFile=strDup("");
 				pElement->psTableInfo->pszSqlAlternateName=strDup("");
-				pElement->psTableInfo->pTableComments=strDup("");
+				pElement->psTableInfo->pszTableComments=strDup("");
+				pElement->psTableInfo->pszPresetAutoinc=strDup("");
 			}
 			break;
+
 		case FHD_FIELD: 
 			pElement->psFieldInfo=ehAllocZero(sizeof(FXD_FLD_INFO)); 
 			if (bAllocInfo)
@@ -1799,7 +1805,8 @@ FXD_ELEMENT *FhdElementClone(FXD_ELEMENT *pSource)
 		memcpy(pElement->psTableInfo,pSource->psTableInfo,sizeof(FXD_TAB_INFO));
 		pElement->psTableInfo->pszLocalFile=strDup(pSource->psTableInfo->pszLocalFile);
 		pElement->psTableInfo->pszSqlAlternateName=strDup(pSource->psTableInfo->pszSqlAlternateName);
-		pElement->psTableInfo->pTableComments=strDup(pSource->psTableInfo->pTableComments);
+		pElement->psTableInfo->pszTableComments=strDup(pSource->psTableInfo->pszTableComments);
+		pElement->psTableInfo->pszPresetAutoinc=strDup(pSource->psTableInfo->pszPresetAutoinc);
 //		strAssign(&pElement->psTableInfo->pTableComments,pSource->psTableInfo->pTableComments);
 	}
 
@@ -1848,7 +1855,8 @@ void FhdElementFree(FXD_ELEMENT *pFhdElement)
 	{
 		strAssign(&pFhdElement->psTableInfo->pszLocalFile,NULL);
 		strAssign(&pFhdElement->psTableInfo->pszSqlAlternateName,NULL);
-		strAssign(&pFhdElement->psTableInfo->pTableComments,NULL);
+		strAssign(&pFhdElement->psTableInfo->pszTableComments,NULL);
+		strAssign(&pFhdElement->psTableInfo->pszPresetAutoinc,NULL);
 		ehFreePtr(&pFhdElement->psTableInfo); //pFhdElement->psTableInfo=NULL;
 	}
 
@@ -2041,7 +2049,8 @@ static void FXD_SaveFolder(FILE *pf1,_DMI *pdmi,SINT idxFolder)
 				fprintf(pf1,"%s<table name=\"%s\">" CRLF,szTabs2,sFxd.szName);
 				xmlTagFileWrite(pf1,"sqlname",sFxd.psTableInfo->pszSqlAlternateName,szTabs2,CRLF);
 				xmlTagFileWrite(pf1,"filename",sFxd.psTableInfo->pszLocalFile,szTabs2,CRLF);
-				xmlTagFileWrite(pf1,"comments",sFxd.psTableInfo->pTableComments,szTabs2,CRLF);
+				xmlTagFileWrite(pf1,"comments",sFxd.psTableInfo->pszTableComments,szTabs2,CRLF);
+				xmlTagFileWrite(pf1,"autoinc",sFxd.psTableInfo->pszPresetAutoinc,szTabs2,CRLF);
 				fprintf(pf1,"%s<platform>%d</platform>" CRLF,szTabs2,sFxd.psTableInfo->enSqlPlatform);
 				//fprintf(pf1,"\t<comments></comments>" CRLF);
 //				xmlTagFileWrite(pf1,"comments","",szTabs2,CRLF);
@@ -2184,7 +2193,10 @@ BOOL L_AddFolder(XMLDOC sXml,_DMI *pdmi,XMLELEMENT *pFolder,SINT iMainParent)
 
 
 			lpXml=xmlParser(&sXml,WS_FIND,arTable[t]->idx,"table.comments"); 
-			if (lpXml) strAssign(&sFxd.psTableInfo->pTableComments,lpXml->lpValue?lpXml->lpValue:"");
+			if (lpXml) strAssign(&sFxd.psTableInfo->pszTableComments,lpXml->lpValue?lpXml->lpValue:"");
+
+			lpXml=xmlParser(&sXml,WS_FIND,arTable[t]->idx,"table.autoinc"); 
+			if (lpXml) strAssign(&sFxd.psTableInfo->pszPresetAutoinc,lpXml->lpValue?lpXml->lpValue:"");
 
 			//				win_infoarg("%s %d",sFxd.szName,sFxd.psTableInfo->enSqlPlatform);
 			DMIAppend(pdmi,&sFxd);

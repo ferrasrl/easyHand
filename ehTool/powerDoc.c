@@ -13,7 +13,6 @@
 #include "/easyhand/ehtool/imgutil.h"
 #include <math.h>
 
-
 // #define TRACE_MOUSE_PREVIEW	// Mostra la posizione in UM del mouse sul preview
 #define HD_DPI 30000.0 // Profondita HD in DPI per determinare le dimensioni in UM (2014)
 
@@ -2876,8 +2875,10 @@ static BOOL	_addItemMem(PWD_TE uType,PWD_RECT *prumObj,void *psObj,INT iSizeObj)
 	// Se andiamo fuori dal buffer
 	if ((_sPd.lItemBufferCount+iSize)>=_sPd.lItemBufferSize)
 	{
+		DWORD dwOldMemo=_sPd.lItemBufferSize;
 		_sPd.lItemBufferSize=_sPd.lItemBufferCount+iSize+128;
-		_sPd.lpItemBuffer=realloc(_sPd.lpItemBuffer,_sPd.lItemBufferSize);
+//		_sPd.lpItemBuffer=realloc(_sPd.lpItemBuffer,_sPd.lItemBufferSize);
+		_sPd.lpItemBuffer=ehRealloc(_sPd.lpItemBuffer,dwOldMemo,_sPd.lItemBufferSize);
 		if (_sPd.lpItemBuffer==NULL) ehExit("_addItemMem: out of memory B");
 	}
 	
@@ -6812,17 +6813,25 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 					HPDF_Page_SetCharSpace(psPage, (HPDF_REAL) pwdUmTo(psText->umExtraCharSpace,PUM_PT));
 
 					drValue = HPDF_Page_TextWidth (psPage, pszText); // Calcolo Larghezza del testo
+					
+					_pointToReal(sumPage,
+								 psText->umX,
+								 psText->umY,
+								 &pdfPoint.x,
+								 &pdfPoint.y);
 
 					//drValue = HPDF_Page_TextWidth (psPage, psText->pszText);
 					switch (psText->enAlign&0xf)
 					{
 						case PDA_RIGHT:
 //								rumArea.left=rumArea.right-drValue;
-								pdfRect.left=pdfRect.right-drValue;
+//								pdfRect.left=pdfRect.right-drValue;
+								pdfPoint.x-=drValue;
 								break;
 
 						case PDA_CENTER:
-								pdfRect.left+=(pdfSize.cx/2)-(drValue/2);
+								//pdfRect.left+=(pdfSize.cx/2)-(drValue/2);
+								pdfPoint.x-=(drValue/2);
 								break;
 
 						default:
@@ -6831,11 +6840,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 								break;
 					}
 
-					_pointToReal(sumPage,
-						 psText->umX,
-						 psText->umY,
-						 &pdfPoint.x,
-						 &pdfPoint.y);
+
 
 					if (psText->enAlign&PDA_BASELINE) {
 					

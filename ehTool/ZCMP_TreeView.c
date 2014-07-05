@@ -310,7 +310,7 @@ static void Main_OnBeginDrag(HWND hwndTV, LPNMTREEVIEW lpnmtv)
 static void Main_EndDrag(void)//HWND hwndTV, LPNMTREEVIEW lpnmtv) 
 {
 	INT iIndex;
-	CHAR Serv[80];
+	CHAR szServ[80];
 	//static EHDRAGDROP EhDD;
 
 	//ImageList_DragLeave(NULL);
@@ -328,8 +328,8 @@ static void Main_EndDrag(void)//HWND hwndTV, LPNMTREEVIEW lpnmtv)
 	EhDD.hDrag=hDragItem;
 	EhDD.hDrop=hDropItem;
 	OBJ_key=(LONG) &EhDD;
-	sprintf(Serv,"%sDD",TVList[iIndex].lpObj->nome);
-	obj_addevent(Serv);
+	sprintf(szServ,"%sDD",TVList[iIndex].lpObj->nome);
+	obj_addevent(szServ);
 }
 
 // Main_OnMouseMove - drags an item in a tree view control, 
@@ -433,7 +433,7 @@ static LRESULT TreeViewNotify(HWND hWnd, LPARAM lParam,INT iLVIndex,LPNMHDR pnmh
 	LPNMLVKEYDOWN pnkd;
 
 	struct OBJ *poj;
-	CHAR Serv[20];
+	CHAR szServ[20];
 	LPNMHDR lpnmh;
 	HTREEITEM hItem;
 	LPNMTREEVIEW lpnmtv;
@@ -460,6 +460,18 @@ static LRESULT TreeViewNotify(HWND hWnd, LPARAM lParam,INT iLVIndex,LPNMHDR pnmh
 		case TVN_SELCHANGING:
 			 lpnmtv = (LPNMTREEVIEW) lParam;
 			 TreeView_SelectDropTarget(lpnmh->hwndFrom,lpnmtv->itemNew.hItem); 
+
+			 ZeroFill(item);
+			 hItem=TreeView_GetSelection(lpnmh->hwndFrom);
+			 item.mask=TVIF_PARAM; 
+			 item.hItem=hItem;
+			 item.pszText=szServ;
+			 item.cchTextMax=sizeof(szServ);
+			 TreeView_GetItem(lpnmh->hwndFrom,&item);
+			 OBJ_key=item.lParam;
+
+			 sprintf(szServ,"%sSEL",poj->nome);
+			 obj_addevent(szServ);
 			 break;
 		
 		case NM_DBLCLK :
@@ -467,13 +479,13 @@ static LRESULT TreeViewNotify(HWND hWnd, LPARAM lParam,INT iLVIndex,LPNMHDR pnmh
 			 hItem=TreeView_GetSelection(lpnmh->hwndFrom);
 			 item.mask=TVIF_PARAM; 
 			 item.hItem=hItem;
-			 item.pszText=Serv;
-			 item.cchTextMax=sizeof(Serv);
+			 item.pszText=szServ;
+			 item.cchTextMax=sizeof(szServ);
 			 TreeView_GetItem(lpnmh->hwndFrom,&item);
-
 			 OBJ_key=item.lParam;
-			 sprintf(Serv,"%sDCLK",poj->nome);
-			 obj_addevent(Serv);
+
+			 sprintf(szServ,"%sDCLK",poj->nome);
+			 obj_addevent(szServ);
 			 break;
 
 
@@ -484,16 +496,16 @@ static LRESULT TreeViewNotify(HWND hWnd, LPARAM lParam,INT iLVIndex,LPNMHDR pnmh
 			 ZeroFill(item);
 			 item.mask=TVIF_TEXT|TVIF_PARAM; 
 			 item.hItem=hItem;
-			 item.pszText=Serv;
-			 item.cchTextMax=sizeof(Serv);
+			 item.pszText=szServ;
+			 item.cchTextMax=sizeof(szServ);
 
 			 TreeView_GetItem(lpnmh->hwndFrom,&item);
-			 //_d_("[%s]      ",Serv);
+			 //_d_("[%s]      ",szServ);
 			 
 			 
 			 OBJ_key=item.lParam;
-			 sprintf(Serv,"%sRC",poj->nome);
-			 obj_addevent(Serv);
+			 sprintf(szServ,"%sRC",poj->nome);
+			 obj_addevent(szServ);
 			 break;
 
 		 case TVN_BEGINDRAG:
