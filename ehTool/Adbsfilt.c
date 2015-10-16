@@ -307,7 +307,7 @@ LONG adb_Filter(HDB hdb,SINT iCommand,CHAR *pCampo,CHAR *pAzione,void *pValore)
 										lpsi=(INT16 *) psElement->szValore; *lpsi=atoi(pValore);
 										break;
 
-							 case ADB_INT32:
+							 case ADB_UINT32:
 							 case ADB_AINC:
 										psElement->fValore=atoi(pValore);
 										//memset(psElement->Valore,0,sizeof(psElement->Valore));
@@ -491,7 +491,7 @@ LONG adb_Filter(HDB hdb,SINT iCommand,CHAR *pCampo,CHAR *pAzione,void *pValore)
 
 								 case ADB_BOOL:
 								 case ADB_INT:
-								 case ADB_INT32:
+								 case ADB_UINT32:
 								 case ADB_AINC:
 								 case ADB_NUME:
 								 case ADB_COBD:
@@ -857,8 +857,11 @@ static BOOL Comparatore(HDB hdb,ADBF_ELEM *psElement,BOOL ConvNum,CHAR *pValore)
 		 case ADB_INT:
 		 case ADB_BOOL:
 		 case ADB_AINC:
-		 case ADB_INT32:
 			 sprintf(psElement->pBuffer+strlen(psElement->pBuffer),"%d",adb_FldInt(hdb,psElement->arFields[x]));
+			 break;
+
+		 case ADB_UINT32:
+			 sprintf(psElement->pBuffer+strlen(psElement->pBuffer),"%u",adb_FldInt(hdb,psElement->arFields[x]));
 			 break;
 
 		 case ADB_NUME:
@@ -895,7 +898,7 @@ static BOOL Comparatore(HDB hdb,ADBF_ELEM *psElement,BOOL ConvNum,CHAR *pValore)
 		 case ADB_COBD:
 		 case ADB_COBN:
 		 case ADB_AINC:
-		 case ADB_INT32:
+		 case ADB_UINT32:
 			 dValore=adb_FldInt(hdb,psElement->lpFldName);
 			 if ((SINT) dValore & (SINT) fValore) Check=TRUE; else Check=FALSE;
 			 break;
@@ -941,7 +944,7 @@ static BOOL Comparatore(HDB hdb,ADBF_ELEM *psElement,BOOL ConvNum,CHAR *pValore)
 			 break;
 
 	 case ADB_AINC:
-	 case ADB_INT32:
+	 case ADB_UINT32:
 			 Cmp=0;
 			 dValore=adb_FldInt(hdb,psElement->lpFldName);
 			 if (dValore>fValore) Cmp=1;

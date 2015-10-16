@@ -478,7 +478,13 @@ char *bstrstr(char *lpObj,int iLenObj,char *lpFind,int iLenFind,int *iPos)
 CHAR * cgiGet(EH_CGI_INFO * psCgi, CHAR * pszName) {
 
 	EH_CGI_PTR ps=cgiGetPtr(psCgi,pszName);
-	if (!ps) return NULL; 
+	if (!ps) {
+		CHAR * psz=NULL;
+#ifndef EH_FASTCGI
+		paramStr(pszName,&psz);
+#endif	
+		return psz; 
+	}
 	return ps->val; 
 
 }
@@ -799,13 +805,15 @@ BOOL cgiFileOut(UTF8 * utfFileName,CHAR * pszContentType,BOOL bZip,BOOL bDateWri
 		}
 		_lstOutput(lstHeader,"\n"); 
 		printf("\n"); ////ehPrintf("\n");
-		cgiBinOutput(pbZip,iZipSize);
+		cgiBinOutput(pbZip,iZipSize); 
 		ehFree(pbZip);
 
 	} else {
 	
-		if (!strEmpty(pszContentType)) lstPushf(lstHeader,"Content-Type: %s",pszContentType);
-		lstPush(lstHeader,"Content-Type: application/octet-stream");
+		if (!strEmpty(pszContentType)) 
+			lstPushf(lstHeader,"Content-Type: %s",pszContentType);
+			else
+			lstPush(lstHeader,"Content-Type: application/octet-stream");
 		lstPushf(lstHeader,"Content-Length: %d",iSourceSize);
 		if (bDateWri) {
 			TIME64	tWrite;

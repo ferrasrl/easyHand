@@ -133,23 +133,20 @@ void * ehzProgressBar(struct OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 			ThePoint=(DExt->ly/3);
 			iMyShadow=ColorLum(sys.Color3DShadow,-30);
 			if (iBar>0) 
-			{//Tboxp(DExt->px+1,DExt->py+1,iDiv,iLy-1,sys.Color3DHighLight,SET);
-			 Tline(DExt->px+1,DExt->py+1,iDiv,DExt->py+1,iMyShadow,SET);
-			 for (a=2;a<DExt->ly-2;a++)
-			 {
-			  LONG Col;
-			  if (a<ThePoint) Col=ColorFusion(sys.Color3DShadow,psBar->cBar,(100/ThePoint*a));
-							  else
-							  Col=ColorFusion(sys.Color3DShadow,psBar->cBar,(100/(DExt->ly-ThePoint)*(DExt->ly-a)));
-              iEnd=iDiv+a-2; if (iEnd>iLx-1) iEnd=iLx-1;
-			  Tline(DExt->px+2,DExt->py+a,iEnd,DExt->py+a,Col,SET);
-			 }
-			 Tline(DExt->px+1,iLy-1,iEnd,iLy-1,ColorLum(sys.Color3DShadow,-40),SET);
-			 /*
-			 clip_set(DExt->px+1,DExt->py+1,iDiv,iLy-1,"Test");
-			 dispf(iText,DExt->py,0,-1,ON,"SMALL F",3,szServ);
-			 clip_pop();
-			 */
+			{
+				 Tline(DExt->px+1,DExt->py+1,iDiv,DExt->py+1,iMyShadow,SET);
+				 for (a=2;a<DExt->ly-2;a++) {
+
+					 LONG Col;
+					 if (a<ThePoint) 
+						Col=ColorFusion(sys.Color3DShadow,psBar->cBar,(100/ThePoint*a));
+						else
+						Col=ColorFusion(sys.Color3DShadow,psBar->cBar,(100/(DExt->ly-ThePoint)*(DExt->ly-a)));
+//					 iEnd=iDiv+a-2; if (iEnd>iLx-1) iEnd=iLx-1;
+					 iEnd=iDiv-2; if (iEnd>iLx-1) iEnd=iLx-1;
+					 Tline(DExt->px+2,DExt->py+a,iEnd,DExt->py+a,Col,SET);
+				 }
+				 Tline(DExt->px+1,iLy-1,iEnd,iLy-1,ColorLum(sys.Color3DShadow,-40),SET);
 			}
 
 			ThePoint=DExt->ly-ThePoint;
@@ -162,7 +159,8 @@ void * ehzProgressBar(struct OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 			  if (a<ThePoint) Col=ColorFusion(iMyShadow,sys.Color3DLight,(100/ThePoint*a));
 							  else
 							  Col=ColorFusion(iMyShadow,sys.Color3DLight,(100/(DExt->ly-ThePoint)*(DExt->ly-a)));
-				if (iBar>0) {iEnd=iDiv+a; if (iEnd>iLx-1) iEnd=iLx-1;} else iEnd=iDiv+1;
+//				if (iBar>0) {iEnd=iDiv+a; if (iEnd>iLx-1) iEnd=iLx-1;} else iEnd=iDiv+1;
+				if (iBar>0) {iEnd=iDiv-1; if (iEnd>iLx-1) iEnd=iLx-1;} else iEnd=iDiv+1;
 				Tline(iEnd,DExt->py+a,iLx-1,DExt->py+a,Col,SET);
 			 }
 			}

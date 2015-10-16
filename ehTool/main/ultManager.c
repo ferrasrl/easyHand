@@ -1,15 +1,19 @@
 // -------------------------------------------
-//   UltManager
+//   ultManager
 //   Universal Language Translator 
 //   Windows 32bit version         
 //                                           
 //                          by Ferrà srl 2005 
+//                          by Ferrà srl 2014 
 // -------------------------------------------
 
+//
+// External reference
+// http://fr.wikipedia.org/wiki/Liste_des_codes_ISO_639-1 > Tabella Iso delle lingue
+//
 #include "/easyhand/inc/easyhand.h"
-
-//#include "c:/easyhand/ehtool/main\strEncode.h"
 #include <time.h>
+#pragma comment(lib,"mpr.lib")
 
 //#define ULT_VERSION "2.1"
 #define ULT_VERSION "3.0"
@@ -26,8 +30,17 @@ static struct {
 //	EH_ULT	sApp;	
 } _local={false,0,false};
 
-#define STD_TAG "#["
-#define WITANGO_TAG "#(W>"		// witango	: Witango encoding (Es ' diventa <@SQ>)
+// Come sorgente (se ISO o UTF8) controlla quanto dichiarato nel ULT
+#define TAG_BEGIN "#["
+#define TAG_END "]#"
+
+// Il sorgente è UTF8
+#define UTF_TAG_BEGIN "$["
+#define UTF_TAG_END "]$"
+#define SPECIAL_TAG_END ")#"
+#define WITANGO_TAG "#(W>"			// witango	: Witango encoding (Es ' diventa <@SQ>)
+#define WITANGO_TAG_ARRAY "#(WA>"	// witangoarray: Witango encoding (Es ' diventa <@SQ>)
+
 #define JAVA_TAG "#(J>"			// js		: Java encoding		(Es ' diventa \')
 #define HTMLPURE_TAG "#(H>"		// html		:
 #define UTF8_TAG "#(U>"			// utf		:
@@ -35,13 +48,17 @@ static struct {
 
 typedef enum {
 	
-	ULT_TAG_STD,		// 1 STD_TAG		Se non diversamente indicato, converte tutti i caratteri tranne <>: per testi con HTML incluso
+	ULT_TAG_DEF,		// 1 TAG_BEGIN		Se non diversamente indicato, converte tutti i caratteri tranne <>: per testi con HTML incluso
+	ULT_TAG_UTF,		// 1 UTF_TAG_BEGIN		Se non diversamente indicato, converte tutti i caratteri tranne <>: per testi con HTML incluso
+	ULT_TAG_WITANGO_ARRAY,
 	ULT_TAG_WITANGO,	// 2 WITANGO_TAG
 	ULT_TAG_HTMLP,	// 4 HTMLPURE_TAG	new 2007 HtmlPure converte anche <>& e ritorni a capo (Non per mette la scrittura di HTML)
 	ULT_TAG_UTF8,		// 5 new 2007 : testi utf8 con tag html incluso
 	ULT_TAG_HTMLUTF8, // 6 new 2007 : testi utf8 SENZA tag html incluso | per vedere i caratteri <> e gli altri in utf8
 	ULT_TAG_JAVA,		// 3 
+
 	
+
 	ULT_TAG_END
 
 } EN_ULT_TAGTYPE;
@@ -57,16 +74,27 @@ typedef enum {
 	OUT_WITANGO			// "Popola" una stringa Witango	
 } EN_OUT_TARGET;
 
-static CHAR *arEnc1[]={
-	"#[%s]#",				// Default:		Non effettua encoding
-	WITANGO_TAG "%s)#",
-	JAVA_TAG"%s)#",
-	HTMLPURE_TAG"%s)#",
-	UTF8_TAG"%s)#",
-	HTMLUTF8_TAG"%s)#",
-	NULL};
+typedef struct {
+	BOOL	bUtf;
+	CHAR *  pszBegin;
+	CHAR *  pszEnd;
+} __ENTYPE;
 
-//static void EncodeOrderPrepare(void);
+static __ENTYPE _arsEncoders[]={
+	{false,TAG_BEGIN,TAG_END},				// Default:		Non effettua encoding
+	{true,UTF_TAG_BEGIN,UTF_TAG_END},				// Default:		Sorgente UTF (forzatura nei casi default LATIN1
+	{false,WITANGO_TAG,SPECIAL_TAG_END},
+	{false,JAVA_TAG,SPECIAL_TAG_END},
+	{false,HTMLPURE_TAG,SPECIAL_TAG_END},
+	{false,UTF8_TAG,SPECIAL_TAG_END},
+	{false,HTMLUTF8_TAG,SPECIAL_TAG_END},
+	{false,NULL}
+};
+
+//
+//	static Functions
+//
+
 static void		_ultTypeRecovery(EH_ULT * psUlt);
 static INT		_ultEnumType(CHAR *lpType);
 static void		_ultItemsLoad(EH_ULT * psUlt,CHAR *lpItem,BOOL bUserExtract);
@@ -84,6 +112,9 @@ static WCHAR *	_witangoEncoding(WCHAR *pcwWordTrans);
 static WCHAR *	_witangoDecoding(WCHAR *pcwWordTrans);
 static WCHAR *	_ltgtEncoding(WCHAR *pcwWordTrans);
 static CHAR *	_tokExtract(EH_ULT * psUlt,CHAR ** lpCursor);
+static BOOL		_caCreate(CHAR * pszLocalName,CHAR * pszRemoteName,CHAR * pszUserName,CHAR * pszPassword);
+static BOOL		_caDestroy(CHAR * pszRemoteName);
+
 
 typedef struct {
 
@@ -126,30 +157,39 @@ static void _ultItemsLoadOld(	EH_ULT * psUlt,
 //
 static EH_ULT_LANG _arLangPreset[]=
 {
-	{EH_LANG_ITALIAN,"IT","Italiano",	L"Italiano",	"Italian",	"it"},
-	{EH_LANG_FRENCH ,"FR","Francese",	L"Français",	"French",	"fr"},
-	{EH_LANG_ENGLISH,"EN","Inglese",	L"English",		"English",	"en"},
-	{EH_LANG_DEUTCH ,"DE","Tedesco",	L"Deutsch",		"German",	"de"},
-	{EH_LANG_SPAIN  ,"ES","Spagnolo",	L"Español",		"Spanish",	"es"},
-	{10				,"PT","Portoghese",	L"Portuguese",	"Portuguese","pt"},
-	{11				,"CZ","Ceco",		L"Czech",		"Czech",	"cs"},
-	{12				,"PL","Polacco",	L"Polish",		"Polish",	"pl"},
-	{13				,"NL","Olandese",	L"*NETHERLANDS","?",		"nl"},
-	{14				,"SE","Svedese",	L"Swedish",		"Swedish",	"sv"},
-	{15				,"DK","Danese",		L"Danish",		"Danish",	"da"},
-	{16             ,"GR","Greco",		L"Greek",		"Greek",	"gr"},
-	{17             ,"HU","Ungherese",	L"Hungarian",	"Hungarian","hu"},
-	{18             ,"SK","Slovacco",	L"*Slovak",		"Slovak",	"sk"},
-	{19             ,"RU","Russo",		L"Russian",		"Russian",	"ru"},
-	{20             ,"JP","Giapponese",	L"Japanese",	"Japanese",	"ja"},
-	{21             ,"TR","Turco",		L"Turk",		"Turk",		"tr-TR"},
-	{22             ,"CN","Cinese",		L"China",		"China",	"zh-CN"},
-	{0xFFFF			,"..","Files",		L"File coinvolti",""},
-	{0x10000		,"##","Codice Sorgente",	L"Codice Sorgente",""},
-	{0x10001		,"#N","Campo Note",L"Campo Note",""},
+	{EH_LANG_ITALIAN,"IT","Italiano",	"Italiano",	"	Italian",		"it", "ita",	"it-IT", "ltr"},
+	{EH_LANG_FRENCH ,"FR","Francese",	"FranÃ§ais",	"French",		"fr", "fra",	"fr-FR", "ltr"},
+	{EH_LANG_ENGLISH,"EN","Inglese",	"English",		"English",		"en", "eng",	"en-US", "ltr"},
+	{EH_LANG_DEUTCH ,"DE","Tedesco",	"Deutsch",		"German",		"de", "deu",	"de-DE", "ltr"},
+	{EH_LANG_SPAIN  ,"ES","Spagnolo",	"EspaÃ±ol",		"Spanish",		"es", "spa",	"es-ES", "ltr"},
+	{10				,"PT","Portoghese",	"PortuguÃªs",	"Portuguese",	"pt", "por",	"pt-BR", "ltr"},
+	{11				,"CZ","Ceco",		"ÄŒesky",		"Czech",		"cs", "ces",	"cs-CZ", "ltr"},
+	{12				,"PL","Polacco",	"Polski",		"Polish",		"pl", "pol",	"pl-PL", "ltr"},
+	{13				,"NL","Olandese",	"Nederlands",	"Dutch",		"nl", "nld",	"nl-NL", "ltr"},
+	{14				,"SE","Svedese",	"Svenska",		"Swedish",		"sv", "swe",	"sv-SE", "ltr"}, // Sweden
+	{15				,"DK","Danese",		"Dansk",		"Danish",		"da", "dan",	"da-DK", "ltr"},
+	{16             ,"GR","Greco",		"Î•Î»Î»Î·Î½Î¹ÎºÎ¬","Greek",		"el", "ell",	"el-GR", "ltr"},
+	{17             ,"HU","Ungherese",	"magyar",		"Slovak",		"hu", "hun",	"hu-HU", "ltr"},
+	{19             ,"RU","Russo",		"Ñ€ÑƒÑÑÐºÐ¸Ð¹","Russian",		"ru", "rus",	"ru-RU", "ltr"},
+	{20             ,"JP","Giapponese",	"æ—¥æœ¬èªž",	"Japanese",		"ja", "jpn",	"ja-JP", "ltr"},
+	{21             ,"TR","Turco",		"TÃ¼rkmen ",	"Turkmen",		"tr", "tur",	"tr-TR", "ltr"},
+	{22             ,"CN","Cinese",		"ä¸­æ–‡",		"Chinese",		"zh", "zho",	"zh-CN", "ltr"},
+	{23             ,"AR","Arabo",		"â€«Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©",	"Arab",	"ar", "ara",	"ar-SA", "rtl"}, // Arabia Saudita
+	{0xFFFF			,"..","Files",		"File coinvolti","",NULL,NULL,NULL,NULL},
+	{0x10000		,"##","Codice Sorgente",	"Codice Sorgente","",NULL,NULL,NULL,NULL},
+	{0x10001		,"#N","Campo Note","Campo Note","",NULL,NULL,NULL,NULL},
 //	{0x10002		,"#C","Codice alfanumerico",L"Codice alfanumerico",""}, // Usato nei Virtual Ult
-	{0,NULL,NULL,NULL}
+	{0,NULL,NULL,NULL,NULL,NULL,NULL,NULL}
 };
+
+static CHAR * _merge(CHAR * pszDest,CHAR *pszStart,CHAR *pszTag,CHAR * pszEnd)
+{
+	strcpy(pszDest,pszStart);
+	strcat(pszDest,pszTag);
+	strcat(pszDest,pszEnd);
+	return pszDest;
+}
+
 
 
 //
@@ -272,7 +312,7 @@ BOOL ultResource(CHAR * pszLang,CHAR * pszLangAlternative) {
 }
 
 
-CHAR * ultTag(CHAR * pszStr) {
+UTF8 * ultTag(CHAR * pszStr) {
 
 	if (!sys.ultApp.bReady) return pszStr;
 	return ultTranslate(ULT_TYPE_DISP,pszStr);
@@ -309,6 +349,7 @@ BOOL ultOpenEx(	EH_ULT *	psUlt,
 	psUlt->idxNote=-1;
 	psUlt->arLangReady=ehAlloc(sizeof(EH_ULT_LANG)*ULT_MAXLANG); // Per ora il massimo
 	psUlt->lpVoiceShare=ehAlloc(sizeof(ULTVOICE));
+	psUlt->lstErrors=lstNew();
 
 	// EncodeOrderPrepare();
 
@@ -378,6 +419,7 @@ BOOL ultOpenEx(	EH_ULT *	psUlt,
 		if (*pszBuffer=='@')
 		{
 			CHAR * pszParam;
+
 			// Inizio definizione dizionario
 			if (!strcmp(pszBuffer,"@dictionarystart")) {fLoad=TRUE; continue;}
 
@@ -388,6 +430,36 @@ BOOL ultOpenEx(	EH_ULT *	psUlt,
 			*p=0; p++;
 			pszParam=pszBuffer+1;
 
+			// Transform
+			if (!strcmp(pszParam,"transform")) {
+				strAssign(&psUlt->pszTransform,p);
+				continue;
+			}
+
+			// folder_target
+			if (!strcmp(pszParam,"folder_target")) {
+				strAssign(&psUlt->pszFolderTarget,p);
+				continue;
+			}
+
+			// remote_connection
+			if (!strcmp(pszParam,"remote_connection")) {
+				strAssign(&psUlt->pszRemoteConn,p);
+				continue;
+			}
+
+			// folder_mode
+			if (!strcmp(pszParam,"folder_mode")) {
+				psUlt->enFolderMode=atoi(p);
+				continue;
+			}
+			// date_target
+			if (!strcmp(pszParam,"date_target")) {
+				psUlt->enDateTarget=atoi(p);
+				continue;
+			}
+
+
 			// Encoding
 			if (!strcmp(pszParam,"charset_source")) {psUlt->iCS_Source=ultTextToCode(psUlt,1,p); continue;}
 			if (!strcmp(pszParam,"charset_dict")) {psUlt->iCS_Dictionary=ultTextToCode(psUlt,1,p); continue;}
@@ -397,7 +469,7 @@ BOOL ultOpenEx(	EH_ULT *	psUlt,
 				strTrim(p);
 				if (!strEmpty(p)) {
 					psUlt->pszEncodingFilesSource=strDup(p); 
-					psUlt->arEFS=ARFSplit(psUlt->pszEncodingFilesSource,"|");
+					psUlt->arEFS=strSplit(psUlt->pszEncodingFilesSource,"|");
 					// ehLogWrite("[%s]",psUlt->pszEncodingFilesSource);
 				}
 				continue;
@@ -433,7 +505,7 @@ BOOL ultOpenEx(	EH_ULT *	psUlt,
 						sLangInfo.idLang=0x10002; // Non identificata
 						sLangInfo.lpIsoPrefix=strDup(p); // Va bè fa niente se non libero memoria
 						sLangInfo.lpLangName="?";
-						sLangInfo.pwcLangNameNativo=L"?";
+						sLangInfo.putfLangNameNativo="?";
 						//ARMaker(WS_ADD,&sLangInfo); // Aggiungo nella posizione dell'array la lingua
 						memcpy(psUlt->arLangReady+psUlt->iLangNum,&sLangInfo,sizeof(EH_ULT_LANG));
 					}
@@ -497,7 +569,20 @@ BOOL ultOpenEx(	EH_ULT *	psUlt,
 				psUlt->iVersion=(INT) (atof(p)*100); 
 				if (psUlt->iVersion>200) psUlt->iTypeEncDict=1;
 			}
-			if (!strCaseCmp(pszBuffer,"@lastid")) {psUlt->dwLastId=atoi(p); continue;}
+			if (!strCaseCmp(pszBuffer,"@lastid")) {
+				
+				INT id=atoi(p); 
+				if (id<0) 
+				{
+				//	alert("Lastid errato, effettuare prima possibile un recovery locale del file ULT");
+					psUlt->enError=UER_LAST_ID_CORRUPT;
+				}
+				psUlt->dwLastId=id; 
+				
+				continue;
+
+			
+			}
 		}
 
 		// Carico le parole nel dizionario
@@ -616,8 +701,9 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 	INT	SizeBuf=MAX_TAG_SIZE;
 	INT	a,b,c;
 	ULTVOICE sUltVoice;
-	CHAR *	lpFile;
+	CHAR *	pszFile;
 	CHAR *	lpe;
+	CHAR	szFileBackup[1024];
 
 	CHAR *lpHeader=
 		"@Universal Language Translator\n"\
@@ -635,7 +721,7 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 		"@realcode @#REALCODE#@\n";
 
 	// if (lpFileName) lpFile=lpFileName; else 
-	if (!strEmpty(pszFileName)) lpFile=pszFileName; else lpFile=psUlt->szFile;
+	if (!strEmpty(pszFileName)) pszFile=pszFileName; else pszFile=psUlt->szFile;
 
 	//	  printf("Qui;[%s] . %d\n",lpFile,psUlt->dmiDict.Num);
 	// Forso la scrittura ad ULT_CS_UTF8
@@ -662,11 +748,15 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 	strReplace(Buffer2,"@#ENCODE_HTML#@",ultCodeToText(psUlt,2,psUlt->iEncodeHtml));
 	strReplace(Buffer2,"@#ENCODE_FILE_SOURCE#@",strEver(psUlt->pszEncodingFilesSource));
 	strReplace(Buffer2,"@#REALCODE#@",psUlt->fRealCode?"1":"0");
-	
 
 	_ultTypeRecovery(psUlt);
-
-	pfr=fopen(lpFile,"wb");
+	
+	sprintf(szFileBackup,"%s\\%s-%s-%d.bak",filePath(pszFile),fileName(pszFile),dtNow(),clock());
+	if (fileCheck(pszFile)) 
+	{
+		if (!fileRename(pszFile,szFileBackup)) ehExit("Non posso fare il backup");
+	}
+	pfr=fopen(pszFile,"wb");
 	if (!pfr) 
 	{	
 		INT iErr=osGetError();
@@ -675,8 +765,8 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 			ehFree(Buffer2);
 			return iErr;
 		}
-		if (iErr==5) ehExit("%s accesso non autorizzato",lpFile);
-		ehExit("ULTWrite:%s [%d]",lpFile,osGetError());
+		if (iErr==5) ehExit("%s accesso non autorizzato",pszFile);
+		ehExit("ULTWrite:%s [%d]",pszFile,osGetError());
 	}
 	fprintf(pfr,Buffer2);
 	ehFree(Buffer2);
@@ -685,7 +775,12 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 	fprintf(pfr,"@webfolder %d\n",psUlt->fWebFolder);
 	fprintf(pfr,"@webautoscan %d\n",psUlt->bWebAutoScan);
 	fprintf(pfr,"@dictionaryword %d\n",psUlt->dmiDict.Num);
-	if (!strEmpty(psUlt->pszDoPurge)) fprintf(pfr,"@dopurge %s\n",psUlt->pszDoPurge);
+	if (!strEmpty(psUlt->pszDoPurge))		fprintf(pfr,"@dopurge %s\n",psUlt->pszDoPurge);
+	if (!strEmpty(psUlt->pszTransform))		fprintf(pfr,"@transform %s\n",psUlt->pszTransform);
+	if (!strEmpty(psUlt->pszFolderTarget))	fprintf(pfr,"@folder_target %s\n",psUlt->pszFolderTarget);
+	if (!strEmpty(psUlt->pszRemoteConn))	fprintf(pfr,"@remote_connection %s\n",psUlt->pszRemoteConn);
+	fprintf(pfr,"@folder_mode %d\n",psUlt->enFolderMode);
+	fprintf(pfr,"@date_target %d\n",psUlt->enDateTarget);
 	fprintf(pfr,"@dictionarystart\n");
 
 	/*
@@ -717,7 +812,7 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 					fprintf(pfr,"\3\4%d",dwUser);
 				else
 				{
-					CHAR *lpWord;
+					CHAR * lpWord;
 
 
 					// A) Trasformo il Wide Char in una stringa
@@ -754,6 +849,7 @@ BOOL ultSaveAs(	EH_ULT * psUlt,
 	fprintf(pfr,"@dictionaryend\n");
 	ehFree(Buffer);
 	fclose(pfr);
+	fileRemove(szFileBackup);
 	return 0;
 }
 
@@ -781,8 +877,16 @@ void ultClose(EH_ULT * psUlt)
 		}
 	   DMIClose(&psUlt->dmiDict,"*UltInfo");
 	}
-	
-	ehFreePtrs(5,&psUlt->arLangReady,&psUlt->lpVoiceShare,&psUlt->pszEncodingFilesSource,&psUlt->arEFS,&psUlt->pszDoPurge);
+	psUlt->lstErrors=lstDestroy(psUlt->lstErrors);
+	ehFreePtrs(	8,
+				&psUlt->arLangReady,
+				&psUlt->lpVoiceShare,
+				&psUlt->pszEncodingFilesSource,
+				&psUlt->arEFS,
+				&psUlt->pszDoPurge,
+				&psUlt->pszTransform,
+				&psUlt->pszFolderTarget,
+				&psUlt->pszRemoteConn);
 	memset(psUlt,0,sizeof(EH_ULT));
 }
 
@@ -849,34 +953,31 @@ void ultSetLangText(EH_ULT * psUlt,CHAR * pszLang,CHAR * pszLangAlternative)
 // 
 void ultItemSetFlag(EH_ULT * psUlt)
 {
-  INT a;
-  INT iLangTra=0;
-  psUlt->lpVoiceShare->iTransStatus=0;
-  
-  // Controllo se esiste traduzione
-  for (a=0;a<psUlt->iLangNum;a++) // da 1 perchè salto la prima lingua
-  {
-	if (psUlt->lpVoiceShare->lpwText[a]&&
-		a!=psUlt->idxFiles&&
-		a!=psUlt->idxLangNative&&
-		a!=psUlt->idxNote)//&&
-		//a!=psUlt->idxAlfaCode)
-		{
-			iLangTra++;
-		}
-  }
+	INT a;
+	INT iLangTra=0;
+	psUlt->lpVoiceShare->iTransStatus=0;
 
-  // iLangTra:iLangNum-1=x:100
-  if (iLangTra) psUlt->lpVoiceShare->iTransStatus=100*iLangTra/psUlt->iLangReady;//(psUlt->iLangNum-2);
+	// Controllo se esiste traduzione
+	for (a=0;a<psUlt->iLangNum;a++) // da 1 perchè salto la prima lingua
+	{
+		if (psUlt->lpVoiceShare->lpwText[a]&&
+			a!=psUlt->idxFiles&&
+			a!=psUlt->idxLangNative&&
+			a!=psUlt->idxNote)
+			{
+				iLangTra++;
+			}
+	}
+
+	// iLangTra:iLangNum-1=x:100
+	if (iLangTra) psUlt->lpVoiceShare->iTransStatus=100*iLangTra/psUlt->iLangReady;//(psUlt->iLangNum-2);
 	  
-  // Controllo se esiste il file collegato
-  if (psUlt->idxFiles>-1)
-  {
+	// Controllo se esiste il file collegato
+	if (psUlt->idxFiles>-1)
+	{
 	 if (wcsEmpty(psUlt->lpVoiceShare->lpwText[psUlt->idxFiles])) psUlt->lpVoiceShare->fLost=true; else psUlt->lpVoiceShare->fLost=false;
 
-//	 if (psUlt->lpVoiceShare->fLost) 
-//		 printf("> %S" CRLF,psUlt->lpVoiceShare->lpwText[0]);
-  }
+	}
 }
 
 //
@@ -930,10 +1031,11 @@ void ultAddWord(EH_ULT * psUlt,void *lpElement,INT idxLang,INT iCharSize,DWORD d
 {
 	if (idxLang<0||idxLang>=psUlt->iLangNum) ehExit("ultAddWord().idLang(%d)>%d",idxLang,psUlt->iLangNum);
 	psUlt->lpVoiceShare->dwUser[idxLang]=dwUser;
-	if (lpElement==NULL) // Nessuna parola collegata
+	if (!lpElement) // Nessuna parola collegata
 	{
-	 psUlt->lpVoiceShare->lpwText[idxLang]=NULL; return;
+		psUlt->lpVoiceShare->lpwText[idxLang]=NULL; return;
 	}
+
 	if ((iCharSize==1&&!* (BYTE *) lpElement)||
 	    (iCharSize==2&&!* (WCHAR *) lpElement))
 	{
@@ -987,7 +1089,7 @@ void ultWordFileControl(EH_ULT * psUlt,INT iIndex,CHAR *lpFile) {
 		WCHAR *lpMemo;
 		if (!wcsstr(pwc,pwcFile))
 		{
-			lpMemo=ehAlloc(MAX_TAG_SIZE);
+			lpMemo=ehAlloc(MAX_TAG_SIZE*2);
 			wcscpy(lpMemo,pwc);
 			wcscat(lpMemo,L",");
 			wcscat(lpMemo,pwcFile);
@@ -1003,12 +1105,12 @@ void ultWordFileControl(EH_ULT * psUlt,INT iIndex,CHAR *lpFile) {
 // Cerca la traduzione
 // se in modalità di costruzione aggiunge l'item
 // 
-void * ultTranslateEx(	EH_ULT * psUlt,
-						EN_ULTYPE enType,	
-						WCHAR * pwcWordCode, 
-						CHAR * lpFileSource,
-						BOOL fBuildOn,
-						INT * lpRow) 
+void * ultTranslateEx(	EH_ULT *	psUlt,
+						EN_ULTYPE	enType,	
+						WCHAR *		pwcWordCode, 
+						UTF8 *		lpFileSource,
+						BOOL		fBuildOn,
+						INT *		lpRow) 
 {
 	INT iRow;
 
@@ -1282,30 +1384,31 @@ void ultWordDelete(EH_ULT * psUlt,INT Index,INT iLang,DWORD dwUser) {
 //	Ritorna FALSE - Se è stato fatto l'update
 //			TRUE  - Se la parola era già cosi: Nessuna modifica
 // --------------------------------------------------
-BOOL ultWordUpdate(EH_ULT * psUlt,INT iRow,INT iLang,void *lpWord,INT iCharSize,DWORD dwUser)
+BOOL ultWordUpdate(EH_ULT * psUlt,INT iRow,INT iLang,void * pWord,INT iCharSize,DWORD dwUser)
 {
-
+ 
 	ULTVOICE sVoice;
-	WCHAR *lpElement;
+	WCHAR * pElement;
 
-	if (iLang==0) return TRUE; // Non posso modificare l'originale se no mi salta la ricerca binaria
+	if (iLang==0) return true; // Non posso modificare l'originale se no mi salta la ricerca binaria
 	
 	// -----------------------------------------------
 	// Cancellazione Word                            |
 	// -----------------------------------------------
     DMIRead(&psUlt->dmiDict,iRow,&sVoice);
-	lpElement=sVoice.lpwText[iLang];
+	if (iLang<0||iLang>=ULT_MAXLANG) ehError();
+	pElement=sVoice.lpwText[iLang];
 
-	if (!lpElement&&!lpWord) return TRUE; // Nessun cambio
-	if (lpElement)
-	{
-		if (iCharSize==2&&lpWord)
+	if (!pElement&&!pWord) return TRUE; // Nessun cambio
+
+	// Se ho già elemento inserito e diverso da quello che voglio cambiare lo libero
+	if (pElement) {
+		if (iCharSize==2&&pWord)
 		{
-			if (!wcscmp(lpElement,lpWord)) return TRUE; // La parola è già cosi
+			if (!wcscmp(pElement,pWord)) return true; // La parola è già cosi
 		}
-
-		if (sVoice.lpbText) {ehFree(sVoice.lpbText); sVoice.lpbText=NULL;}
-		if (sVoice.lpwText[iLang]) {ehFree(sVoice.lpwText[iLang]); sVoice.lpwText[iLang]=NULL;}
+		ehFreePtr(&sVoice.lpbText); // if (sVoice.lpbText) {ehFree(sVoice.lpbText); sVoice.lpbText=NULL;}
+		ehFreePtr(&sVoice.lpwText[iLang]); //if (sVoice.lpwText[iLang]) {ehFree(sVoice.lpwText[iLang]); sVoice.lpwText[iLang]=NULL;}
 		DMIWrite(&psUlt->dmiDict,iRow,&sVoice);
 	}
 
@@ -1313,7 +1416,7 @@ BOOL ultWordUpdate(EH_ULT * psUlt,INT iRow,INT iLang,void *lpWord,INT iCharSize,
 	// Inserisco la nuova parola                     |
 	// -----------------------------------------------
     DMIRead(&psUlt->dmiDict,iRow,psUlt->lpVoiceShare);
-	ultAddWord(psUlt,lpWord,iLang,iCharSize,dwUser);
+	ultAddWord(psUlt,pWord,iLang,iCharSize,dwUser);
 	ultItemSetFlag(psUlt);
     DMIWrite(&psUlt->dmiDict,iRow,psUlt->lpVoiceShare);
 	return FALSE;
@@ -1388,7 +1491,7 @@ static void _ultItemsLoad(EH_ULT * psUlt,CHAR *lpItem,BOOL bUser)
 	WCHAR *lpw;
 	BOOL fDup;
 	INT iType;
-	DWORD dwID,dwUser;
+	DWORD dwID,dwUser=0;
 	WCHAR *lpUser;
 
 	// Tipo 
@@ -1407,13 +1510,20 @@ static void _ultItemsLoad(EH_ULT * psUlt,CHAR *lpItem,BOOL bUser)
 
 	// Estraggo la parola "codice" : (spesso Lingua Nativa)
 	lpTok=_tokExtract(psUlt,&lpItem); if (!lpTok) ehExit("Errore Code = NULL");
-	lpw=_tokDecode(psUlt,lpTok); if (!lpw) ehExit("Errore Code Convert = NULL");
+	lpw=_tokDecode(psUlt,lpTok); //if (!lpw) ehExit("Errore Code Convert = NULL");
+	if (!lpw&&lpTok) { // Errore
+		// lstPushf(psUlt->lstErrors,"%x:%d:%s",dwID,dwID,lpItem);
+		lpw=wcsDup(L"");
+	}
 	//win_infoarg("[%ls]",lpw);
 
 	if (bUser)
 	{
-		lpUser=wcsstr(lpw,L"\4"); *lpUser=0; 
-		dwUser=_wtoi(lpUser+1);
+		lpUser=wcsstr(lpw,L"\4"); 
+		if (lpUser) {
+			*lpUser=0; 
+			dwUser=_wtoi(lpUser+1);
+		}
 	}
 	// Aggiungo /Cerco il nuovo idem
 	iRow=ultItemInsert(psUlt,iType,lpw,dwID,&fDup);
@@ -1425,11 +1535,17 @@ static void _ultItemsLoad(EH_ULT * psUlt,CHAR *lpItem,BOOL bUser)
 	{
 		lpTok=_tokExtract(psUlt,&lpItem); 
 		lpw=_tokDecode(psUlt,lpTok);
+		if (!lpw&&lpTok) {
+			lstPushf(psUlt->lstErrors,"%x:%d:%s",dwID,dwID,lpItem);
+		}
 		dwUser=UU_UNKNOW;
-		if (bUser)
+		if (bUser&&lpw)
 		{
-			lpUser=wcsstr(lpw,L"\4"); *lpUser=0; 
-			dwUser=_wtoi(lpUser+1);
+			lpUser=wcsstr(lpw,L"\4"); 
+			if (lpUser) {
+				*lpUser=0; 
+				dwUser=_wtoi(lpUser+1);
+			} else dwUser=0;
 		}
 
 		// Carico solo la lingua selezionata
@@ -1467,8 +1583,8 @@ static void _ultItemsLoad(EH_ULT * psUlt,CHAR *lpItem,BOOL bUser)
 // 
 
 typedef struct {
-		CHAR	szFileShort[300];
-		CHAR	szFileLong[300];
+		UTF8	utfFileShort[300];
+		UTF8	utfFileLong[300];
 		FILETIME ftCT;
 		SYSTEMTIME sTime;
 		
@@ -1489,7 +1605,7 @@ static BOOL _fileScanAdd(EH_ULT * psUlt,S_SOURCE *psSource);
 //
 BOOL ultExtEnable(CHAR *lpExt)
 {
-	CHAR *lpEstensioniPossibili="|.taf|.tcf|.inc|.html|.htm|.txt|.cfm|.php|.asp|.xml|.xsd|.js|.css|.strings|.config|";
+	CHAR *lpEstensioniPossibili="|.taf|.tcf|.inc|.html|.htm|.txt|.cfm|.php|.asp|.xml|.xsd|.js|.css|.strings|.config|.dat|.inf|";
 	CHAR szServ[20];
 	sprintf(szServ,"|%s|",lpExt);
 	if (strstr(lpEstensioniPossibili,lpExt)) return TRUE; else return FALSE;
@@ -1549,18 +1665,18 @@ S_FOLDERSCAN sFolderScan;
 // Genera una lista con l'elenco dei sorgenti presenti
 // all'interno della cartella di ult
 //
-static void _ultFileSearch(CHAR *lpFolderSource)  // Folde da analizzare
+static void _ultFileSearch(UTF8 * pszFolderSource)  // Folde da analizzare
 {
 	struct _finddata_t ffbk;
     LONG lFind;
 	BYTE *p;
 	CHAR szFolderScan[500];
-	CHAR szFolder[500];
-	CHAR szFileName[500];
+	CHAR szFolder[500]="";
+	CHAR utfFileName[500]="";
 	S_SOURCE sSource;
 	FILETIME ftLAT,ftLWT;
 
-	strcpy(szFolder,lpFolderSource);  AddBs(szFolder);
+	strCopy(szFolder,pszFolderSource);  AddBs(szFolder);
 	strcpy(szFolderScan,szFolder); 
 	strcat(szFolderScan,"*.*");
 	lFind=_findfirst(szFolderScan, &ffbk);
@@ -1596,39 +1712,40 @@ static void _ultFileSearch(CHAR *lpFolderSource)  // Folde da analizzare
 				//
 				// Dovrei controllare se è stato modificato dall'ultima volta
 				//
-				sprintf(szFileName,"%s%s",szFolder,ffbk.name);
-				hSource=CreateFile(szFileName, // Leggo il sorgente
+				sprintf(utfFileName,"%s%s",szFolder,ffbk.name);
+				hSource=CreateFile(utfFileName, // Leggo il sorgente
 									GENERIC_READ,
 									FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,
 									OPEN_EXISTING,
 									FILE_ATTRIBUTE_NORMAL,NULL);
 				if (hSource==INVALID_HANDLE_VALUE) 
 				{
-					ehPrintf("_ultFileSearch(): Non posso aprire [%s], errore %d",szFileName,osGetError());
+					ehPrintf("_ultFileSearch(): Non posso aprire [%s], errore %d",utfFileName,osGetError());
 					continue; // Lo salto
 				}
 
-				ZeroFill(sSource);
+				_(sSource);
 				if (!GetFileTime(hSource,&ftLWT,&ftLAT,&sSource.ftCT)) {
 				
-					ehExit("_ultFileSearch(): Non riesco a legge la data di [%s], errore %d",szFileName,osGetError());
+					ehExit("_ultFileSearch(): Non riesco a legge la data di [%s], errore %d",utfFileName,osGetError());
 
 				}
 				if (hSource!=INVALID_HANDLE_VALUE) CloseHandle(hSource);
 				if (!sSource.ftCT.dwHighDateTime&&!sSource.ftCT.dwLowDateTime) 
 				{
-					ehExit("_ultFileSearch(): Errore nella data del files [%s]",szFileName);
+					ehExit("_ultFileSearch(): Errore nella data del files [%s]",utfFileName);
 				}
 
 				//
 				// Controllare se devo inserirlo nella lista da fare
 				//
-				strcpy(sSource.szFileShort,szFileName);
-				strReplace(sSource.szFileShort,sFolderScan.lpULTFolderRoot,"");
-				strcpy(sSource.szFileShort,sSource.szFileShort);
-				strcpy(sSource.szFileLong,szFileName);
+				strCopy(sSource.utfFileShort,utfFileName);
+				strReplace(sSource.utfFileShort,sFolderScan.lpULTFolderRoot,"");
+				if (*sSource.utfFileShort=='\\') strcpy(sSource.utfFileShort,sSource.utfFileShort+1);
+				//strcpy(sSource.utfFileShort,sSource.utfFileShort);
+				strCopy(sSource.utfFileLong,utfFileName);
 
-				// ehLogWrite("SRC- %s",sSource.szFileShort);
+				// ehLogWrite("SRC- %s",sSource.utfFileShort);
 
 				//
 				// Controllo se è da creare
@@ -1640,7 +1757,7 @@ static void _ultFileSearch(CHAR *lpFolderSource)  // Folde da analizzare
 				{
 					CHAR szServ[500];
 					sprintf(szServ,"%s=%u:%u\n",
-							sSource.szFileShort,
+							sSource.utfFileShort,
 							sSource.ftCT.dwHighDateTime,
 							sSource.ftCT.dwLowDateTime);
 					if (strstr(sFolderScan.lpULL,szServ)) sSource.fCopy=FALSE;
@@ -1660,7 +1777,7 @@ static void _ultFileSearch(CHAR *lpFolderSource)  // Folde da analizzare
 //
 BOOL ultFolderScan(EH_ULT * psUlt) {
 
-	CHAR *lpFileCurrent;
+	CHAR * pszFileCurrent=NULL;
 	CHAR *lpWord;
 	BYTE * pszFiles;
 	BOOL fError=FALSE;
@@ -1746,26 +1863,32 @@ BOOL ultFolderScan(EH_ULT * psUlt) {
 			pszFiles=wcsToUtf(psUlt->lpVoiceShare->lpwText[psUlt->idxFiles]);
 			pwcFileMemo=wcsDup(psUlt->lpVoiceShare->lpwText[psUlt->idxFiles]);
 //			lpFileCurrent=lpcFiles;
-			ar=ARFSplit(pszFiles,",");
+			ar=strSplit(pszFiles,",");
+			printf("$|%d|%d| %s [%S:%S]" CRLF,
+					idx,
+					psUlt->idxFiles,
+					pszFiles,
+					psUlt->lpVoiceShare->lpwText[psUlt->idxLangCode],
+					psUlt->lpVoiceShare->lpwText[psUlt->idxFiles]);
 			
 			for (x=0;ar[x];x++) {
 			
-			//while (TRUE)
-//			{
-//				if (!lpFileCurrent) ehError();
-//				p=strstr(lpFileCurrent,","); if (p) *p=0;
 				EN_CHARTYPE enSourceEncode;
-				CHAR * pszUltTag;
-				lpFileCurrent=ar[x];
-				enSourceEncode=_ultGetSourceEncode(psUlt,lpFileCurrent);
+				CHAR * pszStdTag;
+				CHAR * pszUtfTag;
+				strAssign(&pszFileCurrent,ar[x]);
+
+				enSourceEncode=_ultGetSourceEncode(psUlt,pszFileCurrent);
 				switch (enSourceEncode) {
 
 					case ULT_CS_UTF8:
-						pszUltTag=wcsToUtf(psUlt->lpVoiceShare->lpwText[psUlt->idxLangCode]);
+						pszStdTag=wcsToUtf(psUlt->lpVoiceShare->lpwText[psUlt->idxLangCode]);
+						pszUtfTag=strDup(pszStdTag);
 						break;
 
 					default:
-						pszUltTag=wcsToStr(psUlt->lpVoiceShare->lpwText[psUlt->idxLangCode]);
+						pszStdTag=wcsToStr(psUlt->lpVoiceShare->lpwText[psUlt->idxLangCode]);
+						pszUtfTag=wcsToUtf(psUlt->lpVoiceShare->lpwText[psUlt->idxLangCode]);
 						break;
 
 				}
@@ -1776,7 +1899,7 @@ BOOL ultFolderScan(EH_ULT * psUlt) {
 				for (a=0;a<dmiSource.Num;a++)
 				{
 					DMIRead(&dmiSource,a,&sSource);
-					if (!strcmp(sSource.szFileShort,lpFileCurrent)) {idxFile=a; break;}
+					if (!strcmp(sSource.utfFileShort,pszFileCurrent)) {idxFile=a; break;}
 				}
 
 				//
@@ -1788,7 +1911,7 @@ BOOL ultFolderScan(EH_ULT * psUlt) {
 					INT e;
 					BOOL fFound=FALSE;
 
-					if (!strEnd(lpFileCurrent,".strings")) {
+					if (!strEnd(pszFileCurrent,".strings")) {
 
 						UTF8 * putf=wcsToUtf(psUlt->lpVoiceShare->lpwText[psUlt->idxLangCode]);
 						sprintf(lpWord,"\"%s\"",putf);
@@ -1800,36 +1923,49 @@ BOOL ultFolderScan(EH_ULT * psUlt) {
 						ehFree(putf);
 					}
 					else {
-
-						for (e=0;arEnc1[e];e++)
+						// Controllo se il tag è nel file
+						for (e=0;_arsEncoders[e].pszBegin;e++)
 						{
-							sprintf(lpWord,arEnc1[e],pszUltTag);
+							__ENTYPE * ps=_arsEncoders+e;
+							if (!ps->bUtf)
+								_merge(lpWord,ps->pszBegin,pszStdTag,ps->pszEnd);
+								else
+								_merge(lpWord,ps->pszBegin,pszUtfTag,ps->pszEnd);
+							
 							if (!sSource.lpFileContent) 
 								ehError();
 							if (strstr(sSource.lpFileContent,lpWord)) 
 							{
-								fFound=TRUE;
+								fFound=true;
 								break;
 							}
 						}
 					}
-					if (!fFound) FileTextRemove(pwcFileMemo,lpFileCurrent,1);
+					if (!fFound) 
+						FileTextRemove(pwcFileMemo,pszFileCurrent,1);
 				}
-				else
+				else    
 				// C il file non esiste più
 				{
-					FileTextRemove(pwcFileMemo,lpFileCurrent,1);
-					_ultFileRemove(psUlt,lpFileCurrent); // CANCELLO IL FILE DA TUTTO IL DIZIONARIO
+					printf("Cancello [%S] - %d [%s]" CRLF,psUlt->lpVoiceShare->lpwText[psUlt->idxLangCode],idx,pszFileCurrent);
+//					ehGetch();
+					FileTextRemove(pwcFileMemo,pszFileCurrent,1);
+					_ultFileRemove(psUlt,pszFileCurrent); // CANCELLO IL FILE DA TUTTO IL DIZIONARIO
 				}
-				ehFree(pszUltTag);
+				ehFree(pszStdTag);
+				ehFree(pszUtfTag);
 //				if (p) {*p=','; lpFileCurrent=p+1;} else break;
 			}
 			ehFree(ar);
 
+			ehFreePtr(&pszFileCurrent);
+
+			//
 			// Potrebbe non esserci
+			//
 			if (psUlt->lpVoiceShare->lpwText[psUlt->idxFiles])
 			{
-				if (wcscmp(pwcFileMemo,psUlt->lpVoiceShare->lpwText[psUlt->idxFiles]))
+ 				if (wcscmp(pwcFileMemo,psUlt->lpVoiceShare->lpwText[psUlt->idxFiles]))
 				{ 
 					ultWordUpdate(psUlt,idx,psUlt->idxFiles,pwcFileMemo,2,UU_SOURCE);
 				}	
@@ -1855,27 +1991,27 @@ BOOL ultFolderScan(EH_ULT * psUlt) {
 static INT _ultTagSearch(	EH_ULT  *	psUlt,
 							BYTE *		lpMemo,
 							EN_ULTYPE	iTagType,
-							CHAR *		lpDelimStart,
+							CHAR *		pszDelimStart,
 							CHAR *		lpDelimStop,
 							EN_CHARTYPE	enSourceEncode,
 							CHAR *		lpFileName)
 {
 	BYTE *lpScan,*lpStart,*lpEnd;
 	BOOL fRet=FALSE;
-	INT iLenDelimStart=strlen(lpDelimStart);
+	INT iLenDelimStart=strlen(pszDelimStart);
 	BYTE cBackup;
 	UINT uiTagSizeMax=MAX_TAG_SIZE;
 	lpScan=lpMemo;
-	// return 0;
 
 	while (true)
 	{
-		lpStart=strstr(lpScan,lpDelimStart); if (!lpStart) break;
+		lpStart=strstr(lpScan,pszDelimStart); if (!lpStart) break;
 		lpStart+=iLenDelimStart;
 		lpEnd=strstr(lpStart,lpDelimStop); 
+
 		if (!lpEnd) 
 		{ 
-			ehPrintf("%s" CRLF "? Tag aperto<br />\n%s\n",lpFileName,lpStart);
+			ehPrintf("%s: tag aperto!" CRLF "%s\n",lpFileName,lpStart);
 			fRet=TRUE; 
 			break;
 		} // Tag Aperto
@@ -1883,7 +2019,7 @@ static INT _ultTagSearch(	EH_ULT  *	psUlt,
 		cBackup=*lpEnd;	*lpEnd=0; 
 
 		//if (strlen(lpStart)>1000) win_infoarg("[%s]",lpStart); 
-		if (strstr(lpStart,lpDelimStart)||strstr(lpStart,lpDelimStop))
+		if (strstr(lpStart,pszDelimStart)||strstr(lpStart,lpDelimStop))
 		{
 			ehPrintf("? Mark errato in file %s\nFrase:\n%s\n",lpFileName,lpStart);
 			fRet=TRUE;
@@ -1896,9 +2032,6 @@ static INT _ultTagSearch(	EH_ULT  *	psUlt,
 
 				case ULT_CS_UTF8:
 					lpw=strDecode(lpStart,SD_UTF8,NULL);
-					//if (!strBegin(lpStart,"Quanti")) 
-					//	ehPrintf("qui");
-//					ehLogWrite("UTF8->[%s]=%S",lpStart,lpw);
 					break;
 
 				default:
@@ -1944,7 +2077,7 @@ static BOOL _fileStringScan(EH_ULT * psUlt,
 							CHAR * pszFileContent,
 							S_SOURCE *psSource) {
 
-//	CHAR * pszFileContent=fileStrRead(psSource->szFileLong); 
+//	CHAR * pszFileContent=fileStrRead(psSource->utfFileLong); 
 	INT a;
 	EH_AR ar;
 	CHAR * psz;
@@ -1957,13 +2090,13 @@ static BOOL _fileStringScan(EH_ULT * psUlt,
 		psz=strExtract(ar[a],"\"","\"=\"",false,false);
 		if (!strEmpty(psz)) {
 			// ehPrintf("- %s" CRLF,psz);
-			//_ultTagSearch(lpFileContent,ULT_TYPE_HTML,UTF8_TAG,")#",MAX_TAG_SIZE,psSource->szFileShort);
+			//_ultTagSearch(lpFileContent,ULT_TYPE_HTML,UTF8_TAG,")#",MAX_TAG_SIZE,psSource->utfFileShort);
 
 			lpw=utfToWcs(psz);
 			ultTranslateEx(	psUlt,
 							ULT_TYPE_HTML,
 							lpw,
-							psSource->szFileShort,
+							psSource->utfFileShort,
 							true, // Creo se è il caso
 							NULL); 
 			ehFree(lpw);
@@ -2011,12 +2144,12 @@ static INT _fileScanAdd(EH_ULT *psUlt,S_SOURCE * psSource) {
 	//
 	
 	if (!psSource->fTranslate) return false;
-	lpFileContent=fileStrRead(psSource->szFileLong); if (!lpFileContent) ehExit("Errore");
+	lpFileContent=fileStrRead(psSource->utfFileLong); if (!lpFileContent) ehExit("Errore");
 
 	//
 	// File .strings (Mac)
 	//
-	if (!strEnd(psSource->szFileLong,".strings")) {
+	if (!strEnd(psSource->utfFileLong,".strings")) {
 
 		fRet=_fileStringScan(psUlt,lpFileContent,psSource);
 
@@ -2026,14 +2159,19 @@ static INT _fileScanAdd(EH_ULT *psUlt,S_SOURCE * psSource) {
 		//
 		// Scansione TAG per HTML/WTAG
 		//
-		EN_CHARTYPE enSourceEncode=_ultGetSourceEncode(psUlt,psSource->szFileShort);
+		EN_CHARTYPE enSourceEncode=_ultGetSourceEncode(psUlt,psSource->utfFileShort);
 
-		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,"#[","]#",enSourceEncode,psSource->szFileShort);
-		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,WITANGO_TAG,")#",enSourceEncode,psSource->szFileShort);
-		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,JAVA_TAG,")#",enSourceEncode,psSource->szFileShort);
-		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,HTMLPURE_TAG,")#",enSourceEncode,psSource->szFileShort);
-		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,UTF8_TAG,")#",enSourceEncode,psSource->szFileShort);
-		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,HTMLUTF8_TAG,")#",enSourceEncode,psSource->szFileShort);
+		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,TAG_BEGIN,TAG_END,enSourceEncode,psSource->utfFileShort); // Sorgente dichiarato (lati1/Utf)
+		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,UTF_TAG_BEGIN,UTF_TAG_END,ULT_CS_UTF8,psSource->utfFileShort); // Solo UTF
+		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,WITANGO_TAG,SPECIAL_TAG_END,enSourceEncode,psSource->utfFileShort);
+		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,JAVA_TAG,SPECIAL_TAG_END,enSourceEncode,psSource->utfFileShort);
+		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,HTMLPURE_TAG,SPECIAL_TAG_END,enSourceEncode,psSource->utfFileShort);
+		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,UTF8_TAG,SPECIAL_TAG_END,enSourceEncode,psSource->utfFileShort);
+		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,HTMLUTF8_TAG,SPECIAL_TAG_END,enSourceEncode,psSource->utfFileShort);
+
+		// Array
+		fRet|=_ultTagSearch(psUlt,lpFileContent,ULT_TYPE_HTML,WITANGO_TAG_ARRAY,")#",enSourceEncode,psSource->utfFileShort);
+
 	}
 
 	if (psSource->fLoadFile) 
@@ -2042,7 +2180,7 @@ static INT _fileScanAdd(EH_ULT *psUlt,S_SOURCE * psSource) {
 		ehFree(lpFileContent);
 
 
-	// ehPrintf("%s>%d" CRLF,psSource->szFileShort,fRet);
+	// ehPrintf("%s>%d" CRLF,psSource->utfFileShort,fRet);
 	//if (!lpiHdl) memoFree(hdl,"File"); else *lpiHdl=hdl;
 	psSource->fError=fRet;
 	return fRet;
@@ -2073,9 +2211,10 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 	INT iCount;
 	FILE * ch;
 #endif
-	EH_ULT sBackup;
-	BYTE *lpFolderBase;
-	S_SOURCE sSource;
+	EH_ULT		sBackup;
+	BYTE *		lpFolderBase;
+	S_SOURCE	sSource;
+	CHAR *		pszFolderTarget;
 
 //	FILE *ch;
 	_DMI dmiSource=DMIRESET;
@@ -2086,32 +2225,38 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 	// Apro il log della "Costruzione" se richiesto
 	if (psUlt->fLogWrite) 
 	{
-		CHAR szDestFolder[500];
-		sprintf(szDestFolder,"c:\\comFerra\\Ult\\Logs");
-		if (!fileCheck(szDestFolder)) CreateDirectory(szDestFolder,NULL);
-		sprintf(psUlt->szLogFile,"c:\\comFerra\\Ult\\Logs\\Log_%s.txt",dtNow());
+//		CHAR szDestFolder[500];
+//		sprintf(szDestFolder,"c:\\comFerra\\ult\\Logs");
+//		if (!fileCheck(szDestFolder)) CreateDirectory(szDestFolder,NULL);
+		sprintf(psUlt->szLogFile,"c:\\comFerra\\logs\\ult\\report_%s.txt",dtNow());
 		_ultLogOpen(psUlt);
 	}
 
 	if (!lpFileUlt) {ehExit("Manca il nome della cartella."); return;}
 
 	// A) Cerco se la cartella esiste
-	if (!fileCheck(lpFileUlt)) {ehExit("il file %s non esiste",lpFileUlt); return;}
+	if (!fileCheck(lpFileUlt)) {ehExit("%s not exist",lpFileUlt); return;}
 
 	// B) Cerco la cartella ULT
 
-	p=strReverseStr(lpFileUlt,"."); if (!p) ehExit("ULTWebBuilder() A: %s",lpFileUlt);
+	p=strReverseStr(lpFileUlt,"."); if (!p) ehExit("ultGeneralFileBuilder() A: %s",lpFileUlt);
 	lpFolderBase=lpFileUlt;
 	p=strReverseStr(lpFileUlt,"\\"); if (!p) ehExit("??????????");
 	strcpy(szNameULT,p+1); *p=0;
 	p=strReverseStr(szNameULT,"."); if (p) *p=0; else ehExit("ULTWebBuilder() B: %s",szNameULT);
 
 	strcpy(szULTFolder,lpFolderBase); //AddBs(szULTFolder);
-	strcat(szULTFolder,"\\ULT");
+	strcat(szULTFolder,"\\ult");
 	sprintf(szULTFile,"%s\\%s.ult",lpFolderBase,szNameULT);
 	sprintf(szULLFile,"%s\\%s.ull",lpFolderBase,szNameULT);
 
+	//
 	// Apro il dizionario
+	//
+	if (fShowFilesTouch) {
+		printf("ult:%s" CRLF,szULTFile);
+	}
+
 	if (fOpenDizionario)
 	{
 		if (!ultOpen(psUlt,szULTFile,EH_LANG_ITALIAN,TRUE))
@@ -2120,12 +2265,12 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 #ifdef EH_CONSOLE
 			ehPrintf("Non è presente il dizionario %s\n",szULTFile);
 			_ultLogWrite(psUlt,"Non è presente il dizionario %s",szULTFile);
-			psUlt->fLogError=TRUE;
+			psUlt->fLogError=true;
 			_ultLogClose(psUlt);
 #endif
 			return;
 		}
-	}
+	} 
 
 	// Backup
 	memcpy(&sBackup,psUlt,sizeof(EH_ULT));
@@ -2144,14 +2289,37 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 		if (fileCheck(szULLFile))
 		{
 			sFolderScan.lpULL=fileStrRead(szULLFile);
+			if (fShowFilesTouch) printf("read: %s" CRLF,szULLFile);
 		} 
 	}
 
-	// ------------------------------------------
+	//
+	//	Open Remote Connection (apre connessione remota)
+	// 
+	if (!strEmpty(psUlt->pszRemoteConn)) {
+		
+		EH_AR ars=strSplit(psUlt->pszRemoteConn,"|");
+		if (ARLen(ars)>=3) {
+			BOOL bError=_caCreate("",ars[0],ars[1],ars[2]);
+			if (bError) {
+#ifdef EH_CONSOLE
+				ehPrintf("Errore in creazione connessione %s",ars[0]);
+				_ultLogWrite(psUlt,"Errore in creazione connessione %s",ars[0]);
+#endif
+				psUlt->fLogError=true;
+				_ultLogClose(psUlt);
+			ehFree(ars);
+			return;
+			}
+		}
+		ehFree(ars);
+		
+	}
+
+	// 
 	// Loop sui file contenuti nella cartella
 	//
-	//sprintf(szFileScan,"%s\\*.*",szULTFolder);
-
+	
 	//
 	// D) Scandaglio i file della cartella Root e genero i file ULT
 	//
@@ -2164,6 +2332,7 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 	// _ultFileSearch()
 	//
 	_ultFileSearch(szULTFolder); // Richiesta di analisi ricorsiva
+	
 
 	//
 	//
@@ -2172,6 +2341,10 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 	//memoLock(dmiSource.Hdl);
 	ehFreeNN(sFolderScan.lpULL);
 	ehLogWrite("Controllo %d sorgenti. Lingue:%d",dmiSource.Num,psUlt->iLangNum);
+	if (fShowFilesTouch) printf("Controllo %d sorgenti. Lingue:%d",dmiSource.Num,psUlt->iLangNum);
+
+	pszFolderTarget=lpFolderBase; if (!strEmpty(psUlt->pszFolderTarget)) pszFolderTarget=psUlt->pszFolderTarget;
+
 	// ------------------------------------------
 	// Loop sulle lingue
 	//
@@ -2188,11 +2361,30 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 //		ehPrintf("OK %s<BR>",ultCodeToText(psUlt->iLangList[a])); fflush(stdout);
 		ultSetLangIdx(psUlt,a,-1);
 
+		
 		//
 		// C) Controllo se ho la directory di destinazione
 		//
-		sprintf(szDestFolder,"%s\\%s",lpFolderBase,lpLang);
-		if (!fileCheck(szDestFolder)) CreateDirectory(szDestFolder,NULL);
+		switch (psUlt->enFolderMode) {
+			
+			case FM_STANDARD:
+				sprintf(szDestFolder,"%s\\%s",pszFolderTarget,lpLang);
+				break;
+
+			case FM_ISO2:
+				sprintf(szDestFolder,"%s\\%s",pszFolderTarget,lpLang);
+				break;
+
+			case FM_ISO3:
+				sprintf(szDestFolder,"%s\\%s",pszFolderTarget,psUlt->arLangReady[a].pszIso3);
+				break;
+
+			case FM_EXTENDED:
+				sprintf(szDestFolder,"%s\\%s-%s",pszFolderTarget,psUlt->arLangReady[a].pszIsoExt);
+				break;
+		}
+
+		if (!fileCheck(szDestFolder)) dirCreate(szDestFolder);
 
 		//
 		// D) Costruisco i file necessari
@@ -2204,10 +2396,10 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 			if (!sSource.fCopy) continue; // Non è da copiare, già ce l'ho
 			if (sSource.fTranslate)
 			{
-				 ehLogWrite("Builder %s [%s] ...",sSource.szFileShort,lpLang);
+			//	 ehLogWrite("Builder %s [%s] ...",sSource.utfFileShort,lpLang);
 				 _ultFileBuilder(	psUlt,
-									sSource.szFileLong,	// Nome del file originale
-									sSource.szFileShort, // Nome senza cartella di origine
+									sSource.utfFileLong,	// Nome del file originale
+									sSource.utfFileShort, // Nome senza cartella di origine
 									szDestFolder,		// Nome della cartella di destinazione in lingua
 									true,
 									fShowFilesTouch);
@@ -2216,10 +2408,16 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 			else
 			{
 				CHAR szDest[500];
-				sprintf(szDest,"%s\\%s",szDestFolder,sSource.szFileShort);
-				ehLogWrite("Copy %s [%s] ...",sSource.szFileShort,lpLang);
-				dirCreateFromFile(szDest);
-				fileCopy(sSource.szFileLong,szDest,true);
+				//
+				// Salto files di sistema
+				//
+				if (strCaseCmp(sSource.utfFileShort,"Thumbs.db")) {
+					sprintf(szDest,"%s\\%s",szDestFolder,sSource.utfFileShort);
+				//	ehLogWrite("Copy %s [%s] ...",sSource.utfFileShort,lpLang);
+					printf("Copy %s [%s] ..." CRLF,sSource.utfFileShort,lpLang);
+					dirCreateFromFile(szDest);
+					fileCopy(sSource.utfFileLong,szDest,true);
+				}
 			}
 
 		}
@@ -2286,16 +2484,38 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 	{
 		DMIRead(&dmiSource,x,&sSource); 
 		fprintf(ch,"%s=%u:%u\n",
-				sSource.szFileShort,
+				sSource.utfFileShort,
 				sSource.ftCT.dwHighDateTime,
 				sSource.ftCT.dwLowDateTime);
 	}
 	fclose(ch);
 #endif
 
+	//
+	//	Close Remote Connection (apre connessione remota)
+	//
+	if (!strEmpty(psUlt->pszRemoteConn)) {
+		
+		EH_AR ars=strSplit(psUlt->pszRemoteConn,"|");
+		if (ARLen(ars)>=3) {
+			BOOL bError=_caDestroy(ars[0]);
+			if (bError) {
+#ifdef EH_CONSOLE
+				ehPrintf("Errore in destroy connection %s",ars[0]);
+				_ultLogWrite(psUlt,"Errore in destroy connection %s",ars[0]);
+#endif
+			}
+		}
+		ehFree(ars);
+		
+	}
+
+
 	DMIClose(&dmiSource,"SOURCES");
 	_ultLogClose(psUlt);
 	printf("done: %s" CRLF,chronoFormat(chronoGet(NULL),1));
+
+
 	//
 	// Restore
 	//
@@ -2303,7 +2523,9 @@ void ultGeneralFileBuilder(EH_ULT * psUlt,
 	
 	if (fOpenDizionario) ultClose(psUlt);
 }
+
 /*
+
 static void WebFileBuilder(CHAR *lpFile,CHAR *lpDestFolder,CHAR *lpLang)
 {
 	INT hdl;
@@ -2463,9 +2685,6 @@ WCHAR * _witangoEncoding(WCHAR *pcwWordTrans)
 	wcscpy(pwBuffer,pcwWordTrans);
 	while (wcsReplace(pwBuffer,L"\'",L"<@SQ>"));
 	while (wcsReplace(pwBuffer,L"\"",L"<@DQ>"));
-//	while (wcsReplace(pwBuffer,L"\n\r",L"<@CRLF>"));
-//	while (wcsReplace(pwBuffer,L"\r",L"<@CR>"));
-//	while (wcsReplace(pwBuffer,L"\n",L"<@LF>"));
 	return pwBuffer;
 }
 
@@ -2491,19 +2710,95 @@ WCHAR * _witangoDecoding(WCHAR *pcwWordTrans)
 }
 
 //
-// _ltgtEncoding()
+// _outCharEncoding()
 //
-/*
-WCHAR * _ltgtEncoding(WCHAR *pcwWordTrans)
-{
-	WCHAR *pwBuffer=ehAlloc(wcslen(pcwWordTrans)*10); // Esagero
-	wcscpy(pwBuffer,pcwWordTrans);
-	while (wcsReplace(pwBuffer,L"<",L"&lt;"));
-	while (wcsReplace(pwBuffer,L">",L"&gt;"));
-	return pwBuffer;
-}
-*/
+static CHAR * _outCharEncoding(WCHAR * pcwWordTrans,EN_OUT_TARGET enOutTarget,	EN_STRENC enOutCharEncoding) {
 
+	WCHAR *	pwcEncode=NULL;
+
+	CHAR * pszRet=NULL;
+	switch (enOutTarget) {
+	
+		case OUT_TEXT:			// Nessun encoding aggiuntivo		: se UTF8 diretto, altrimenti Latin1 solo superiore al 127
+
+			switch (enOutCharEncoding) {
+			
+				case SE_UTF8: pszRet=strEncodeW(pcwWordTrans,SE_UTF8,NULL); break;
+				case SE_HTML: pszRet=strEncodeW(pcwWordTrans,SE_HTMLS,NULL); break;
+				default:ehError();
+
+			}
+			break;
+
+		case OUT_WEB:			// Testo in una pagina web			: Per renderlo visibile tutto viene convertito in encoding HTML
+
+			switch (enOutCharEncoding) {
+			
+				case SE_UTF8: pszRet=strEncodeEx(2,pcwWordTrans,2,SE_UTF8,SE_HTML_XML); break;
+				case SE_HTML: pszRet=strEncodeW(pcwWordTrans,SE_HTML,NULL); break;
+				default:ehError();
+
+			}
+			break;				
+		
+		case OUT_WEB_HTML:		// Testo in una pagina web + html	: Il testo può contenere tag html, quindi vengono preservati i tag e convertiti solo i caratteri superiori al ASCII
+			
+			switch (enOutCharEncoding) {
+			
+				case SE_UTF8: pszRet=strEncodeW(pcwWordTrans,SE_UTF8,NULL); break;
+				case SE_HTML: pszRet=strEncodeW(pcwWordTrans,SE_HTMLS,NULL); break;
+				default:ehError();
+
+			}
+			break;				
+		
+		case OUT_XML:			// Testo in un XML					: Vengono convertiti i tag <> 
+			
+			switch (enOutCharEncoding) {
+			
+				case SE_UTF8: pszRet=strEncodeEx(2,pcwWordTrans,2,SE_UTF8,SE_HTML_XML); break;
+				case SE_HTML: pszRet=strEncodeW(pcwWordTrans,SE_HTML_XML,NULL); break;
+				default:ehError();
+
+			}
+			break;
+
+		case OUT_JS:			// Stringa Javascript				: Il testo viene codificato usando \(qualcosa)
+			
+			pwcEncode=_witangoDecoding(pcwWordTrans); // ??
+			
+			switch (enOutCharEncoding) {
+			
+				case SE_UTF8: 
+					pszRet=strEncodeEx(2,pwcEncode,2,SE_UTF8,SE_JSON); 
+					break; // Converte in \ \,'," e i valori inferiori a 32
+				case SE_HTML: pszRet=strEncodeW(pwcEncode,SE_JSON,NULL); break;
+				default:ehError();
+
+			}
+			break;
+
+		case OUT_WITANGO:		// Stringa Witango : Il testo viene codificato usando <@SQ><@DQ>
+
+			pwcEncode=_witangoEncoding(pcwWordTrans);
+			
+			switch (enOutCharEncoding) {
+			
+				case SE_UTF8: pszRet=strEncodeW(pwcEncode,SE_UTF8,NULL); break;
+				case SE_HTML: pszRet=strEncodeW(pwcEncode,SE_HTMLS,NULL); break;
+				default:ehError();
+
+			}
+			break;
+
+		default:
+			ehError(); // Tipo di out non definito
+			break;
+
+	}
+	ehFreePtrs(1,&pwcEncode);
+	return pszRet;
+}
 
 // -------------------------------------------------------------------------------
 // _ultFileBuilder()
@@ -2515,25 +2810,26 @@ WCHAR * _ltgtEncoding(WCHAR *pcwWordTrans)
 // Ritorna -1 se il file non esiste
 //
 
-INT _ultFileBuilder(EH_ULT * psUlt,
-					 CHAR *lpFileSourceLong, // Nome completo del file sorgente
-					 CHAR *lpFileSourceShort,
-					 CHAR *lpFolderLang, // Nome della Folder in Lingua
-					 BOOL fRemoveFileReference, // T/F se rimuovere in automatico dal dizionario "lpFileSource" inesistente.
-					 BOOL fShowFileTouch)
+INT _ultFileBuilder(	EH_ULT * psUlt,
+						CHAR *	pszFileSourceLong, // Nome completo del file sorgente
+						CHAR *	lpFileSourceShort,
+						CHAR *	lpFolderLang, // Nome della Folder in Lingua
+						BOOL	fRemoveFileReference, // T/F se rimuovere in automatico dal dizionario "lpFileSource" inesistente.
+						BOOL	fShowFileTouch)
 {
 					
-	INT hdl;
+	INT		hdl;
 	BYTE *lp,*lpStart,*lpEnd;
-	WCHAR *pcwWordTrans;
-	CHAR *lpTagFind=NULL;
-	INT iFileSize,hdlMemo=0;
-	CHAR *lpMemo;
-	BYTE *lpCharText;
-	CHAR szFileTarget[500];
-	CHAR szIsoLower[10];
-	CHAR *lpIsoLang=psUlt->arLangReady[psUlt->idxLangTranslated].lpIsoPrefix;//ultCodeToText(0,psUlt->iLangList[psUlt->iLangSelector]);
-	INT iCount;
+	WCHAR *	pcwWordTrans;
+	CHAR *	lpTagFind=NULL;
+	INT		iFileSize,hdlMemo=0;
+	CHAR *	lpMemo;
+	BYTE *	lpCharText;
+	CHAR	szFileTarget[500];
+	CHAR	szIsoLower[10];
+	CHAR	szServ[80];
+	CHAR *	lpIsoLang=psUlt->arLangReady[psUlt->idxLangTranslated].lpIsoPrefix;//ultCodeToText(0,psUlt->iLangList[psUlt->iLangSelector]);
+	INT		iCount;
 	static INT iPos=0;
 	HANDLE hdlFile;
 	INT iLen;
@@ -2548,28 +2844,27 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 	CHAR * psz;
 	CHAR * pszPoint;
 	DWORD dwMemoSize;
+	EN_CHARTYPE enSourceEncode;
 
 	EN_OUT_TARGET	enOutTarget=0,enOutTargetStandard=0;
 	EN_STRENC		enOutCharEncoding=0;
 	S_TAGFILEINFO	sTagFileInfo;
 	INT		iTags;
 
-
 // 	printf("[a] %s" CRLF,chronoFormat(chronoGet(NULL),1));
-
 	start=clock();
 	if (!lpIsoLang) ehExit("?lpLang = NULL (%d)",psUlt->idxLangTranslated);
 
-	if (!fileCheck(lpFileSourceLong)) 
+	if (!fileCheck(pszFileSourceLong)) 
 	{
 		if (fRemoveFileReference)
 		{
-			_ultFileRemove(psUlt,fileName(lpFileSourceLong)); return -1;
+			_ultFileRemove(psUlt,fileName(pszFileSourceLong)); return -1;
 		}
 		else
 		{
-			if (fShowFileTouch) printf ("? File %s inesistente",lpFileSourceLong); //return -1;
-			_ultLogWrite(psUlt,"?File %s inesistente",lpFileSourceLong); 
+			if (fShowFileTouch) printf ("? File %s inesistente",pszFileSourceLong); //return -1;
+			_ultLogWrite(psUlt,"?File %s inesistente",pszFileSourceLong); 
 			psUlt->fLogError=TRUE;
 			//_ultLogClose();
 			return -1;
@@ -2583,21 +2878,21 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 	iCount=0;
 	while (TRUE)
 	{
-		hdl=fileLoad(lpFileSourceLong,RAM_AUTO); 
+		hdl=fileLoad(pszFileSourceLong,RAM_AUTO); 
 		if (hdl<0)
 		{
 			iCount++; if (iCount<5) {Sleep(1000); continue;} // Conto fino a 5
 			if (fShowFileTouch) 
 			{
-				if (fShowFileTouch) ehPrintf("?fileLoad_error ? :[%s]\n",lpFileSourceLong);
-				_ultLogWrite(psUlt,"?fileLoad_error ? :[%s]\n",lpFileSourceLong);
+				if (fShowFileTouch) ehPrintf("?fileLoad_error ? :[%s]\n",pszFileSourceLong);
+				_ultLogWrite(psUlt,"?fileLoad_error ? :[%s]\n",pszFileSourceLong);
 				psUlt->fLogError=TRUE;
 				return -1;
 			}
 			else
 			{
-				//ehExit("?fileLoad_error ? :[%s]\n",lpFileSourceLong);
-				_ultLogWrite(psUlt,"?fileLoad_error ? :[%s]\n",lpFileSourceLong);
+				//ehExit("?fileLoad_error ? :[%s]\n",pszFileSourceLong);
+				_ultLogWrite(psUlt,"?fileLoad_error ? :[%s]\n",pszFileSourceLong);
 				psUlt->fLogError=TRUE;
 				return -1;
 			}
@@ -2655,19 +2950,17 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 		ehFree(psz);
 	}
 
-
+	enSourceEncode=_ultGetSourceEncode(psUlt,pszFileSourceLong);
 	//
 	// Tag replacing
 	//
 	iTags=0;
-	enTagType=ULT_TAG_STD;
+	enTagType=ULT_TAG_DEF;
 	pszPoint=lpMemo;
-// 	printf("filesize:%d " CRLF,strlen(lpMemo));
 	while (true)
 	{
 		iItemType=-1;
 		
-
 		//
 		// Trovo il Tag
 		//
@@ -2675,16 +2968,25 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 		switch (enTagType) {
 		
 			//
-			// Cerco un Tag Html normale
+			// Cerco un Tag Standard #[ ]#
 			//
-			case ULT_TAG_STD:
-				pszPoint=lpStart=strstr(pszPoint,"#["); 
+			case ULT_TAG_DEF:
+				pszPoint=lpStart=strstr(pszPoint,TAG_BEGIN); 
 				if (lpStart) 
 				{
-			//		enTagType=ULT_TAG_STD;//ULT_TAG_HTMLS; 
 					iItemType=ULT_TYPE_HTML;
 					lpStart+=2;
-					lpEnd=strstr(lpStart,"]#"); 
+					lpEnd=strstr(lpStart,TAG_END); 
+				}
+				break;
+
+			case ULT_TAG_UTF:
+				pszPoint=lpStart=strstr(pszPoint,UTF_TAG_BEGIN); 
+				if (lpStart) 
+				{
+					iItemType=ULT_TYPE_HTML;
+					lpStart+=2;
+					lpEnd=strstr(lpStart,UTF_TAG_END); 
 				}
 				break;
 
@@ -2701,7 +3003,7 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 				break;
 
 			case ULT_TAG_UTF8:
-					// Cerco un Tag con codifica UTF8 forzata
+				// Cerco un Tag con codifica UTF8 forzata
 				pszPoint=lpStart=strstr(pszPoint,UTF8_TAG);
 				if (lpStart) 
 				{
@@ -2745,6 +3047,17 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 				}
 				break;
 
+			// Cerco un Tag con codifica Witango
+			case ULT_TAG_WITANGO_ARRAY:
+				pszPoint=lpStart=strstr(lpMemo,WITANGO_TAG_ARRAY); 
+				if (lpStart) 
+				{
+					iItemType=ULT_TYPE_HTML; 
+					lpStart+=5; 
+					lpEnd=strstr(lpStart,")#"); 
+				}
+				break;
+
 			default: 
 				break;
 
@@ -2765,11 +3078,11 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 		// Post-controlli sul tag
 		if (!lpEnd) 
 		{
-			ehLogWrite("#Errore in file %s\n%30.30s...\n(%d)",lpFileSourceLong,lpStart,iLen);
+			ehLogWrite("#Errore in file %s\n%30.30s...\n(%d)",pszFileSourceLong,lpStart,iLen);
 			//
 			// scrivo un log on fly da visualizzare o spedire via email
 			//
-			_ultLogWrite(psUlt,"#Errore in file %s\n%30.30s...\n(%d)",lpFileSourceLong,lpStart,iLen);
+			_ultLogWrite(psUlt,"#Errore in file %s\n%30.30s...\n(%d)",pszFileSourceLong,lpStart,iLen);
 			psUlt->fLogError=TRUE;
 			goto FINE;
 		}
@@ -2780,7 +3093,7 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 			ehLogWrite(
 					"Tag Mark errato, Tipo %d, file:%s - Cercare: %80.80s ...\n (%d)",
 					enTagType,
-					lpFileSourceLong,
+					pszFileSourceLong,
 					lpStart,
 					iLen);
 			//
@@ -2788,7 +3101,7 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 			//
 			_ultLogWrite(psUlt,"Tag Mark errato, Tipo %d, file:%s - Cercare: %80.80s ...\n (%d)",
 					enTagType,
-					lpFileSourceLong,
+					pszFileSourceLong,
 					lpStart,
 					iLen);
 			psUlt->fLogError=TRUE;
@@ -2796,11 +3109,11 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 		}
 	
 		// Ricerco se all'interno ho un apertura
-		if (strstr(lpStart,"#[")||strstr(lpStart,"#("))
+		if (strstr(lpStart,UTF_TAG_BEGIN)||strstr(lpStart,TAG_BEGIN)||strstr(lpStart,"#("))
 		{
 			ehLogWrite("Tag Mark errato, Tipo %d, file:%s - Cercare: %80.80s ...\n (%d)",
 					enTagType,
-					lpFileSourceLong,
+					pszFileSourceLong,
 					lpStart,
 					iLen);
 			//
@@ -2810,22 +3123,215 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 					psUlt,
 					"Tag Mark errato, Tipo %d, file:%s - Cercare: %80.80s ...\n (%d)",
 					enTagType,
-					lpFileSourceLong,
+					pszFileSourceLong,
 					lpStart,
 					iLen);
 			psUlt->fLogError=TRUE;
 			goto FINE;
 		}
+		
+		switch (enTagType)
+		{
+
+			default:
+				switch (enSourceEncode)
+				{
+					default:
+					case ULT_CS_LATIN1: 
+						pwcFind=strToWcs(lpStart); // Converto in UniCode Latin1 To Unicode
+						break;
+
+					case ULT_CS_UTF8: 
+						pwcFind=utfToWcs(lpStart); // Converto in UniCode Latin1 To Unicode
+						break;
+				}
+
+				break;
+
+			case ULT_TAG_UTF:
+				pwcFind=utfToWcs(lpStart); // Converto in UniCode Latin1 To Unicode
+				break;
+
+		
+		}
+		
+
+//		pwcEncode=NULL;
+
+		//
+		// Scelte di ricerca e output in base al Tag
+		//
+		switch (enTagType)
+		{
+			//
+			// Conversione HTMLS (default)
+			// La parola viene convertita seguendo una codifica relativa al CharSet
+			// in caso di LATIN1 i caratteri <>& e CR non vengono converiti
+			//
+			case ULT_TAG_DEF: 
+				_merge(lpTagFind,TAG_BEGIN,lpStart,TAG_END);
+				//sprintf(lpTagFind,TAG_BEGIN "%s" TAG_END,lpStart); 
+				*lpEnd=charBackup;
+				enOutTarget=enOutTargetStandard; // OUT_TEXT_HTML
+				break;
 
 
-		pwcFind=strToWcs(lpStart); // Converto in UniCode Latin1 To Unicode
-		pcwWordTrans=ultTranslateEx(psUlt,iItemType,pwcFind,NULL,FALSE,&iRow); // Traduco
+			case ULT_TAG_UTF: 
+				_merge(lpTagFind,UTF_TAG_BEGIN,lpStart,UTF_TAG_END);
+				// sprintf(lpTagFind,UTF_TAG_BEGIN "%s" UTF_TAG_END,lpStart); 
+				//
+				*lpEnd=charBackup;
+				enOutTarget=enOutTargetStandard; // OUT_TEXT_HTML
+				break;
+
+				//
+			// Conversione HTML
+			// La parola viene convertita seguendo una codifica relativa al CharSet
+			// in caso di LATIN1 vengono convertiti tutti i caratteri
+			//
+			case ULT_TAG_HTMLP: 
+				//sprintf(lpTagFind,HTMLPURE_TAG "%s)#",lpStart); 
+				_merge(lpTagFind,HTMLPURE_TAG,lpStart,SPECIAL_TAG_END);
+				*lpEnd=charBackup;
+				enOutTarget=OUT_WEB;
+				break;
+
+			//
+			// Conversione UTF8 (forzata)
+			// La parola viene convertita seguendo una codifica relativa al CharSet
+			//
+			case ULT_TAG_UTF8: 
+				//sprintf(lpTagFind,UTF8_TAG "%s)#",lpStart); 
+				_merge(lpTagFind,UTF8_TAG,lpStart,SPECIAL_TAG_END);
+				*lpEnd=charBackup;
+				enOutTarget=OUT_WEB_HTML; // Non ne sono sicuro
+				enOutCharEncoding=SE_UTF8;
+				break;
+
+			//
+			// Conversione HTMLUTF8 (forzata)
+			// La parola viene convertita seguendo una codifica relativa al CharSet
+			//
+			case ULT_TAG_HTMLUTF8: 
+				//sprintf(lpTagFind,HTMLUTF8_TAG "%s)#",lpStart); 
+				_merge(lpTagFind,HTMLUTF8_TAG,lpStart,SPECIAL_TAG_END);
+				*lpEnd=charBackup;
+				enOutTarget=OUT_TEXT;
+				enOutCharEncoding=SE_UTF8;
+				break; 
+
+			//
+			// Conversione Witango
+			// Le quote (' e ") vengono convertiti per non avere problemi in Witango
+			// 
+			case ULT_TAG_WITANGO: 
+				_merge(lpTagFind,WITANGO_TAG,lpStart,SPECIAL_TAG_END);
+				//sprintf(lpTagFind,WITANGO_TAG "%s)#",lpStart); 
+				*lpEnd=charBackup;
+				enOutTarget=OUT_WITANGO;
+				break;
+
+			case ULT_TAG_WITANGO_ARRAY: 
+				_merge(lpTagFind,WITANGO_TAG_ARRAY,lpStart,SPECIAL_TAG_END);
+				//sprintf(lpTagFind,WITANGO_TAG_ARRAY "%s)#",lpStart); 
+				*lpEnd=charBackup;
+				enOutTarget=OUT_WITANGO;
+				break;
+
+			//
+			// Conversione Java
+			// Gli accenti vengono convertiti per non avere problemi in Witango
+			// 
+			case ULT_TAG_JAVA: 
+				_merge(lpTagFind,JAVA_TAG,lpStart,SPECIAL_TAG_END);
+				//sprintf(lpTagFind,JAVA_TAG "%s)#",lpStart); 
+				*lpEnd=charBackup;
+				enOutTarget=OUT_JS;
+				break;
+
+			default:
+				ehError();
+		}
+
+
+		//
+		// Array della parola in tutte le lingue
+		//
+		if (enTagType==ULT_TAG_WITANGO_ARRAY) {
+
+			//
+			// Loop sulle lingue per preparare l'array
+			//
+			INT idxBackup=psUlt->idxLangTranslated;
+			INT iLang;
+			EH_LST lstWord=lstNew();
+			for (iLang=0;iLang<psUlt->iLangNum;iLang++) {
+				
+				if (iLang!=psUlt->idxLangCode&&
+					iLang!=psUlt->idxFiles&&
+					iLang!=psUlt->idxNote) {
+						psUlt->idxLangTranslated=iLang;
+						
+						if (!wcscmp(pwcFind,L"~LANG~")) lpCharText=strDup(psUlt->arLangReady[iLang].lpIsoPrefix);
+						else if (!wcscmp(pwcFind,L"~xiff~")) lpCharText=strDup(psUlt->arLangReady[iLang].lpXiff);
+						else 
+						{
+							pcwWordTrans=ultTranslateEx(psUlt,iItemType,pwcFind,NULL,FALSE,&iRow); 
+							lpCharText=_outCharEncoding(pcwWordTrans,enOutTarget,enOutCharEncoding);
+						}
+						
+						lstPush(lstWord,lpCharText);
+						ehFree(lpCharText);
+				}
+			}
+
+			switch (enTagType) {
+			
+				case ULT_TAG_WITANGO_ARRAY:
+					{
+						EH_LST lst=lstNew();
+						CHAR * pszWord;
+						BOOL bFirst=true;
+
+						lstPush(lst,"<@ARRAY VALUE=\"");
+						for (lstLoop(lstWord,pszWord)) {
+							if (!bFirst) lstPush(lst,"|");
+							lstPush(lst,pszWord);
+							bFirst=false;
+						}
+						lstPush(lst,"\" CDELIM='|' RDELIM='<@CHAR 2>'>");
+						lpCharText=lstToString(lst,"","",""); lstDestroy(lst);
+ 
+					}
+					break;
+				
+				default:
+					ehError();
+			
+			}
+			psUlt->idxLangTranslated=idxBackup;
+			lstDestroy(lstWord); 
+			
+		} else {
+
+			//
+			// Traduzione dell'item (standard)
+			//
+			pcwWordTrans=ultTranslateEx(psUlt,iItemType,pwcFind,NULL,FALSE,&iRow); // Traduco
+			lpCharText=_outCharEncoding(pcwWordTrans,enOutTarget,enOutCharEncoding);
+		}
+
 		if (!pcwWordTrans) 
 		{
 			ehExit("Traduzione: %S ? ",pwcFind);
 		}
 		iCountSwap++; if (iCountSwap>10000) ehExit("Over load");
 
+		//
+		//	Encoding dell'uscita 
+		//
+		// lpCharText=_outCharEncoding(pcwWordTrans,enOutTarget,enOutCharEncoding);
+		/*
 		pwcEncode=NULL;
 		switch (enTagType)
 		{
@@ -2889,97 +3395,9 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 				enOutTarget=OUT_JS;
 				break;
 		}
-
-		//
-		//	Encoding dell'uscita 
-		//
-		lpCharText=NULL;
-
-		switch (enOutTarget) {
-		
-				case OUT_TEXT:			// Nessun encoding aggiuntivo		: se UTF8 diretto, altrimenti Latin1 solo superiore al 127
-
-					switch (enOutCharEncoding) {
-					
-						case SE_UTF8: lpCharText=strEncodeW(pcwWordTrans,SE_UTF8,NULL); break;
-						case SE_HTML: lpCharText=strEncodeW(pcwWordTrans,SE_HTMLS,NULL); break;
-						default:ehError();
-
-					}
-					break;
-
-				case OUT_WEB:			// Testo in una pagina web			: Per renderlo visibile tutto viene convertito in encoding HTML
-
-					switch (enOutCharEncoding) {
-					
-						case SE_UTF8: lpCharText=strEncodeEx(2,pcwWordTrans,2,SE_UTF8,SE_HTML_XML); break;
-						case SE_HTML: lpCharText=strEncodeW(pcwWordTrans,SE_HTML,NULL); break;
-						default:ehError();
-
-					}
-					break;				
-				
-				case OUT_WEB_HTML:		// Testo in una pagina web + html	: Il testo può contenere tag html, quindi vengono preservati i tag e convertiti solo i caratteri superiori al ASCII
-					
-					switch (enOutCharEncoding) {
-					
-						case SE_UTF8: lpCharText=strEncodeW(pcwWordTrans,SE_UTF8,NULL); break;
-						case SE_HTML: lpCharText=strEncodeW(pcwWordTrans,SE_HTMLS,NULL); break;
-						default:ehError();
-
-					}
-					break;				
-				
-				case OUT_XML:			// Testo in un XML					: Vengono convertiti i tag <> 
-					
-					switch (enOutCharEncoding) {
-					
-						case SE_UTF8: lpCharText=strEncodeEx(2,pcwWordTrans,2,SE_UTF8,SE_HTML_XML); break;
-						case SE_HTML: lpCharText=strEncodeW(pcwWordTrans,SE_HTML_XML,NULL); break;
-						default:ehError();
-
-					}
-					break;
-
-				case OUT_JS:			// Stringa Javascript				: Il testo viene codificato usando \(qualcosa)
-					
-					pwcEncode=_witangoDecoding(pcwWordTrans); // ??
-					
-					switch (enOutCharEncoding) {
-					
-						case SE_UTF8: 
-							lpCharText=strEncodeEx(2,pwcEncode,2,SE_UTF8,SE_JSON); 
-							break; // Converte in \ \,'," e i valori inferiori a 32
-						case SE_HTML: lpCharText=strEncodeW(pwcEncode,SE_JSON,NULL); break;
-						default:ehError();
-
-					}
-					break;
-
-				case OUT_WITANGO:		// Stringa Witango : Il testo viene codificato usando \(qualcosa)
-
-					pwcEncode=_witangoEncoding(pcwWordTrans);
-					
-					switch (enOutCharEncoding) {
-					
-						case SE_UTF8: lpCharText=strEncodeW(pwcEncode,SE_UTF8,NULL); break;
-						case SE_HTML: lpCharText=strEncodeW(pwcEncode,SE_HTMLS,NULL); break;
-						default:ehError();
-
-					}
-					break;
-
-				default:
-					ehError(); // Tipo di out non definito
-					break;
-
-		}
-
-		// Trovo e sostituisco
+*/
 		while (strReplace(pszPoint,lpTagFind,lpCharText));
-		//memReplace(lpMemo,pszPoint,lpTagFind,lpCharText,iFileSize);
-
-		ehFreePtrs(3,&pwcEncode,&lpCharText,&pwcFind);
+		ehFreePtrs(2,&lpCharText,&pwcFind);
 
 	}
 	// printf("[c] %s = %d tags" CRLF,chronoFormat(chronoGet(NULL),1),iTags);
@@ -2990,7 +3408,14 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 	while (strReplace(lpMemo,"#LANG#",lpIsoLang));
 	strcpy(szIsoLower,lpIsoLang); _strlwr(szIsoLower);
 	while (strReplace(lpMemo,"#lang#",szIsoLower));
+	while (strReplace(lpMemo,"#xiff#",psUlt->arLangReady[psUlt->idxLangTranslated].lpXiff)); // new 2014
+	while (strReplace(lpMemo,"#lang3#",psUlt->arLangReady[psUlt->idxLangTranslated].pszIso3));
 
+	// Direzione (introdotta nel 2015)		
+	sprintf(szServ,"dir=\"%s\"",psUlt->arLangReady[psUlt->idxLangTranslated].pszDir);
+	while (strReplace(lpMemo,"#tagDir#",szServ));
+	while (strReplace(lpMemo,"#dir#",psUlt->arLangReady[psUlt->idxLangTranslated].pszDir));
+	
 	//
 	// Salvo il file
 	//
@@ -2999,11 +3424,39 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 	// a) Trovare il nome definitivo del file
 	//
 
-	//
-	// b) Creo le cartelle intermedie se non le ho
-	//
 
 	sprintf(szFileTarget,"%s\\%s",lpFolderLang,lpFileSourceShort);
+
+	//
+	// c) Trasformo se richiesto l'estensione del file
+	// Es .taf > .jsp
+	//
+	if (!strEmpty(psUlt->pszTransform)) {
+		EH_AR arExt=strSplit(psUlt->pszTransform,",");
+		INT a;
+		for (a=0;arExt[a];a++) {
+			EH_AR arTrans=strSplit(arExt[a],">");
+			INT iLen=ARLen(arTrans);
+			if (iLen==2) {
+				CHAR szOld[20];
+				CHAR szNew[20];
+				sprintf(szOld,".%s",arTrans[0]);
+				sprintf(szNew,".%s",arTrans[1]);
+				if (strstr(szFileTarget,szOld)) {
+					strReplace(szFileTarget,szOld,szNew);
+					ehFree(arTrans);
+					break;
+				}
+			}
+			ehFree(arTrans);
+		}
+		ehFree(arExt);
+	
+	}
+
+	//
+	// b) Creo le cartelle intermedie se non le ho (del file)
+	//
 	dirCreateFromFile(szFileTarget);
 	
 	// ehLogWrite("%s",szFileTarget);
@@ -3011,43 +3464,43 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 	// if (bFileTarget) fileStrWrite("c:\\comFerra\\ULT\\LastFile.log",lpMemo);
 
 	iCount=0;
-	while (TRUE)
+	while (true)
 	{
-	 //ch=fopen(szNewName,"wb"); 
-	  hdlFile= CreateFile((LPCTSTR) szFileTarget,
+		hdlFile= CreateFile((LPCTSTR) szFileTarget,
 						   GENERIC_WRITE,
 						   FILE_SHARE_READ|FILE_SHARE_WRITE,//FILE_SHARE_READ,
 						   NULL,//&sSA,
 						   CREATE_ALWAYS,
 						   FILE_FLAG_SEQUENTIAL_SCAN,
 						   (HANDLE)NULL);
- 
-	 if (hdlFile==(HANDLE) INVALID_HANDLE_VALUE) 
-	 {
-		 iCount++; if (iCount<8) {Sleep(1000); continue;}
-		 if (fShowFileTouch) 
-		 {
-			ehPrintf("?File_save_error ? :[%s]\n",szFileTarget);
-			goto FINE;
-		 }
-		 else
-		 {
-			//ehExit("#_ultFileBuilder: Write [%s] err:%d",szFileTarget,osGetError());
-			 _ultLogWrite(psUlt,"#_ultFileBuilder: Write [%s] err:%d",szFileTarget,osGetError());
-			 psUlt->fLogError=TRUE;
-			 goto FINE;
-		 }
-	 }
-	 break;
+
+		if (hdlFile==(HANDLE) INVALID_HANDLE_VALUE) 
+		{
+			iCount++; if (iCount<8) {Sleep(1000); continue;}
+			if (fShowFileTouch) {
+
+				ehPrintf("?File_save_error ? :[%s]\n",szFileTarget);
+				goto FINE;
+
+			}
+			else {
+
+				//ehExit("#_ultFileBuilder: Write [%s] err:%d",szFileTarget,osGetError());
+				 _ultLogWrite(psUlt,"#_ultFileBuilder: Write [%s] err:%d",szFileTarget,osGetError());
+				psUlt->fLogError=TRUE;
+				goto FINE;
+
+			}
+		}
+		break;
 	}
 
-//	fwrite(lpMemo,strlen(lpMemo),1,ch);
 	WriteFile(
-		hdlFile,                    // handle to file to write to
-		lpMemo,                // pointer to data to write to file
-		strlen(lpMemo),     // number of bytes to write
-		&dwBytesWritten,  // pointer to number of bytes written
-		NULL        // pointer to structure for overlapped I/O
+			hdlFile,                    // handle to file to write to
+			lpMemo,                // pointer to data to write to file
+			strlen(lpMemo),     // number of bytes to write
+			&dwBytesWritten,  // pointer to number of bytes written
+			NULL        // pointer to structure for overlapped I/O
 		);
 	
 	if (dwBytesWritten!=strlen(lpMemo)) {win_infoarg("Errore in scrittura caratteri"); ehLogWrite("Errore in scrittura caratteri");}
@@ -3056,6 +3509,12 @@ INT _ultFileBuilder(EH_ULT * psUlt,
 	{
 		ehPrintf("!%s > OK %s\n",szFileTarget,chronoFormat(clock()-start,4));
 	}
+	if (psUlt->enDateTarget==DAMO_ORIGINAL) {
+		S_FILEINFO sInfo;
+		fileGetInfo(pszFileSourceLong,&sInfo);
+		fileSetDate(szFileTarget,sInfo.sFd.tTimeCreation,sInfo.sFd.tTimeAccess,sInfo.sFd.tTimeWrite);
+	}
+
 
 FINE:
 	if (hdlMemo) memoFree(hdlMemo,"File");
@@ -3136,6 +3595,27 @@ INT ultDwToRow(EH_ULT * psUlt,DWORD dwId)
 		if (sUltVoice.dwID==dwId) return x;
 	}
 	return -1;
+}
+
+//
+// ultIdRecovery()
+//
+BOOL ultIdRecovery(EH_ULT * psUlt) {
+
+
+	INT x;
+	DWORD dwId=0x1205;
+	ULTVOICE sUltVoice;
+	for (x=0;x<psUlt->dmiDict.Num;x++)
+	{
+		DMIRead(&psUlt->dmiDict,x,&sUltVoice);
+		sUltVoice.dwID=dwId; 	psUlt->dwLastId=dwId;
+		DMIWrite(&psUlt->dmiDict,x,&sUltVoice);
+		dwId++;
+	}
+
+	return false;
+	
 }
 
 // Recodifica
@@ -3474,14 +3954,16 @@ INT _ultFileRemove(EH_ULT * psUlt,CHAR *lpFileName)
 	INT iSize,iCount=0;
 	ULTVOICE sVoice;
 
-	if (!*lpFileName) ehExit("_ultFileRemove(): File name non indicato");
+	if (!*lpFileName) {
+		ehExit("_ultFileRemove(): File name non indicato");
+	}
 
 //	ehPrintf("Rimuovi %s<BR>",lpFileName); fflush(stdout);
 	pwcFile=strToWcs(lpFileName);
 	iSize=wcslen(pwcFile)*2+10;	pwcFind=ehAlloc(iSize); 	
 	_snwprintf(pwcFind,iSize,L",%s,",pwcFile); //wcslwr(pwcFind);
 
-	iSize=8000; pwcList=ehAlloc(iSize);
+	iSize=8000; pwcList=ehAllocZero(iSize);
 	for (x=0;x<psUlt->dmiDict.Num;x++)
 	{
 		DMIRead(&psUlt->dmiDict,x,&sVoice);
@@ -3901,3 +4383,49 @@ static BOOL _getTagFileInfo(CHAR * pszFileMemo,S_TAGFILEINFO * psFileInfo,BOOL b
 
 	return bReady;
 }
+
+
+//
+// caCreate() 
+// Ritorna FALSE se tutto ok
+// 
+static BOOL _caCreate(CHAR * pszLocalName,CHAR * pszRemoteName,CHAR * pszUserName,CHAR * pszPassword) 
+{
+	NETRESOURCE	nr;
+	DWORD		dwRes;
+	BOOL		bRet=true;
+
+	_(nr);
+	nr.dwType           =   RESOURCETYPE_DISK;
+	nr.lpLocalName      =   pszLocalName;
+	nr.lpRemoteName     =   pszRemoteName;
+
+	dwRes=WNetAddConnection2  (		&nr,
+									pszPassword,
+									pszUserName,
+									0
+								);
+	if (dwRes==NO_ERROR) {
+		//lstPush(_s.lstConn,ars[0]);
+		bRet=false;
+	} else {
+
+		CHAR * psz=osErrorStrAlloc(dwRes);
+		printf("not access: %s : %s" CRLF,pszRemoteName,psz);
+//		ehLogWrite("not access: %s : %s" CRLF,pszRemoteName,psz);
+		ehFree(psz);
+
+	}
+	return bRet;
+
+}
+
+//
+// caDestroy()
+//
+static BOOL _caDestroy(CHAR * pszRemoteName) {
+
+	WNetCancelConnection2(pszRemoteName, 0, FALSE);
+	return false;
+}
+

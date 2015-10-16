@@ -50,6 +50,7 @@ typedef struct {
 	BYTE *	lpSourceEnd; // Fine nel sorgente originale
 
 	CHAR *	lpValue;	// Value Es. <tag>[valore]</tag> (solo se semplice)
+	WCHAR *	pwValue;	// Valore in unicode
 	BYTE *	pszValueStart; // Inizio del value nel sorgente originale (ex lpSourcePointer)
 	BYTE *	pszValueEnd; // Vine del value sorgente originale
 
@@ -63,20 +64,26 @@ typedef XMLELEMENT ** XMLARRAY;
 
 struct xmlDoc {
 
-	CHAR	szFile[255]; // Nome dell'elemento
-	SINT	hdlDOM;
-	CHAR *	lpDOM;
-	_DMI	dmiElement;
-	BOOL	bUseNamespace; // T/F se devo usare i namespace
+	CHAR		szFile[255]; // Nome dell'elemento
+	INT			hdlDOM;
+	CHAR *		lpDOM;
+	_DMI		dmiElement;
+	BOOL		bUseNamespace; // T/F se devo usare i namespace
 
-	XML_PTR arElement;
-	INT	*	arId;	// Indice degli ID
+	XML_PTR		arElement;
+	INT	*		arId;	// Indice degli ID
+	
+	CHAR *		pszXml; // Prima riga di definizione
+	CHAR *		pszVersion;	
+	CHAR *		pszEncoding;	
+	EN_CHARTYPE	enCharSource;
+	EN_CHARTYPE	enCharGet;
 
 };
 typedef struct xmlDoc XMLDOC;
 
 
-void *	xmlParser(XMLDOC *lpXml,SINT cmd,SINT info,void *ptr);
+void *	xmlParser(XMLDOC *lpXml,INT cmd,SINT info,void *ptr);
 SINT	xmlIdBuilder(XMLDOC *lpXml); // 2010
 XMLELEMENT * xmlIdSearch(XMLDOC *lpXml,CHAR *psIdValue); // 2010
 
@@ -97,7 +104,8 @@ INT		xmlArrayLen(XMLARRAY);
 INT		xmlGetIdx(XMLELEMENT *);
 
 CHAR *	xmlGetAttrib(XMLELEMENT *lpXml,CHAR *lpName);
-CHAR *	xmlGetValue(XMLDOC *lpXml,SINT idx,CHAR *pNodeElement);
+CHAR *	xmlGetValue(XMLDOC *lpXml,INT idx,CHAR *pNodeElement);
+CHAR *  xmlGet(XMLELEMENT * pxml,CHAR *pszNodeElement);
 CHAR *	xmlGetAttribStr(XMLELEMENT *lpXml);
 
 #ifndef EH_MEMO_DEBUG

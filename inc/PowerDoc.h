@@ -17,6 +17,7 @@ typedef enum {
 	PWD_LAYHIDE,
 	PWD_LAYTYPE0,
 	PWD_LAYTYPE1,
+	PWD_LAYTYPE2,
 	PWD_PAGEFREE		// Pagina libera: non impostate
 
 } PWD_LAY;
@@ -281,11 +282,14 @@ typedef struct {
 	CHAR *		lpTitolo;		 // Titolo della stampa
 	CHAR *		lpSottoTitolo; // Sotto Titolo della stampa
 
-	BOOL		fLineVertField; // Flag di separazione campi con linea verticale
-//	INT			iLineVertColor; // Colore linea verticale	
-	BOOL		fLineHorzField; // Flag di separazione campi con linea orizzontale
-	PWD_COLOR	colLineHorz; // Colore linea orizzontale
+	BOOL		fLineVertField;		// Flag di separazione campi con linea verticale
+	PWD_VAL		umLineVertWidth;	// Spessore linea 
 	PWD_COLOR	colLineVert; // Colore linea orizzontale
+
+	BOOL		fLineHorzField;		// Flag di separazione campi con linea orizzontale
+	PWD_VAL		umLineHorzWidth;	// Altezza testa del report Um di pollice (0=Automatica)
+	PWD_COLOR	colLineHorz; // Colore linea orizzontale
+
 	PWD_COLOR	colTitleBack;
 	PWD_COLOR	colTitleText;
 	
@@ -302,10 +306,8 @@ typedef struct {
     PWD_VAL		umBodyTop;		// Posizione fisica verticale (in dot) dell'inizio del corpo "righe" (ex yHeadDot)
 	PWD_VAL		umBodyBottom;	// Posizione fisica verticale (in dot) della fine del corpo "righe" 
 	PWD_VAL		umHeadBottom;	// Posizione fisica verticale della testata (senza il titolo del layout)	
-//    double umFootHeight;    // Altezza in dot della "footer" di stampa ->   era yCueHeight
 	PWD_VAL		umTitlePadded;	// Altezza del titolo+padding sopra e sotto
 	PWD_VAL		umRowPadded;	// Altezza di una riga fisica effettiva (testo+padding sopra e sotto)
-
 
 	INT			iRowsSize;    // Altezza in righe della linea (Es. ci può essere 1 sola riga di descrizione ma alta (3 righe) per la presenza di campi testo/note dinamici)
 	INT			iFieldNum;    // Reserved: Numero dei campi totali

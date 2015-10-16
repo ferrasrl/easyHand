@@ -67,7 +67,8 @@ typedef struct {
 	BOOL		bWidthPerc;	// T/F iWidth è una percentuale dell'area client
 	INT			iMinWidth;	// Dimensioni minima
 	INT			iMaxWidth;	// Dimensione massima
-
+	BOOL		bEnable;	// Disattiva l'elemento (grigio)
+	BOOL		bLock;		// Elemento attivo ma non riceve input
 
 	INT			iHeight;	// Larghezza 0=automatica (altezza riga)
 	INT			iAfterWidth;// Larghezza del testo after (dopo il campo di test0) 0= automatica
@@ -75,7 +76,8 @@ typedef struct {
 	INT			iRow;		// Riga (Virtuale) della tabella
 	EH_COLOR	colText;	
 	RECT		rcMargin;
-	EN_FDM		enFdm;
+	EN_FDM		enFdm;		// Formato Data Tempo
+	INT			enCRLF;		// (USato nei textarea) 0=CRLF, 1=CR
 	
 	INT			iTitleStyle;	// Usato solo per gli oggetti TITOLO
 	INT			iTitleWidth;	// Larghezza alternativa del nome (titolo) del campo
@@ -136,7 +138,9 @@ void * ehzForm(struct OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr);
 typedef struct {
 
 	struct OBJ *	psObj;
+
 	HWND		wnd;
+	EH_LST		lstGarbage;		// Spazzature delle memorie (da liberare in chiusura)
 	_DMI		dmiField;
 	EH_FORM_FIELD *arField;
 	BOOL		bBuilded;		// Form Pronto per essere visualizzato	
@@ -199,8 +203,8 @@ typedef struct {
 	void	(*Exclude)(void * this,CHAR * pszNames,BOOL bExclude);
 
 	void	(*Visible)(void *this,CHAR *pszFieldFocus,BOOL bVisible);
-	void	(*SetFunction)(void *this,CHAR *pszField,void * (*funcExtern)(EH_OBJPARAMS));
-	void	(*SendMessage)(void *this,CHAR *pszField, INT cmd, LONG info,void *ptr);
+	void	(*SetFunction)(void *this,CHAR * pszField,void * (*funcExtern)(EH_OBJPARAMS));
+	void	(*SendMessage)(void *this,CHAR * pszField, INT cmd, LONG info,void *ptr);
 	void	(*Refresh)(void *this,CHAR *pszField);
 	void	(*setNotifyFunc)(void *this,void * (*funcExtern)(void * this,EH_SRVPARAMS));
 	void	(*ensureVisible)(void *this,CHAR * pszField);
@@ -218,6 +222,7 @@ typedef struct {
 	BOOL	(*adbWrite)(void * this, HDB hdb, CHAR * pszFields);
 	BOOL	(*adbGetDifference)(void *this, HDB hdb, HREC hRec, EH_LST lstField);
 #endif
+
 
 } EHZ_FORM;
 

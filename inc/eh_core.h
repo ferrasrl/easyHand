@@ -127,8 +127,12 @@
 	typedef __time64_t TIME64;
 	#define strLwr(a) strlwr(a)
 	#define strUpr(a) strupr(a)
-    #define wcsLwr(a) _wcslwr(a)
-	#define wcsUpr(a) _wcsupr(a)
+//    CHAR * strLwr(CHAR *);
+//    CHAR * strUpr(CHAR *);
+//  #define wcsLwr(a) _wcslwr(a)
+//	#define wcsUpr(a) _wcsupr(a)
+    WCHAR * wcsLwr(WCHAR *);
+    WCHAR * wcsUpr(WCHAR *);
 
 	#define _BREAK_POINT_ __asm { int 3 }
 
@@ -313,8 +317,12 @@
 	typedef signed int   	    SINT;
 	typedef signed int   	    INT32;
 	typedef signed short int	INT16;
-	typedef char 		UTF8;
-	typedef char *		PUTF8;
+
+	typedef unsigned int    UTF32;  /* at least 32 bits */
+	typedef unsigned short  UTF16;  /* at least 16 bits */
+	typedef unsigned char   UTF8;   /* typically 8 bits */
+
+	typedef unsigned char *		PUTF8;
 	typedef int			HMEM;
 	typedef CHAR **		EH_AR;
 	typedef CHAR **		EH_ARF;
@@ -559,6 +567,7 @@ typedef DWORD EH_ACOLOR;	// Alpha Color
 //
 
 	typedef enum {
+
 		_UNKNOW=-1,
 		_ALFA=0, // Alfanumerico testo fisso
 		_NUMBER=1, // Numero con decimali
@@ -572,6 +581,7 @@ typedef DWORD EH_ACOLOR;	// Alpha Color
 		_GEOMETRY, // Geometrico
 		_POINT, // Punto Geometrico
 		_TIME // Time (Tempo : default Local)
+
 	} EH_DATATYPE;
 
 //
@@ -646,8 +656,6 @@ extern "C" {
 */
 
 
-
-
 	//
 	// MEMO ELEMENT
 	//
@@ -685,10 +693,12 @@ extern "C" {
 
 		#define EMD_END_FUNC ,CHAR * pszProg,INT iLine
 		typedef struct {
+
 			void *pMemo;
 			CHAR *pszProgram;
 			INT iLine;
 			SIZE_T dwSize;
+
 		} S_ALLOC_CONTROL;
 		// void MemoDebugShow(void);
 		void MemoDebugSet(BOOL bSet);
@@ -703,11 +713,14 @@ extern "C" {
 #ifndef EH_MEMO_DEBUG
 	S_UNIVAL * valCreate(EH_DATATYPE enDaTy,LONG lValue,void *pVoid);
 	S_UNIVAL * valCreateNumber(double dValue);
+	S_UNIVAL * valCreateText(CHAR * pszText);
 #else
 	S_UNIVAL * _valCreate(EH_DATATYPE enDaTy,LONG lValue,void *pVoid EMD_END_FUNC);
 	S_UNIVAL * _valCreateNumber(double dValue EMD_END_FUNC);
+	S_UNIVAL * _valCreateText(CHAR * pszText EMD_END_FUNC);
 	#define	valCreate(a,b,c) _valCreate(a,b,c,__FILE__,__LINE__)
 	#define	valCreateNumber(a) _valCreateNumber(a,__FILE__,__LINE__)
+	#define	valCreateText(a) _valCreateText(a,__FILE__,__LINE__)
 #endif
 S_UNIVAL * valDup(S_UNIVAL * psRet);
 void valPrint(S_UNIVAL *);
@@ -998,37 +1011,39 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 	#define O_MOUSE_MASK 0x10    // Il mouse Ë sopra l'oggetto
 
 	struct OBJ {
-			EH_OBJTYPE tipo;
-			CHAR	nome[LUNNOMEOBJ+1]; // TIPO OGGETTO,NOME ASSEGNATO
-			EN_OBJ_STS status;			  //
-			INT		bEnable;			  // T/F se l'oggetto Ë attivo
-			INT		px,py,col1,col2; //                        POSIZIONE E COLORI
-			CHAR	text[80];   //                     TESTO DA SCRIVERE SULLO SCHERMO
-			CHAR	grp[2];     //                     GRUPPO DI APPARTENENZA (x O_RADIO)
-			void * (*funcExtern)(struct OBJ *psObj,EN_MESSAGE enMess,LONG lParam,void *pVoid); //  funzione esterna di controllo
-			CHAR **	ptr; // Puntatore ad una lista di parametri aggiuntivi
-			INT		idxFont; // Indice del font in memoria da usare
-			INT		CharY;
-			INT		iStyle;
-			HWND	hWnd;
-			HMENU	hMenu;
 
-			INT		iHmz;			// Tooltip associato all'oggetto
-			INT		idMgz;			// id Mouse cursor associato all'oggetto
-			BOOL	bFreeze;		// T/F se devo congelare l'oggetto (se congelato, non verranno effettuate chimate esterne)
-			INT		yTitle;			// Dimensione del titolo (OW_SCR,OW_SCRDB)
-			BOOL	fVertBar;		// Se esiste la barra verticale negli scroll
-			BOOL	fHRedraw;		// Redraw completo in caso di variazione orizzontale
-			BOOL	fMouseGhost;	// Disabilita l'intercettazione del mouse
-			INT		idxWin;			// New 2007
-			BOOL	bVisible;		// new 2007 T/F se visibile
-			void *	pOther;			// Puntatore ad altro (new) 11/2007
-			void *	pOtherEx;		// Dati aggiuntivi in fase di ricerca Estesi (2008) usato Es. OdbcScroll()
-			RECT	sClientRect;	// New 2008 Rettangolo dell'area client dell'oggetto
-			SIZE	sClientSize;	// Dimensioni area Cliente
-			POINT	sClientCursor;	// Punto in cui si trova il cursore del mouse
-			BOOL	bTabCode;		// T/F se è ho una array con tab code (new 2010)
-			BOOL	bHidden;		// T/F se l'oggetto è nascosto (incredibile 2011)
+			EH_OBJTYPE	tipo;
+			CHAR		nome[LUNNOMEOBJ+1]; // TIPO OGGETTO,NOME ASSEGNATO
+			EN_OBJ_STS	status;			  //
+			INT			bEnable;			  // T/F se l'oggetto Ë attivo
+			INT			px,py,col1,col2; //                        POSIZIONE E COLORI
+			CHAR		text[80];   //                     TESTO DA SCRIVERE SULLO SCHERMO
+			CHAR		grp[2];     //                     GRUPPO DI APPARTENENZA (x O_RADIO)
+			void *		(*funcExtern)(struct OBJ *psObj,EN_MESSAGE enMess,LONG lParam,void *pVoid); //  funzione esterna di controllo
+			CHAR **		ptr; // Puntatore ad una lista di parametri aggiuntivi
+			INT			idxFont; // Indice del font in memoria da usare
+			INT			CharY;
+			INT			iStyle;
+			HWND		hWnd;
+			HMENU		hMenu;
+
+			INT			iHmz;			// Tooltip associato all'oggetto
+			INT			idMgz;			// id Mouse cursor associato all'oggetto
+			BOOL		bFreeze;		// T/F se devo congelare l'oggetto (se congelato, non verranno effettuate chimate esterne)
+			INT			yTitle;			// Dimensione del titolo (OW_SCR,OW_SCRDB)
+			BOOL		fVertBar;		// Se esiste la barra verticale negli scroll
+			BOOL		fHRedraw;		// Redraw completo in caso di variazione orizzontale
+			BOOL		fMouseGhost;	// Disabilita l'intercettazione del mouse
+			INT			idxWin;			// New 2007
+			BOOL		bVisible;		// new 2007 T/F se visibile
+			void *		pOther;			// Puntatore ad altro (new) 11/2007
+			void *		pOtherEx;		// Dati aggiuntivi in fase di ricerca Estesi (2008) usato Es. OdbcScroll()
+			RECT		sClientRect;	// New 2008 Rettangolo dell'area client dell'oggetto
+			SIZE		sClientSize;	// Dimensioni area Cliente
+			POINT		sClientCursor;	// Punto in cui si trova il cursore del mouse
+			BOOL		bTabCode;		// T/F se è ho una array con tab code (new 2010)
+			BOOL		bHidden;		// T/F se l'oggetto è nascosto (incredibile 2011)
+			DWORD		dwParams;		// Paremtri per qualche caso
 		};
 
 #define EH_OBJ struct OBJ
@@ -1056,9 +1071,12 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 	CHAR *	ehUserPath(CHAR *pszProgram,CHAR *pszBuffer,SIZE_T sztBuffer);// Percorso dei dati dell'utente
 	CHAR *	ehWorkingPath(CHAR *pszProgram,CHAR *pszBuffer,SIZE_T sztBuffer); // Percorso di lavoro dell'applicazione
 	CHAR *	ehAppGetVersion(void); // New 2009
-	CHAR	*GetSystemProductKey(void); // new 2008
-	CHAR	*GetCurrentUserName(void); // new 2008
+	CHAR *	GetSystemProductKey(void); // new 2008
+	CHAR *	GetCurrentUserName(void); // new 2008
 	void	OsEventLoop(INT iNum);
+
+	void *	msGetRegisterKey(CHAR * pszPath,DWORD * pdwType,DWORD * pdwSize); // New 2015
+	BOOL	msSetRegisterKey(CHAR * pszPath,void * pVoid, DWORD dwSize, DWORD dwType); // New 2015
 
 	INT		ehStart(void (*funcNotifyStart)(INT),void (*funcNotifyEnd)(INT));
 	void	ehExit(CHAR *pszMess,...);
@@ -1084,13 +1102,15 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
     UTF8 *  iosGetDevice(UTF8 * pszDest,SIZE_T iLen);
 	void	uiAlertView(CHAR * pszTitle, CHAR * pszMessage, void *);
  #ifdef __OBJC__
-    BYTE * uiGetUrl(CHAR *pszUrl,SIZE_T * piLength);
+    BYTE *	uiGetUrl(CHAR *pszUrl,SIZE_T * piLength);
  #endif
 #endif
 	
 	void	ehSocketInit(void); // new 2010 - Avvio dei socket
-	void	ehReport(BOOL bShow,CHAR *Mess);
+	void	ehReport(BOOL bShow,CHAR * psMess);
 	void	ehConsole(BOOL bShow,BOOL bSaveRestorePosition); // Solo GDI
+	void	ehConsoleShow(BOOL bShow); // Solo GDI
+	void	ehConsoleSet(INT iMode,CHAR * pszTitle,RECT * pRect,CHAR * pszFont,INT iFontSize);
 
 #ifdef __windows__
 
@@ -1240,7 +1260,8 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 		INT		iDayLightBias;	// Differenza del DayLight
 		INT		iBias;		// Differenza da UTC (Local TimeZone+Bias DayLight) 
 
-		TIME64	utcTime;	// UTC (Coordinated Universal Time = tempo coordinato universale) 
+		TIME64	utcTime;	// UTC (Universal Time Coordinated = tempo coordinato universale) 
+		BOOL	bUtcDesc;	// T/F se la suddivisione (YMD/HMS) è UTC o LocalTime
 
 	} EH_TIME;
 
@@ -1255,13 +1276,14 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 							INT			iTimeZone);	// Differenza GMT
 	CHAR *		timeGetDate(EH_TIME *psEht,CHAR *pDateTarget,BOOL bFormatYMD);
 	// new 2010
-	void		timeCalc(EH_TIME *psEht,
+	void		timeCalc(EH_TIME * psEht,
 						INT iDays,
 						INT iMonth,
 						INT iYear,
 						INT iOre,
 						INT iMin,
-						INT iSec);
+						INT iSec,
+						BOOL bUtc);
 	void		timeValidate(EH_TIME *psEht);
 
 	typedef struct {
@@ -1297,13 +1319,13 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 	TIME64			timeEhtToT64(EH_TIME * pFileTime);	// Eht > T64
 	#define timeEhtToTimeStamp(a,b,c) timeFormat(c,a,b,"'%Y-%m-%d %H:%M:%S'",NULL)
 
-	struct tm *		timeT64ToTm(struct tm * psTm,TIME64 iTime64);	// tm > T64
+	struct tm *		timeT64ToTm(struct tm * psTm,TIME64 iTime64,BOOL bLocal);	// tm > T64
 	CHAR *			timeT64ToDt(CHAR *psDtDest, TIME64 iTime64);		// time64 > Dt
-	EH_TIME *		timeT64ToEht(EH_TIME * psTime, TIME64 iTime64);
+	EH_TIME *		timeT64ToEht(EH_TIME * psTime, TIME64 iTime64, BOOL bLocal); // 
 
 	EH_TIME *		timeTmToEht(EH_TIME *psTime, struct tm * psTm);		// tm > eht
 	TIME64			timeTmToT64(struct tm * psTm);
-
+	#define timeEhtToISO(a,b,c) timeFormat(c,a,b,"%Y-%m-%dT%H:%M:%S",NULL)	
 	//#define timeGetDayMonth(psEht) ((!(psEht->wYear%4)&&(psEht->wMonth==2))?arDayPerMonth[psEht->wMonth-1]+1:arDayPerMonth[psEht->wMonth-1])
 
 	//
@@ -1317,6 +1339,7 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 		SYSTEMTIME *	timeFtToSt(SYSTEMTIME * psSt,FILETIME *psFt);		// FileTime > SystemTime
 		TIME64			timeFtToT64(const FILETIME* pFileTime);				// FileTime > time64
 		CHAR *			timeFtToDt(CHAR *psDtDest,FILETIME *psFileTime);	// FileTime > Dt (string)
+		EH_TIME *		timeFtToEht(EH_TIME * psEht,FILETIME * psFileTime,BOOL bLocal);	// FileTime > Eht
 
 		struct tm *		timeStToTm(struct tm *psTm,SYSTEMTIME *s);			// SystemTime > Tm
 		EH_TIME *		timeStToEht(EH_TIME *psEht,SYSTEMTIME *psSt);		// SystemTime > Ehd
@@ -1336,7 +1359,7 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 
 	CHAR *	dateToday(void);
 	CHAR *	dateTodayRev(void);
-	CHAR *	dateTodayRfc(void); // new 2009
+	CHAR *	dateTodayRfc(INT iFormat); // new 2009 0=Email
 	CHAR *	dateCalc(CHAR *pszDateDMY,INT iDays);
 	INT		dateDiff(CHAR * pszDateDMY_A,CHAR * pszDateDMY_B);
 #define DATE_DIFF_ERROR -10000000
@@ -1449,6 +1472,7 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 	#define AddSl AddBs
 	#define strCaseCmp _stricmp
 	#define memCaseCmp _memicmp
+	#define wcsCaseCmp _wcsicmp
 #else
 	#define OS_DIR_SLASH "/"
 	#define AddSl AddSlash
@@ -1462,7 +1486,7 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 	INT		wcsCmp(WCHAR * pszA,WCHAR * pszB); // 2012
 	
 	CHAR *	strCpy(CHAR *pszDest,CHAR *pszSource,SIZE_T tSize); // 2010
-#define		strCopy(a,b) strCpy(a,b,sizeof(a))
+#define		strCopy(a,b) strCpy(a,b,sizeof(a)-1)
 	CHAR *  strCpyAsc(CHAR *pszDest,WCHAR *pwcSource); // 2011
 	CHAR *	strCpyUtf(CHAR *pszDest,WCHAR *pwcSource,INT iSizeDest); // 2011
 	WCHAR *	wcsCpyUtf(WCHAR *pwcDest,UTF8 * pszSource,INT iSizeDest); // 2011
@@ -1477,8 +1501,10 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 	BOOL	strCaseReplace(CHAR *lpSource,CHAR *lpFindStr,CHAR *lpReplaceStr);
 
 	BOOL	strBegin(CHAR *lpString,CHAR *lpControllo); // new 8/2007
+	BOOL	wcsBegin(WCHAR * pwcString,WCHAR * pwcControllo); // 2015
 	BOOL	strCaseBegin(CHAR *lpString,CHAR *lpControllo); // new 8/2007
 	BOOL	strEnd(CHAR *lpString,CHAR *lpControllo); // new 11/2007
+	BOOL	wcsEnd(WCHAR * pwcString,WCHAR * pwcControllo); // 2015
 	BOOL	strCaseEnd(CHAR *lpString,CHAR *lpControllo); // new 11/2007
 	CHAR *	strWordCase(CHAR *); //new 9/1007
 	void	strUtfBreak(CHAR *pStringUft,UINT iMaxSize); // new 11/2008
@@ -1506,6 +1532,8 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 	CHAR	* strKeepAlloc(CHAR *lpSource,CHAR *lpChar);
 	INT		strCount(CHAR *pSource,CHAR *pChar); // new 2009
 	BOOL	strControl(CHAR *pszCharList,CHAR *pszStringCheck); // new 2010
+	CHAR *	strSeo(CHAR * pszSeo,INT iSize); // 
+
 #define strSplit ARFSplit
 
 	//
@@ -1657,6 +1685,7 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 	void		memoSetName(HMEM hdl,CHAR *pszName);
 	EH_MEMO_ELEMENT * memoGetInfo(HMEM hdl);
 	void *		memoPtr(HMEM hdl,BOOL * pbLock); // Ex. memo_heap
+	void		memoReport(void); // 2014
 
 //
 //	Windows
@@ -1786,6 +1815,126 @@ void	eventPush(EN_EHEVENT enType,DWORD dwParam,void * pExtra,CHAR * pszFormat,..
 // <== AUDIO SECTION (END) =========================================================
 //
 
+ // =================================================================================
+//
+// ==> LST > LISTE (2012)
+//
+// =================================================================================
+
+	struct ehLstItem {
+		union {
+
+			CHAR *	pszStr;
+			void *	ptr;
+		};
+		struct ehLstItem * psNext;
+	};
+	typedef struct ehLstItem EH_LST_I;
+
+	typedef struct {
+
+		INT			iLength;
+		INT			iSize;
+		BOOL		bLop;	// T/F Lista di puntatori (settato in automatico on lstPushPtr() 
+		EH_LST_I *	psFirst;
+		EH_LST_I *	psLast;
+		
+		EH_LST_I *	psCurrent;	// Per i loop
+		BOOL		bNextFirst;	// Uso interno: il next riparte dal primo
+
+	} EH_LST_S;
+	
+	typedef EH_LST_S * EH_LST;
+	
+	#ifdef EH_MEMO_DEBUG
+		EH_LST 		_lstCreate(SIZE_T iMemo EMD_END_FUNC);
+		#define		lstCreate(a) _lstCreate(a,__FILE__,__LINE__)
+	#else
+		EH_LST 		lstCreate(SIZE_T iMemo);
+	#endif
+
+	#define		lstNew()	lstCreate(0)
+	void		lstClean(EH_LST psList);
+	EH_LST 		lstDestroy(EH_LST psList);
+	EH_LST		lstDestroyPtr(EH_LST psList); // 2015
+	
+	void *		lstPush(EH_LST psList,void * ps);
+	void *		lstPushf(EH_LST psList,CHAR *pString,...);
+	void *		lstPushPtr(EH_LST psList,void * ptr);
+	void *		lstPop(EH_LST psList);
+	BOOL		lstRemoveI(EH_LST psList,EH_LST_I * psElement);
+
+//	#define 	lstPushf(lst,frm,...) lstPushf(lst,fom,__VA_ARGS__)
+
+	void *		lstInsf(EH_LST psList,INT idx,CHAR *pString,...);
+	void *		lstGet(EH_LST psList,INT idx);
+	void *		lstFirst(EH_LST psList);
+	void *		lstLast(EH_LST psList);
+
+	void *		lstNext(EH_LST psList);
+	EH_LST_I *  lstSearch(EH_LST psList,void * pValue);
+	EH_LST_I *	lstSearchCase(EH_LST psList,CHAR * psz);
+
+	void		lstPrint(EH_LST psList);
+#ifndef EH_MEMO_DEBUG
+	EH_LST		lstDup(EH_LST lstSource);
+#else
+	EH_LST		_lstDup(EH_LST lstSource,CHAR * pszProgram,INT iLine);
+	#define		lstDup(psList) _lstDup(psList,__FILE__,__LINE__) 
+
+#endif
+	BOOL		lstIsIn(EH_LST psList,void * pElement);
+	void		lstSort(EH_LST psList, int (*compare )(const void *elem1, const void *elem2 ));
+	void		lstSortText(EH_LST psList, BOOL bDesc);
+	#define		lstLoop(lst,psEle) psEle=lstFirst(lst);psEle;psEle=lstNext(lst)
+#define		lstForSafe(lst,psEle,lstI) lstI=lst->psFirst; for (lstI=lst->psFirst,psEle=lstI?lstI->ptr:NULL;lstI;lstI=lstI->psNext,psEle=lstI?lstI->ptr:NULL)
+
+#ifndef EH_MEMO_DEBUG
+	CHAR *		lstToString(EH_LST psList,CHAR *pdzDelim,CHAR *pszStart,CHAR *pszStop); 
+#else
+	CHAR *		_lstToString(EH_LST psList,CHAR *pdzDelim,CHAR *pszStart,CHAR *pszStop,CHAR * pszProg,INT iLine);
+	#define		lstToString(psList,pdzDelim,pszStart,pszStop) _lstToString(psList,pdzDelim,pszStart,pszStop,__FILE__,__LINE__) 
+#endif
+	void **		lstToArf(EH_LST psList,BOOL bFreeList);
+	EH_LST		lstFrag(CHAR * pszString,INT * ariSize);
+	EH_LST		lstFromTxt(EH_LST lst,UTF8 * pszFileName,BOOL bNotEmptyLines);
+#define			lstPushNotIn(a,b) if (!lstIsIn(a,b)) lstPush(a,b);
+	
+	// LAD -- (liste di aggregati)
+	typedef struct {
+
+		CHAR *	pszCode;
+		INT		iQta;
+		double	dQta;		
+	} S_LAD;
+	typedef S_LAD * LADPTR;
+	#define ladCreate() lstCreate(sizeof(S_LAD))
+	LADPTR ladGet(EH_LST lst,CHAR * pszCode);
+	LADPTR ladAddi(EH_LST lst,CHAR * pszCode,INT iQta);
+	LADPTR ladAdd(EH_LST lst,CHAR * pszCode,double dQta);
+	EH_LST ladDestroy(EH_LST lst);
+
+	typedef struct {
+		
+		CHAR * pszName;
+		CHAR * pszValue;
+
+	} S_COUPLE;
+
+	//  couple Functions
+	EH_LST	coupleCreate(void); // 2015
+	EH_LST	coupleClean(EH_LST lst);
+	EH_LST	coupleDestroy(EH_LST lst);
+	void	coupleAdd(EH_LST lst,CHAR * pszName,CHAR * pszFormat, ...);
+	CHAR *	coupleGet(EH_LST lst,CHAR * pszName);
+	void	couplePrint(EH_LST lst);
+	EH_LST	coupleFromUrl(CHAR * pszUrl);
+
+
+//
+// <== LST (END) =========================================================
+//
+
 // =================================================================================
 //
 // ==> ULT SECTION (Translator)
@@ -1830,7 +1979,7 @@ typedef enum {
 typedef enum {
 
 	ULT_CS_UNKNOW=-1,
-	ULT_CS_LATIN1=0,
+	ULT_CS_LATIN1=0,	//  Anche > window 1252
 	ULT_CS_UTF8=1,
 	ULT_CS_ASCII=2,
 	ULT_CS_ANSI=3,
@@ -1857,9 +2006,12 @@ typedef struct {
 	EN_LANGUAGE		idLang;
 	CHAR *			lpIsoPrefix;
 	CHAR *			lpLangName;			// Uso Interno
-	WCHAR *			pwcLangNameNativo;
+	PUTF8 			putfLangNameNativo;
 	CHAR *			lpTransName;
 	CHAR *			lpXiff;
+	CHAR *			pszIso3;
+	CHAR *			pszIsoExt;
+	CHAR *			pszDir;
 
 } EH_ULT_LANG;
 
@@ -1884,6 +2036,30 @@ typedef struct {
 
 } ULTVOICE;
 
+
+typedef enum {
+
+	UER_READY=0, // Nessun errore
+	UER_LAST_ID_CORRUPT=0x0001
+
+} EN_UER;
+
+typedef enum {
+	
+	FM_STANDARD,	// IT
+	FM_ISO2,		// it
+	FM_ISO3,		// ita
+	FM_EXTENDED,	// it-IT
+
+} EN_FOMO;
+
+typedef enum {
+	
+	DAMO_BUILD,		// Data della costruzione del file (default)
+	DAMO_ORIGINAL,	// Data originale del file
+
+} EN_DAMO;
+
 typedef struct {
 
 	BOOL	bReady;
@@ -1900,8 +2076,8 @@ typedef struct {
 	INT		iLangNative;			// Codice Interno della lingua nativa |iLangNative|
 
 	INT		hdlLangReady;			  // Memoria che contiene hdlLangReady
-	EH_ULT_LANG *arLangGeneral; // Array con le lingue gestibili
-	EH_ULT_LANG *arLangReady;	  // Array cone le lingue presenti nel dizionario
+	EH_ULT_LANG * arLangGeneral; // Array con le lingue gestibili
+	EH_ULT_LANG * arLangReady;	  // Array cone le lingue presenti nel dizionario
 	
 	CHAR **	lpLangSuffix;		// Puntatore a suffissi di lingua
 
@@ -1922,7 +2098,7 @@ typedef struct {
 	INT		iNewItem; // Nuovi item (Es. usato in Scan)
 
 	ULT_TYPE arType[ULT_MAXTYPE];
-	ULTVOICE *lpVoiceShare;		// Memoria di appoggio condivisa
+	ULTVOICE * lpVoiceShare;		// Memoria di appoggio condivisa 
 	INT		iSizeVoice;
 
 	BOOL	fWebFolder;		// T/F se agganciato ad un WebFolder
@@ -1943,6 +2119,16 @@ typedef struct {
 	BOOL	fLogWrite;			// Scrive il log in fase di costruzione files
 	BOOL	fLogShowEnd;		// Mostra il log alla fine
 	BOOL	fLogError;			// Se non stati riscontrati errori durante la creazione dei files
+
+	CHAR *	pszTransform;		// Trasformazione di estensione
+
+	CHAR *	pszFolderTarget;	// Folder Target
+	CHAR *	pszRemoteConn;		// Remote Connection server|user|password
+	EN_FOMO	enFolderMode;		// Folder Mode
+	EN_DAMO	enDateTarget;		// Date Target
+
+	EN_UER	enError;
+	EH_LST	lstErrors;
 
 } EH_ULT;
 
@@ -1989,7 +2175,7 @@ void	ultItemSetFlag(EH_ULT * psUlt);
 void *	ultTranslateEx(	EH_ULT * psUlt,
 						EN_ULTYPE iType,
 						WCHAR *pwcWordCode, // Ricerca Wide Char
-						CHAR *lpFile,
+						UTF8 * utf8File,
 						BOOL fBuildOn,
 						INT *lpRow); // Dove si trova nelle righe
 
@@ -2015,6 +2201,7 @@ BOOL	ultMultiFileBuilder(EH_ULT * psUlt,
 							WCHAR *pwcFileList, // Elenco dei file da rielaborare separati da virgola
 							INT *lpiFileMissing,
 							BOOL fShowFilesTouch);	// Numero dei File scomparsi
+BOOL	ultIdRecovery(EH_ULT * psUlt); // 2014
 
 //void *ULTTranslateCheck(INT iType,BYTE *lpWord);//,INT iCharSet);
 //
@@ -2291,13 +2478,15 @@ CHAR *	ultTranslateSZZAlloc(CHAR *lpStringZZ); // New 2005 Double Zero String
 		FDE_SUBFOLDER=0x0001,		// Analizza anche le sotto cartelle
 		FDE_UNICODE=0x0002,			// In unicode
 		FDE_DMIMODE=0x0004,			// Modalita DMI
-		FDE_FULLPATH=0x0008,		// Richiedo costruizione FullPath
-		FDE_RELAPATH=0x0010,		// Richiedo costruizione Percorco Relativo
+		FDE_FULLPATH=0x0008,		// Richiedo costruzione FullPath
+		FDE_RELAPATH=0x0010,		// Richiedo costruzione Percorso Relativo
 
 		FDE_ADDFOLDER=0x0100,		// Aggiunge le cartelle trovate alla lista
 		FDE_ADDHIDDEN=0x0200,		// Aggiunge i files nascosti
 		FDE_ADDSYSTEM=0x0400,		// Aggiunge i files di sistema
-		FDE_DELEMPTYFOLDER=0x1000	// Cancella le cartelle che si svuotano (solo in delete)
+		FDE_DELEMPTYFOLDER=0x1000,	// Cancella le cartelle che si svuotano (solo in delete)
+		FDE_NO_GETINFO=0x2000		// Non effettua getInfo aggiuntivo (lento su sistemi in rete e linux)
+
 	} EN_FD_PARAM;
 
 	BOOL   f_volumeinfo(CHAR *lpRootPathName,VOLINFO *VolInfo);
@@ -2327,6 +2516,7 @@ CHAR *	ultTranslateSZZAlloc(CHAR *lpStringZZ); // New 2005 Double Zero String
 	BOOL	fileMove(UTF8 * pszFileSource,UTF8 * pszFileDest);
 	BOOL	fileRename(UTF8 * pszOldName,UTF8 * pszNewName);
 	void	fileView(CHAR * pszUtfFileName);
+	UTF8 *	fileNameUnion(UTF8 * pszBuffer,UINT uiBuffer,UTF8 * pszFolder,UTF8 * pszFileName); // new 2015
 
 	// command line options
 	typedef enum {
@@ -2346,7 +2536,8 @@ CHAR *	ultTranslateSZZAlloc(CHAR *lpStringZZ); // New 2005 Double Zero String
 	BOOL	fileStrWrite(UTF8 * pszFileNameUtf,CHAR *pszString); // New 2007
 	BOOL	fileStrWriteSure(UTF8 * pszFileName,CHAR * pszString,INT iTempt,INT dwPauseMs);
 
-	BOOL	fileStrAppend(UTF8 * pszFileNameUtf,CHAR *lpString); // new 2007
+	BOOL	fileStrAppend(UTF8 * pszFileNameUtf,CHAR * lpString); // new 2007
+	BOOL	fileStrAppendf(UTF8 * pszFileName,CHAR * pszFormat, ...); // new 2014
 
 	BYTE *	fileMemoReadEx(UTF8 * pszFileNameUtf,SIZE_T *ptSize,FO_PARAM dwParam); // new 2010
 #define		fileMemoRead(a,b) fileMemoReadEx(a,b,FO_READ)
@@ -2379,11 +2570,14 @@ CHAR *	ultTranslateSZZAlloc(CHAR *lpStringZZ); // New 2005 Double Zero String
 	//
 
 	typedef struct {
+
+		INT	iError;					// 0=No, 1=Directory not found
         INT iCount;
-		S_FILEINFO sFileInfo;			// Informazioni file di Easyhand
+		S_FILEINFO sFileInfo;		// Informazioni file di Easyhand
 
 #ifdef __windows__
 		WCHAR *	pwcFolderDir;
+		PUTF8	putfFolderBase;
 		BOOL	bTranslate;		// T/F (true Default) traduce nel formato Easyhand i parametri del file
 //		struct	_wfinddata64i32_t sFind;	// Informazioni file di Windows
 		struct	_wfinddata64_t sFind;
@@ -2392,10 +2586,12 @@ CHAR *	ultTranslateSZZAlloc(CHAR *lpStringZZ); // New 2005 Double Zero String
 #endif
 
 #if defined(__linux__)||defined(__apple__)
+		
 		CHAR *	pszDirectory;
 		CHAR *	pszWildCard;
 		BOOL	bTranslate;		// T/F (true Default) traduce nel formato Easyhand i parametri del file
 		dev_t   sDev;
+		PUTF8	putfFolderBase;
 
     #ifndef DIROPEN_FTS
         DIR *   psDIR;
@@ -2427,19 +2623,24 @@ CHAR *	ultTranslateSZZAlloc(CHAR *lpStringZZ); // New 2005 Double Zero String
 */
 
 	typedef struct {
-		EN_FD_PARAM	dwParam;
-		INT64	tDateLimit;
-		BOOL	(*subControl)(void *lpFolder,S_FILEINFO *psFileInfo);
+
+		EN_FD_PARAM		dwParam;
+		INT64			tDateLimit;
+		BOOL			(*subControl)(void *lpFolder,S_FILEINFO *psFileInfo);
 
 		// Risultato
-		SIZE_T	tCount;
-		_DMI	dmiFiles;
-		EH_AR	arFiles;
+		SIZE_T			tCount;
+		_DMI			dmiFiles;
+		EH_AR			arFiles;
 
-		CHAR *	pszFolderStart;
-		INT		iFolderStartLen;
+		CHAR *			pszFolderStart;
+		INT				iFolderStartLen;
+		INT				iError;		// Si è verificato un errore in ricerca
+		
+		DWORD			dwTimeElapsed;
 
 	} EH_FILEDIR;
+
 	EH_FILEDIR * fileDirCreate(	UTF8 * pszWildCardUtf,
 								CHAR * pszDate,
 								EN_FD_PARAM dwParam,
@@ -2481,7 +2682,7 @@ CHAR *	ultTranslateSZZAlloc(CHAR *lpStringZZ); // New 2005 Double Zero String
 	INT		MsDriveType(INT iDrive); // Solo su Windows
 
 	BOOL	dirCreate(UTF8 * pszDirectory); // new 2011
-	BOOL	dirCreateFromFile(CHAR *lpFileName); // New 8/2007
+	BOOL	dirCreateFromFile(UTF8 * lpFileName); // New 8/2007
 	BOOL	dirRemove(UTF8 * pszDirectory); // new 2011
 
 //
@@ -2750,8 +2951,10 @@ CHAR *	ultTranslateSZZAlloc(CHAR *lpStringZZ); // New 2005 Double Zero String
 	void	ARClean(EH_AR *par);	// Svuota l'array 2010
 
 	CHAR *	ARAdd(EH_AR *pAr,CHAR *pString); // new 2008
+#define		ARPush(pAr,pString) ARAdd(pAr,pString)
 	CHAR *	ARAddU(EH_AR *pAr,CHAR *pString,BOOL bCaseUnsensitive); // 2010
 	CHAR *	ARAddarg(EH_AR *pAr,CHAR *pString,...); // new 2008
+#define		ARPushf(pAr,pString,...) ARAddarg(pAr,pString,__VA_ARGS__)
 	CHAR *  ARUpdate(EH_AR ar,INT idx,CHAR *pString,...); // new 2008/12 ex arRowUpdate
 	CHAR *  ARIns(EH_AR *pAr,INT idx,CHAR *pString,...); // new 2009/8/8
 	void	ARDel(EH_AR *pAr,INT idx); // new 2009/8
@@ -2819,99 +3022,20 @@ typedef struct {
 	EH_AR	ADArrayCode(EH_AD adAgg);
 	EH_AD	ADUnion(EH_AD padAgregatoA,EH_AD padAgregatoB); // 2010
 
+	typedef enum {
 
-	//
-	// LST Liste dati 2012
-	//
+		AD_GET_MINOR=1,
+		AD_GET_MAJOR,
+		AD_GET_AVERAGE
 
-	struct ehLstItem {
-		union {
+	} EN_ADGETEX;
 
-			CHAR *	pszStr;
-			void *	ptr;
-		};
-		struct ehLstItem * psNext;
-	};
-	typedef struct ehLstItem EH_LST_I;
+	BOOL	ADGetEx(EH_AD pAggregato,
+					EN_ADGETEX enGetEx,
+					CHAR * pszEle,
+					INT iSizeEle,
+					double * pdValue);
 
-	typedef struct {
-
-		INT			iLength;
-		INT			iSize;
-		BOOL		bLop;	// T/F Lista di puntatori (settato in automatico on lstPushPtr() 
-		EH_LST_I *	psFirst;
-		EH_LST_I *	psLast;
-		
-		EH_LST_I *	psCurrent;	// Per i loop
-		BOOL		bNextFirst;	// Uso interno: il next riparte dal primo
-
-	} EH_LST_S;
-	
-	typedef EH_LST_S * EH_LST;
-	
-	#ifdef EH_MEMO_DEBUG
-		EH_LST 		_lstCreate(SIZE_T iMemo EMD_END_FUNC);
-		#define		lstCreate(a) _lstCreate(a,__FILE__,__LINE__)
-	#else
-		EH_LST 		lstCreate(SIZE_T iMemo);
-	#endif
-
-	#define		lstNew()	lstCreate(0)
-	void		lstClean(EH_LST psList);
-	EH_LST 		lstDestroy(EH_LST psList);
-	
-	void *		lstPush(EH_LST psList,void * ps);
-	void *		lstPushf(EH_LST psList,CHAR *pString,...);
-	void *		lstPushPtr(EH_LST psList,void * ptr);
-	void *		lstPop(EH_LST psList);
-	BOOL		lstRemoveI(EH_LST psList,EH_LST_I * psElement);
-
-//	#define 	lstPushf(lst,frm,...) lstPushf(lst,fom,__VA_ARGS__)
-
-	void *		lstInsf(EH_LST psList,INT idx,CHAR *pString,...);
-	void *		lstGet(EH_LST psList,INT idx);
-	void *		lstFirst(EH_LST psList);
-	void *		lstLast(EH_LST psList);
-
-	void *		lstNext(EH_LST psList);
-	EH_LST_I *  lstSearch(EH_LST psList,void * pValue);
-	void		lstPrint(EH_LST psList);
-#ifndef EH_MEMO_DEBUG
-	EH_LST		lstDup(EH_LST lstSource);
-#else
-	EH_LST		_lstDup(EH_LST lstSource,CHAR * pszProgram,INT iLine);
-	#define		lstDup(psList) _lstDup(psList,__FILE__,__LINE__) 
-
-#endif
-	BOOL		lstIsIn(EH_LST psList,void * pElement);
-	void		lstSort(EH_LST psList, int (*compare )(const void *elem1, const void *elem2 ));
-	#define		lstLoop(lst,psEle) psEle=lstFirst(lst);psEle;psEle=lstNext(lst)
-#define		lstForSafe(lst,psEle,lstI) lstI=lst->psFirst; for (lstI=lst->psFirst,psEle=lstI?lstI->ptr:NULL;lstI;lstI=lstI->psNext,psEle=lstI?lstI->ptr:NULL)
-
-#ifndef EH_MEMO_DEBUG
-	CHAR *		lstToString(EH_LST psList,CHAR *pdzDelim,CHAR *pszStart,CHAR *pszStop); 
-#else
-	CHAR *		_lstToString(EH_LST psList,CHAR *pdzDelim,CHAR *pszStart,CHAR *pszStop,CHAR * pszProg,INT iLine);
-	#define		lstToString(psList,pdzDelim,pszStart,pszStop) _lstToString(psList,pdzDelim,pszStart,pszStop,__FILE__,__LINE__) 
-#endif
-	void **		lstToArf(EH_LST psList,BOOL bFreeList);
-	EH_LST		lstFrag(CHAR * pszString,INT * ariSize);
-	EH_LST		lstFromTxt(EH_LST lst,UTF8 * pszFileName,BOOL bNotEmptyLines);
-
-	
-	// LAD -- (liste di aggregati)
-	typedef struct {
-
-		CHAR *	pszCode;
-		INT		iQta;
-		double	dQta;		
-	} S_LAD;
-	typedef S_LAD * LADPTR;
-	#define ladCreate() lstCreate(sizeof(S_LAD))
-	LADPTR ladGet(EH_LST lst,CHAR * pszCode);
-	LADPTR ladAddi(EH_LST lst,CHAR * pszCode,INT iQta);
-	LADPTR ladAdd(EH_LST lst,CHAR * pszCode,double dQta);
-	EH_LST ladDestroy(EH_LST lst);
 
 //
 // <== ARRAY (END) =======================================================
@@ -2941,6 +3065,7 @@ typedef enum {
 	SE_HTMLS=		0x0008,	// HTML ISO-8859-1 Lascia la struttura <> e converte solo i caratteri nono ASCII (solo i tag che contegono #)
 	SE_ISO_LATIN1=  0x0200,	// HTML ISO-8859-1 CONVERTE TUTTO TRANNE i ritorni a capo
 	SE_HTML_XML=	0x0201,	// HTML ISO-8859-1 Converte il <>&
+	SE_HTML_UTF8=	0x0202,	// (new 2014) Converte Tutto solo <> 
 
 	SE_WTC=			0x0004,	// Wide To Char (converte perdendo il secondo byte un Widechar<>Char : Nessun encoding
 	SE_ANSI=		0x0005,	// Wide To Char Ansi
@@ -2955,6 +3080,7 @@ typedef enum {
 	SE_SQLMYSTR=	0x0043,	// Idem come sopra, ma restituisce NULL oppure '<stringa passata codificata>'
 	SE_URL=			0x0080,	// URL Internet (space = +)
 	SE_URLSPC=		0x0081,	// Come Sopra ma space = %20
+	SE_URLUTF8=		0x0082,	// Come Sopra ma traduce solo alcuni siboli <space>+/%
 	SE_BASE64=		0x0100, // Base 64
 	SE_BASE64MAIL=	0x0101, // Base 64 (a capo ogni 77 caratteri)
 	SE_QP=			0x0400, // Quote-printable
@@ -2972,6 +3098,7 @@ typedef enum {
 	SD_HTMLS=		0x1008,	// HTML ISO-8859-1 Lascia la struttura <> e converte solo i caratteri nono ASCII (solo i tag che contegono #)
 	SD_ISO_LATIN1=  0x1200,	// HTML ISO-8859-1 CONVERTE TUTTO TRANNE i ritorni a capo
 	SD_HTML_XML=	0x1201,	// HTML ISO-8859-1 Converte il <>&
+	SD_HTML_UTF8=	0x1202,	// (new 2014) Converte &# vari ma restituisce una stringa utf8 ad un byte
 
 	SD_WTC=			0x1004,	// Wide To Char (converte perdendo il secondo byte un Widechar<>Char : Nessun encoding
 	SD_ANSI=		0x1004,	// Wide To Char Ansi
@@ -3024,7 +3151,7 @@ void *	strEncodeEx(INT iSizeInput, // 0=Char 1=Wchar
 				  void *pString,
 				  INT iNum,...);
 
-#define utfToWcs(a) (WCHAR *) strDecode(a,SE_UTF8,NULL)
+#define utfToWcs(a) (WCHAR *) strDecode((CHAR *) a,SE_UTF8,NULL)
 //#define strToUtf(pszFileName);
 CHAR *	base64Encode(INT iMode,void * lpSource,SIZE_T tSizeSource);
 void *	base64Decode(CHAR * pszSource,SIZE_T *ptSizeRet);
@@ -3037,6 +3164,7 @@ BOOL	isAsciiW(WCHAR * pwcString,BOOL bModeSpace);
 BOOL	isUtf8(CHAR * pszSource,BOOL bFalseWithError); // 2012
 CHAR *	strSwapSql(CHAR **ppsz,BOOL bQuote); // new 2008 Ex void SqlFormatSwap(BYTE **arString); // New 2007
 CHAR *	strSwapUtf(CHAR **ppsz); // new 2008
+CHAR *	strUtf8Repair(CHAR * pszValue,BOOL * pbStrChanged,BOOL * pbStrError);
 
 CHAR *	strEncrypt(CHAR * pszSource,CHAR * pszKey);
 CHAR *	strDecrypt(CHAR * pszSource,CHAR * pszKey);
@@ -3054,13 +3182,16 @@ typedef enum {
 
 EN_BOM bomDecode(CHAR *pszBuffer,DWORD dwBuffer);
 
-
+//
 // Stack Encoding Server
-
+//
 S_SEN *	senCreate(void);
 CHAR *	senEncode(S_SEN *pSen,INT iEncode,CHAR *lpStr);
 #define sqlStr(psSen,str) senEncode(psSen,SE_SQL,str)
 #define senSql(str) senEncode(psSen,SE_SQL,str)
+#define senSqls(str) senEncode(psSen,SE_SQLSTR,str)
+#define senJson(str) senEncode(psSen,SE_JSON,str)
+
 void *	senEncodeEx(S_SEN *pSen,
 				  INT iInputStart,
 				  void *pString,
@@ -3107,14 +3238,19 @@ typedef struct {
 
 EH_JSON *	jsonCreate(CHAR * pszString);
 EH_JSON *	jsonDestroy(EH_JSON * psJson);
+EH_JSON *	jsonDestroyEx(EH_JSON * psJsonStart,BOOL bNotFreeElement);
 CHAR *		jsonGet(EH_JSON * psJson,CHAR *pszCode);
 CHAR *		jsonGetd(EH_JSON * psJson,CHAR *pszCode,CHAR * pszDefault);
+INT			jsonGetInt(EH_JSON * psJson,CHAR * pszCode,INT iValue);
 CHAR *		jsonGetf(EH_JSON * psJson,CHAR * pszFormat, ...);
-CHAR *		jsonGetEx(EH_JSON * psJson,CHAR * pszCode,EH_JSON ** ppsElement);
+CHAR *		jsonGetEx(EH_JSON * psJson,CHAR * pszCode,EH_JSON ** ppsElement,BOOL bCreateElement);
 S_UNIVAL *	jsonGetVal(EH_JSON * psJson,CHAR * pszFormat, ...);
+EH_JSON *	jsonGetPtr(EH_JSON * psJson,CHAR * pszCode);
 void		jsonPrint(EH_JSON * psJson,INT iIndent);
+CHAR *		jsonToString(EH_JSON * psJson,INT iIndent,CHAR * pszFormat,...);
 CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
-
+EH_JSON *	jsonArrayPush(EH_JSON * psJson,CHAR * pszFormat,...);
+EH_JSON *	jsonSet(EH_JSON * psJson,CHAR * pszFormat,...);
 
 
 //
@@ -4236,6 +4372,8 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 	// Macro
 	#define WS_EHMOVE     WS_CLIPCHILDREN|WS_SYSMENU|WS_MINIMIZEBOX|WS_MAXIMIZEBOX|WS_OVERLAPPEDWINDOW|WS_VISIBLE|WS_SIZEBOX
 	#define WS_EHMOVEHIDE WS_CLIPCHILDREN|WS_SYSMENU|WS_MINIMIZEBOX|WS_MAXIMIZEBOX|WS_OVERLAPPEDWINDOW|WS_SIZEBOX
+//	#define WS_EHMOVEHIDE WS_SYSMENU|WS_MINIMIZEBOX|WS_MAXIMIZEBOX|WS_OVERLAPPEDWINDOW|WS_SIZEBOX
+//	#define WS_EHMOVEHIDE WS_SYSMENU|WS_MINIMIZEBOX|WS_MAXIMIZEBOX|WS_SIZEBOX
 	#define WS_EHNOMOVE WS_POPUPWINDOW| WS_CAPTION| WS_VISIBLE
 	#define AUTOMATIC -2
 	#define EHWP_FULLSIZE	  -1
@@ -4269,10 +4407,21 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 
 		} EH_SUBWIN_PARAMS;	// Sub Win Params
 
+		typedef enum {
+			
+			WIN_BITMAP=0x0001,
+			WIN_MAIN=0x0002
+		
+		} EN_WIN;
+
 		
 		struct WIN {
 
 			CHAR  *	titolo;
+
+			BOOL	bHide;		// Finestra nascosta
+			EN_WIN	enWin;		// Parametri (2015)
+
 			LONG    col1;    // Colore dello sfondo -1=Standard
 			LONG    col2;    // DOS: Colore del titolo
 			INT		x,y;     // Posizione della finestra
@@ -4281,17 +4430,8 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 			INT		zooming,efx;
 			INT		zm_x1,zm_y1,zm_x2,zm_y2;
 			INT		bck_relx,bck_rely;
-			/*
-			INT    txc_vedi;
-			INT    txc_x,txc_y;
-			INT    txc_dim_x,txc_dim_y;
-			LONG    txc_color;
-			INT    txc_speed;
-			*/
 			EH_TCURSOR	sTxtCursor;
 			HWND    txc_hWnd;
-//			INT		obj_num;
-//			INT		ipt_num;
 			INT		tipo;
 
 			INT		PMhdl;
@@ -4299,13 +4439,10 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 			CHAR    PMaltO;
 			CHAR    PMaltC;
 
-			//CHAR    job[16];
 			CHAR *	job;
 			HWND	hWnd; // Handle della finestra
 
 			HWND    wndTool;	// Tooltip Windows
-			//INT		ObjPt;// Puntatore alla struttura degli oggetti in azione
-			//INT		IptPt;// Puntatore alla struttura degli input in azione
 			INT		OldInputFocus;
 			INT		OldWriteFocus;
 
@@ -4324,7 +4461,7 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 			INT		xSizeMax;
 			INT		ySizeMin;
 			INT		ySizeMax;
-			WORD    wTypeShow; // Mod. 2001: Tipo di visualizzazione (Es. SW_MAXIMIZE)
+//			WORD    wTypeShow; // Mod. 2001: Tipo di visualizzazione (Es. SW_MAXIMIZE)
 			BOOL    PhaseCritical;
 
 			//
@@ -4351,6 +4488,7 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 		typedef struct WIN EH_WIN;
 
 
+
 		WORD win_openEx(INT  x,INT y,  // Posizione a video (x=EHWP_macro)
 						CHAR  *lpTitle,  // Titolo
 						INT  ClientLx,INT ClientLy, // Dimensioni area Client Interessata
@@ -4358,7 +4496,7 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 						DWORD dwParam, // 1 = Ci sar‡ un menu collegato (Usi Futuri)
 						LONG  WinStyleEx,// Style Esteso
 						LONG  WinType,   // Syle Normale
-						BOOL  DosEmulation, // Emulazione Dos
+						EN_WIN  dwParams, // Emulazione Dos
 						void * (*funcSubWin)(EH_SUBWIN_PARAMS *)); // Sotto procedura dedicata al Paint
 
 		WORD win_open(INT x,INT y,
@@ -4644,7 +4782,7 @@ CHAR *		jsonCleanSource(CHAR * pszSource,BOOL bComment,BOOL bCrLfTab);
 		BOOL	IsWinMaximize(void);
 		INT	objs_dfind(OBJS *Objs,CHAR *Nome);
 		INT	objs_find(CHAR *Nome);
-		void	win_StatusUpdate(HWND win);
+//		void	win_StatusUpdate(HWND win);
 		void	winFullScreen(HWND hwnd,BOOL bFull); // new 2011
 
 		// Assegnazione di nome alfanumero ad un oggetto del OS
@@ -5241,6 +5379,7 @@ typedef enum {
 typedef struct {
 
 		INT		iSystemStatus;	// 0=Non operativo, 1=Operativo, 2=In chiusura
+		BOOL	bExitRequest;
 		BOOL	bSocketReady;	// Se le librerie di socket sono pronte
 		CHAR	szAppNameFull[512]; // Nome del programma in esecuzione (compreso di persorso)
 		CHAR	szApplication[512]; // Nome del programma in esecuzione (compreso di persorso)
@@ -5253,6 +5392,7 @@ typedef struct {
 
 		BOOL	bOnExitReport; // T/F se voglio il rapporto in uscita
 		BOOL	bCgiAmbient;	// 2012 - T/F sono in un ambiente CGI (Es. non posso premere un tasto)
+		DWORD	dwEncodeError;	// Nomero di errori in encoding
 
 		// Transaltor subSystem
 		EH_ULT	ultApp;

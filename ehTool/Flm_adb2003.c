@@ -1297,7 +1297,7 @@ double adb_FldNume(INT Hdb,CHAR *NomeFld)
 	}
 #endif
 
-	if (FldPtr==NULL)
+	if (!FldPtr)
 		 {
 			ehExit("fldNume: %s ?[%d]",NomeFld,Hdb);
 		 }
@@ -1312,7 +1312,7 @@ double adb_FldNume(INT Hdb,CHAR *NomeFld)
 		 case ADB_INT  : lpInt16=(INT16 *) FldPtr;
 						 return (double) *lpInt16;
 #ifdef _WIN32
-		 case ADB_INT32: return (double) * (INT *) FldPtr;
+		 case ADB_UINT32: return (double) * (UINT *) FldPtr;
 #endif
 
 		 case ADB_FLOAT: ptFloat=(float *) FldPtr;
@@ -1415,7 +1415,7 @@ void adb_FldCopy(void *FldPtr,INT Hdb,CHAR *NomeFld,CHAR *DatoAlfa,double DatoNu
 						 *lpInt16=(INT16) DatoNume;
 						 break;
 #ifdef _WIN32
-		 case ADB_INT32: * (UINT *) FldPtr=(INT) DatoNume;
+		 case ADB_UINT32: * (UINT *) FldPtr=(UINT) DatoNume;
 		                 break;
 #endif
 		 case ADB_FLOAT: ptFloat=(float *) FldPtr;
@@ -1509,7 +1509,7 @@ BOOL adb_FldWriteCheck(INT Hdb,CHAR *NomeFld,CHAR *DatoAlfa,double DatoNume,BOOL
 		 case ADB_INT  : 
 						 break;
 #ifdef _WIN32
-		 case ADB_INT32: 
+		 case ADB_UINT32: 
 		                 break;
 #endif
 		 case ADB_FLOAT: 
@@ -1562,6 +1562,9 @@ BOOL adb_FldExist(INT Hdb,CHAR *NomeFld)
 	if (FldPtr==NULL) return FALSE; else return TRUE;
 }
 
+//
+// adb_FldImport()
+//
 BOOL adb_FldImport(HDB hdbDest,HDB hdbSource,BOOL fRealloc,BOOL fCutSpace)
 {
 	INT a;
@@ -1610,7 +1613,7 @@ BOOL adb_FldImport(HDB hdbDest,HDB hdbSource,BOOL fRealloc,BOOL fCutSpace)
 							 break;
 
 						case ADB_INT:
-						case ADB_INT32:
+						case ADB_UINT32:
 						case ADB_NUME:
 						case ADB_COBN:
 						case ADB_COBD:
@@ -1692,7 +1695,7 @@ BOOL adb_FldImport(HDB hdbDest,HDB hdbSource,BOOL fRealloc,BOOL fCutSpace)
 
 				// Tipi differenti da ...
 				if ((FldSource->tipo!=ADB_INT)&&
-					(FldSource->tipo!=ADB_INT32)&&
+					(FldSource->tipo!=ADB_UINT32)&&
 					(FldSource->tipo!=ADB_BOOL)&&
 					(FldSource->tipo!=ADB_NUME)&&
 					(FldSource->tipo!=ADB_COBN)&&
@@ -1709,7 +1712,7 @@ BOOL adb_FldImport(HDB hdbDest,HDB hdbSource,BOOL fRealloc,BOOL fCutSpace)
 					break;
 
 			case ADB_INT:
-			case ADB_INT32:
+			case ADB_UINT32:
 			case ADB_NUME:
 			case ADB_COBN:
 			case ADB_COBD:
@@ -1717,7 +1720,7 @@ BOOL adb_FldImport(HDB hdbDest,HDB hdbSource,BOOL fRealloc,BOOL fCutSpace)
 
 				// Tipi differenti
 				if ((FldSource->tipo!=ADB_INT)&&
-					(FldSource->tipo!=ADB_INT32)&&
+					(FldSource->tipo!=ADB_UINT32)&&
 					(FldSource->tipo!=ADB_BOOL)&&
 					(FldSource->tipo!=ADB_NUME)&&
 					(FldSource->tipo!=ADB_COBN)&&
@@ -1953,7 +1956,7 @@ CHAR * adb_HookTouch(INT Hdb,HREC hRec,struct ADB_HOOK Hook[])
 
 			case ADB_BOOL:
 			case ADB_INT: 
-			case ADB_INT32: 
+			case ADB_UINT32: 
 			case ADB_COBN:
 			case ADB_COBD: if (memcmp(FldPtr,pRecClone+Fld->pos,Fld->RealSize)) fTouch=TRUE;
 						   break;
@@ -2133,16 +2136,16 @@ INT adb_HookWrite(INT Hdb,struct ADB_HOOK Hook[])
 
 			case ADB_BOOL:
 			case ADB_INT : // Tipo intero
-			case ADB_INT32:
+			case ADB_UINT32:
 
-				//if (Fld->tipo==ADB_INT32) else lpInt16=(INT16 *) FldPtr;
+				//if (Fld->tipo==ADB_UINT32) else lpInt16=(INT16 *) FldPtr;
 
 				switch(tipo)
 				{
 					case O_IMARKA:
 					case O_IMARKB:
 					case O_MARK  : 
-									if (Fld->tipo==ADB_INT32)   * (UINT *) FldPtr  =obj_status(NomeObj);
+									if (Fld->tipo==ADB_UINT32)   * (UINT *) FldPtr  =obj_status(NomeObj);
 																else
 															    * (INT16 *) FldPtr =obj_status(NomeObj);
 									break;
@@ -2151,7 +2154,7 @@ INT adb_HookWrite(INT Hdb,struct ADB_HOOK Hook[])
 					case O_LISTP :
 				    case OW_LIST :
 				    case OW_LISTP:
-									if (Fld->tipo==ADB_INT32)   * (UINT *) FldPtr =obj_listget(NomeObj);
+									if (Fld->tipo==ADB_UINT32)   * (UINT *) FldPtr =obj_listget(NomeObj);
 																else
 																*(INT16 *) FldPtr =obj_listget(NomeObj);
 									break;
@@ -2249,7 +2252,7 @@ INT adb_HookWrite(INT Hdb,struct ADB_HOOK Hook[])
 							 *lpInt16=atoi(ipt_read (ipt));
 							 break;
 #ifdef _WIN32
-			 case ADB_INT32: * (UINT *) FldPtr =atoi(ipt_read (ipt));
+			 case ADB_UINT32: * (UINT *) FldPtr =atoi(ipt_read (ipt));
 							 break;
 #endif
 
@@ -2397,10 +2400,10 @@ INT adb_HookGet(INT Hdb,struct ADB_HOOK Hook[])
 				break;
 
 			case ADB_INT : // Tipo intero
-			case ADB_INT32 : // Tipo intero 32bit
+			case ADB_UINT32 : // Tipo intero 32bit
 			case ADB_BOOL: // Tipo Flag
 
-				if (Fld->tipo==ADB_INT32) fDato= * (UINT *) FldPtr;
+				if (Fld->tipo==ADB_UINT32) fDato= * (UINT *) FldPtr;
 									      else 
 										  fDato= * (INT16 *) FldPtr;
 				switch(tipo)
@@ -2495,8 +2498,8 @@ INT adb_HookGet(INT Hdb,struct ADB_HOOK Hook[])
 							ipt_write(ipt,"",*lpInt16);
 							break;
 
-			 case ADB_INT32:
-			 case ADB_AINC: lpLong=(LONG *) FldPtr;
+			 case ADB_UINT32:
+			 case ADB_AINC: lpLong=(UINT *) FldPtr;
 							ipt_write(ipt,"",*lpLong);
 							break;
 
@@ -4030,36 +4033,36 @@ INT adb_openEx(CHAR * file,CHAR * Client,INT modo,INT *lpHdb,INT iModeEmu)
 	}
 #endif
 
- //	-------------------------------------
- //		Cerca prima area adb disponibile  !
- // -------------------------------------
- 
- if (ADB_hdl==-1) win_errgrave("adb_open(): ADBase manager non inizializzato");
- if (ADB_ult>=ADB_max) ehExit("adb_open(): ADBase full[Ult:%d][Max:%d] ",ADB_ult,ADB_max);
+	//	-------------------------------------
+	//		Cerca prima area adb disponibile  !
+	// -------------------------------------
 
- for (a=0;a<=ADB_max;a++)
+	if (ADB_hdl==-1) win_errgrave("adb_open(): ADBase manager non inizializzato");
+	if (ADB_ult>=ADB_max) ehExit("adb_open(): ADBase full[Ult:%d][Max:%d] ",ADB_ult,ADB_max);
+
+	for (a=0;a<=ADB_max;a++)
 	{
 	 if (ADB_info[a].iHdlRam==-1) {Hdb=a;break;}
 	}
- if (Hdb<0) win_errgrave("adb_open(): Dbase manager inquinato");
+	if (Hdb<0) win_errgrave("adb_open(): Dbase manager inquinato");
 
- *lpHdb=-1;
+	*lpHdb=-1;
 
-  // -----------------------------------
-  // calcola la lunghezza del file.ADB !
-  // -----------------------------------
-  strcpy(ADBBuf,file); strcat(ADBBuf,".ADB");
-  if (!fileCheck(ADBBuf)) ehExit("%s non esiste",ADBBuf);
-  SizeInfo=fileSize(ADBBuf);
-  if ((SizeInfo<0)||(SizeInfo>9000)) {win_infoarg("Il record è > di 9000 %d",SizeInfo); return -1;}
+	// -----------------------------------
+	// calcola la lunghezza del file.ADB !
+	// -----------------------------------
+	strcpy(ADBBuf,file); strcat(ADBBuf,".ADB");
+	if (!fileCheck(ADBBuf)) ehExit("%s non esiste",ADBBuf);
+	SizeInfo=fileSize(ADBBuf);
+	if ((SizeInfo<0)||(SizeInfo>9000)) {win_infoarg("Il record è > di 9000 %d",SizeInfo); return -1;}
 
-  //-------------------------------------
-  // APRE IL FILE ADB PER DETERMINARE   !
-  // LA LUGHEZZA DEL RECORD E KEYBUFFER !
-  // ------------------------------------
-  pf1=fopen(ADBBuf,"rb"); if (!pf1) {rt=ON; status=-1; goto fine;}
-  fread(&AdbHead,sizeof(AdbHead),1,pf1);
-  if (strcmp(AdbHead.id,"Adb1.2 Eh3")) {rt=ON; status=-1; goto fine;}
+	//-------------------------------------
+	// APRE IL FILE ADB PER DETERMINARE   !
+	// LA LUGHEZZA DEL RECORD E KEYBUFFER !
+	// ------------------------------------
+	pf1=fopen(ADBBuf,"rb"); if (!pf1) {rt=ON; status=-1; goto fine;}
+	fread(&AdbHead,sizeof(AdbHead),1,pf1);
+	if (strcmp(AdbHead.id,"Adb1.2 Eh3")) {rt=ON; status=-1; goto fine;}
 
 	// ------------------------------------
 	//	    Struttura della memoria ADB    !
@@ -4986,7 +4989,7 @@ INT adb_crea(CHAR * file,
 		 case ADB_INT  : RecSize+=2; RecInfo[Field].size=2; break;
 
 
-		 case ADB_INT32:
+		 case ADB_UINT32:
 		 case ADB_AINC: RecSize+=4; RecInfo[Field].size=4; break;
 
 		 case ADB_FLOAT: RecSize+=4; RecInfo[Field].size=4; break;
@@ -5043,7 +5046,7 @@ INT adb_crea(CHAR * file,
 		 case ADB_BOOL : 
 		 case ADB_FLOAT: 
 		 case ADB_AINC :
-		 case ADB_INT32:
+		 case ADB_UINT32:
 						RealSize=RecInfo[a].size;
 						break;
 
@@ -5184,7 +5187,7 @@ INT adb_crea(CHAR * file,
 
 		 case ADB_BOOL :
 		 case ADB_INT  : 
-		 case ADB_INT32: keySpecs[KS].type = INTEGER_TYPE; break;
+		 case ADB_UINT32: keySpecs[KS].type = INTEGER_TYPE; break;
 
 		 case ADB_FLOAT: keySpecs[KS].type = IEEE_TYPE; break;
 		 case ADB_COBD : keySpecs[KS].type = DECIMAL_TYPE; break;
@@ -6620,7 +6623,7 @@ static CHAR *adb_HLaction(INT Hdb,CHAR *VecchioRec)
 					dCampoPadreOld=(double) *lpInt16;
 					break;
 #ifdef _WIN32
-				case ADB_INT32:
+				case ADB_UINT32:
 					dCampoPadreOld=(double) * (INT *) ptP;
 					break;
 #endif
@@ -6692,8 +6695,8 @@ static CHAR *adb_HLaction(INT Hdb,CHAR *VecchioRec)
 				dCampoPadre=(double) *lpInt16;
 				break;
 #ifdef _WIN32
-			case ADB_INT32:
-				dCampoPadre=(double) * (INT *) ptP;
+			case ADB_UINT32:
+				dCampoPadre=(double) * (UINT *) ptP;
 				break;
 #endif
 			case ADB_FLOAT:
@@ -6748,7 +6751,7 @@ static CHAR *adb_HLaction(INT Hdb,CHAR *VecchioRec)
 				case ADB_BOOL :
 				case ADB_INT  :
 #ifdef _WIN32
-				case ADB_INT32:
+				case ADB_UINT32:
 #endif
 				case ADB_FLOAT:
 				case ADB_AINC:
@@ -6875,7 +6878,7 @@ static CHAR *adb_HLaction(INT Hdb,CHAR *VecchioRec)
 				case ADB_BOOL :
 				case ADB_INT  :
 #ifdef _WIN32
-				case ADB_INT32:
+				case ADB_UINT32:
 #endif
 				case ADB_FLOAT:
 				case ADB_AINC:
@@ -6943,8 +6946,8 @@ static CHAR *adb_HLaction(INT Hdb,CHAR *VecchioRec)
 					dCampoFiglio=(double) *lpInt16;
 					break;
 #ifdef _WIN32
-				case ADB_INT32:
-					dCampoFiglio=(double) * (INT *) ptF;
+				case ADB_UINT32:
+					dCampoFiglio=(double) * (UINT *) ptF;
 					break;
 #endif
 				case ADB_FLOAT:
@@ -7006,7 +7009,7 @@ static CHAR *adb_HLaction(INT Hdb,CHAR *VecchioRec)
 						case ADB_BOOL :
 						case ADB_INT  :
 #ifdef _WIN32
-						case ADB_INT32:
+						case ADB_UINT32:
 #endif
 						case ADB_FLOAT:
 						case ADB_AINC:
@@ -7140,8 +7143,8 @@ static CHAR *adb_HLaction(INT Hdb,CHAR *VecchioRec)
 								dCampoPadre2=(double) *lpInt16;
 								break;
 #ifdef _WIN32
-							case ADB_INT32:
-								dCampoPadre2=(double) * (INT *) ptP2;
+							case ADB_UINT32:
+								dCampoPadre2=(double) * (UINT *) ptP2;
 								break;
 #endif
 							case ADB_FLOAT:
@@ -7213,8 +7216,8 @@ static CHAR *adb_HLaction(INT Hdb,CHAR *VecchioRec)
 								dCampoFiglio2=(double) *lpInt16;
 								break;
 #ifdef _WIN32
-							case ADB_INT32:
-								dCampoFiglio2=(double) * (INT *) ptF2;
+							case ADB_UINT32:
+								dCampoFiglio2=(double) * (UINT *) ptF2;
 								break;
 #endif
 							case ADB_FLOAT:
@@ -7273,7 +7276,7 @@ static CHAR *adb_HLaction(INT Hdb,CHAR *VecchioRec)
 									case ADB_BOOL :
 									case ADB_INT  :
 #ifdef _WIN32
-									case ADB_INT32:
+									case ADB_UINT32:
 #endif
 									case ADB_FLOAT:
 									case ADB_AINC:
@@ -8366,7 +8369,7 @@ FINE:
 static void adb_ODBCDoDictionary(INT Hdl)
 {
 	 SQLCHAR szNameColumn[255];
-	 SQLSMALLINT NameLenght;
+	 SQLSMALLINT NameLength;
 	 SQLSMALLINT DataType;
 	 SQLUINTEGER ColumnSize;
 	 SQLSMALLINT DecimnaDigits;
@@ -8390,7 +8393,7 @@ static void adb_ODBCDoDictionary(INT Hdl)
 	  if (SQLDescribeCol(ADB_info[Hdl].hStmt, // Handle del file
 					     (SQLSMALLINT) i, // Numero della colonna
 					     szNameColumn,sizeof(szNameColumn),
-						 &NameLenght,&DataType,
+						 &NameLength,&DataType,
 				         &ColumnSize,&DecimnaDigits,
 				         &Nullable)!=SQL_SUCCESS) break;
 	  iCount++;
@@ -8428,7 +8431,7 @@ static void adb_ODBCDoDictionary(INT Hdl)
 					    (SQLSMALLINT) (i+1), // Numero della colonna
 					    szNameColumn,
 						(SQLSMALLINT) sizeof(szNameColumn),
-						&NameLenght,
+						&NameLength,
 						&DataType,
 				        &ColumnSize,
 						&DecimnaDigits,
@@ -8969,7 +8972,7 @@ static void EmuBindMaker(HDB Hdb,BOOL fCreate)
 							iSize=32; 
 							break;
 
-						case ADB_INT32:  
+						case ADB_UINT32:  
 						case ADB_AINC:  
 							iSize=32; 
 							break;
@@ -9105,7 +9108,7 @@ void ODBCFieldToAdb(HDB Hdb, // Handle dbase di riferimento
 
 		case ADB_BOOL :
 		case ADB_INT  : 
-		case ADB_INT32: 
+		case ADB_UINT32: 
 		case ADB_FLOAT: 
 		case ADB_AINC:  
 			//adb_FldWrite(Hdb,lpEmuBind->lpAdbField->desc,NULL,atoi(lpNewValue));
@@ -9837,7 +9840,7 @@ static CHAR *EmuSQLFormat(HDB Hdb,EMUBIND *lpEmuBind,void *lpAdbValore)
 		 case ADB_INT  :  sprintf(szServ,"%d",(INT) * (INT16 *) lpAdbValore);
 						  break;
 
-		 case ADB_INT32: //return (double) * (INT *) FldPtr;
+		 case ADB_UINT32: //return (double) * (UINT *) FldPtr;
 		 case ADB_AINC:  
 						 sprintf(szServ,"%d",* (INT *) lpAdbValore);
 						 break;
@@ -10079,7 +10082,12 @@ EH_DATATYPE adb_TypeToDataType(EN_FLDTYPE enType) {
 		case ADB_COBN: enRet=_NUMBER; break;
 		case ADB_AINC: enRet=_ID; break;
 		case ADB_BLOB: enRet=_TEXT; break;
-		case ADB_INT32: enRet=_INTEGER; break;
+		case ADB_UINT32: enRet=_INTEGER; break;
+		case ADB_BINARY: enRet=_BINARY; break;
+
+		default:
+				printf("qui");
+				break;
 
 	}
 

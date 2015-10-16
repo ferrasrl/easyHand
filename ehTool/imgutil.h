@@ -78,11 +78,12 @@
 	} S_CMYK;
 
 	typedef enum {
-		IMGPT_PROPORZIONALE=0,
-		IMGPT_AL_FORMATO=1,
-		IMGPT_AL_CORTO=2,
-		IMGPT_AL_LUNGO=3,
-		IMGPT_PROP_TAGLIA=5,
+		IMGPT_PROPORZIONALE=0,	// Ricalcola un lato mancante (in sDmi viene indicato un alto solo)
+		IMGPT_AL_FORMATO=1,		// La foto viene fatta del formato indicato in sDmin
+		IMGPT_AL_CORTO=2,		// Viene calcolato il lato LUNGO (proporzionalmente) tenendo inviriato il CORTO
+		IMGPT_AL_LUNGO=3,		// Viene calcolato il lato CORTO (proporzionalmente) tenendo inviriato il LUNGO
+		IMGPT_PROP_TAGLIA=5,	// La foto viene tagliata delle dimensioni proporzionali contenute in sDim
+		IMGPT_MAX_SIDE=6,		// La foto viene rimensionata in modo da essere contenuta in una dimensione sDim (max lato)
 		IMGPT_NO=100
 	} EN_IMGPT;
 
@@ -149,21 +150,25 @@
 	void IMGTopdown(INT HdlImage);
 	void IMG_RGBSwapping(IMGHEADER *psImgHead);
 	void IMGCalcSize(IMGHEADER *ImgHead,      // Dimensioni del sorgente
-					 SIZE sDim,		   // Area disponibile
+					 SIZE * psFix,		   // Area disponibile
+					 SIZE * psMin,		   // Area disponibile
+					 SIZE * psMax,		   // Area disponibile
 					 EN_IMGPT iPhotoAdatta,  // Tipo di adattamento
 					 INT iAlignH,	   // Allineamento orizzontale
 					 INT iAlignV,	   // Allineamento verticale
 					 SIZE *sDest,		   // Dimensioni della destinazione
 					 RECT *rDest,
 					 RECT *psrSource); 	   // Posizionamento in destinazione{
-	void RectCalcSize(SIZE sSource,		// Dimensioni del sorgente
-					  SIZE sAreaDest,		// Dimensione Area destinazione desiderata
-					  EN_IMGPT iPhotoAdatta,// Tipo di adattamento
-					  INT iAlignH,	    // Allineamento richiesto orizzontale
-					  INT iAlignV,	    // Allineamento richiesto verticale
-					  SIZE *lpsDest,		// Dimensioni della destinazione
-					  RECT *lprDest,		// Posizionamento in destinazione
-					  RECT *lprSource);	    // Rettangolo da prendere nel sorgente
+	void RectCalcSize(	SIZE * pssSource,		// Dimensioni del sorgente
+						SIZE * psFix,		   // Area disponibile
+						SIZE * psMin,		   // Area disponibile
+						SIZE * psMax,		   // Area disponibile
+						EN_IMGPT iPhotoAdatta,// Tipo di adattamento
+						INT iAlignH,	    // Allineamento richiesto orizzontale
+						INT iAlignV,	    // Allineamento richiesto verticale
+						SIZE *lpsDest,		// Dimensioni della destinazione
+						RECT *lprDest,		// Posizionamento in destinazione
+						RECT *lprSource);	    // Rettangolo da prendere nel sorgente
 
 	#ifndef jmp_buf
 	#include <setjmp.h>

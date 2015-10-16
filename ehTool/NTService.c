@@ -495,7 +495,7 @@ static DWORD _serviceStart(S_NT_SERVICE *psNtService,BOOL fShow)
     return dwStatus;
 }
 
-static void getDebugPriv( void )
+static void _getDebugPriv( void )
 {
 	HANDLE hToken;
 	LUID sedebugnameValue;
@@ -520,16 +520,19 @@ static void getDebugPriv( void )
 	CloseHandle( hToken );
 }
 
+//
+// FNTKillProcess()
+//
 // Ritorna FALSE se tutto OK
 //		   TRUE processo non trovato
 
-BOOL FNTKillProcess(CHAR *lpExeName) 
+BOOL FNTKillProcess(CHAR * pszExeName) 
 { 
     HANDLE         hProcessSnap = NULL; 
     BOOL           bRet      = FALSE; 
     PROCESSENTRY32 pe32      = {0}; 
  
-	getDebugPriv(); // Setto i privilegi del process in modo da poter terminare qualunque processo
+	_getDebugPriv(); // Setto i privilegi del process in modo da poter terminare qualunque processo
 
     //  Take a snapshot of all processes in the system. 
 
@@ -537,13 +540,14 @@ BOOL FNTKillProcess(CHAR *lpExeName)
  
     //  Fill in the size of the structure before using it. 
 
-    pe32.dwSize = sizeof(PROCESSENTRY32); 
  
+	ehLogWrite("Cerco  [%s]",pszExeName);
     //  Walk the snapshot of the processes, and for each process, 
     //  display information. 
     bRet = TRUE; 
 
-    if (Process32First(hProcessSnap, &pe32)) 
+    pe32.dwSize = sizeof(PROCESSENTRY32); 
+	if (Process32First(hProcessSnap, &pe32)) 
     { 
         //DWORD         dwPriorityClass; 
         BOOL          bGotModule = FALSE; 
@@ -551,14 +555,17 @@ BOOL FNTKillProcess(CHAR *lpExeName)
  
         do 
         { 
-			
+//			if (!pe32) break;
 			//win_infoarg("[%s]",pe32.szExeFile);
-			if (!strcmp(pe32.szExeFile,lpExeName))
+//			ehLogWrite("%s:%s",pe32.szExeFile,pszExeName);
+			if (!strCaseCmp(pe32.szExeFile,pszExeName))
 			{
 				HANDLE hProcess;
 				BOOL bResult;
 
-				hProcess=OpenProcess(SYNCHRONIZE|PROCESS_TERMINATE, TRUE, pe32.th32ProcessID);
+				ehLogWrite(" > Trovato %s",pe32.szExeFile);
+//				hProcess=OpenProcess(SYNCHRONIZE|PROCESS_TERMINATE, TRUE, pe32.th32ProcessID);
+				hProcess=OpenProcess(PROCESS_ALL_ACCESS, false, pe32.th32ProcessID);
 				if (hProcess)
 				{
 					/*
@@ -568,8 +575,13 @@ BOOL FNTKillProcess(CHAR *lpExeName)
 								hProcess);
 								*/
 					bResult = TerminateProcess(hProcess,0);
+					ehLogWrite(" > Terminate %s: %x, %d",pe32.szExeFile,hProcess,bResult);
 					CloseHandle(hProcess);
 					bRet = FALSE;    // could not walk the list of processes 
+				}
+				else {
+					ehLogWrite("Errore Open Process %s",pe32.szExeFile);
+				
 				}
 					/*
 				{
@@ -588,9 +600,9 @@ BOOL FNTKillProcess(CHAR *lpExeName)
     } 
  
     // Do not forget to clean up the snapshot object. 
-
-    CloseHandle (hProcessSnap); 
-    return (bRet); 
+    if (hProcessSnap) CloseHandle(hProcessSnap); 
+	ehLogWrite("Close [%d]",bRet);
+    return (bRet);  // False = Tutto ok
 }
 
 EH_AR FNTGetProcessList(void) 
@@ -607,11 +619,11 @@ EH_AR FNTGetProcessList(void)
  
     //  Fill in the size of the structure before using it. 
 
-    pe32.dwSize = sizeof(PROCESSENTRY32); 
  
     //  Walk the snapshot of the processes, and for each process, 
     //  display information. 
 
+    pe32.dwSize = sizeof(PROCESSENTRY32); 
     if (Process32First(hProcessSnap, &pe32)) 
     { 
 //        DWORD         dwPriorityClass; 
@@ -659,6 +671,9 @@ EH_AR FNTGetProcessList(void)
     return ar; 
 } 
 
+//
+// FNTGetProcessListEx()
+//
 
 EH_AR FNTGetProcessListEx(CHAR *pProgramName) 
 { 
@@ -690,6 +705,8 @@ EH_AR FNTGetProcessListEx(CHAR *pProgramName)
         do 
         { 
 			BOOL bTake=true;
+			// ehLogWrite("%s",pe32.szExeFile);
+
 			if (!strEmpty(pProgramName))
 			{
 				bTake=false;
@@ -742,7 +759,9 @@ EH_AR FNTGetProcessListEx(CHAR *pProgramName)
  
     // Do not forget to clean up the snapshot object. 
 
-    CloseHandle (hProcessSnap); 
-	if (!ARLen(ar)) ar=ARDestroy(ar);
+    if (hProcessSnap) CloseHandle(hProcessSnap); 
+	if (ar) {
+		if (!ARLen(ar)) ar=ARDestroy(ar);
+	}
     return ar; 
 }

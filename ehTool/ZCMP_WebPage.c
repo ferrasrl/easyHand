@@ -44,17 +44,17 @@ Then I wrote this example from the ground up in C.
 
 static EH_WEBPAGE *	_WebPageSearch(HWND hwnd);
 static BYTE *		_HtmlBuilderAlloc(BYTE *lpSource);
-static void			_FormSetField(EH_WEBPAGE *psWebPage,SINT iMode,CHAR *lpFormName);
+static void			_FormSetField(EH_WEBPAGE *psWebPage,INT iMode,CHAR *lpFormName);
 LRESULT CALLBACK	_browserWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-static long			_ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,SINT iParam);
-static long			_ieNavigatePage(EH_WEBPAGE *psWebPage, CHAR * pszWebPage,SINT iParam);
+static long			_ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,INT iParam);
+static long			_ieNavigatePage(EH_WEBPAGE *psWebPage, CHAR * pszWebPage,INT iParam);
 
-static CHAR *		_JavaLikeGetValue(EH_WEBPAGE *psWebPage,SINT iMode,CHAR *lpFormName);
+static CHAR *		_JavaLikeGetValue(EH_WEBPAGE *psWebPage,INT iMode,CHAR *lpFormName);
 static BOOL			_JavaLikeSetValue(EH_WEBPAGE *psWebPage,BYTE *pszInputName,void * pszInputValue);//BSTR bsNewValue);
 
-void				PrintDocument(HWND hwnd,SINT iMode);
-static SINT			_formArrayMaker(HWND hwnd,CHAR *lpFormName);
-static void			_LWaiting(EH_WEBPAGE *psWebPage,SINT iParam);
+void				PrintDocument(HWND hwnd,INT iMode);
+static INT			_formArrayMaker(HWND hwnd,CHAR *lpFormName);
+static void			_LWaiting(EH_WEBPAGE *psWebPage,INT iParam);
 
 //	Ricerco/Alloco la collezione di interfacce
 static BOOL			_ieCreate(EH_WEBPAGE *psWebPage,BOOL bGetTag);
@@ -77,7 +77,7 @@ static IDispatch *	_getItemInterface(EH_WEBPAGE * psWebPage,CHAR *pszInputName,B
 // more meaningful code to.
 
 DWORD dwGlobalCookieWB = 0;				// Per registrare e rilasciare un gestore di eventi per il WebBrowser
-static const TCHAR	*BrowserClassName = "FerraBrowser";	// The class name of our Window to host the browser. It can be anything of your choosing.
+static const TCHAR	* BrowserClassName = "FerraBrowser";	// The class name of our Window to host the browser. It can be anything of your choosing.
 // This is used by _ieWritePage(). It can be global because we never change it.
 static const SAFEARRAYBOUND ArrayBound = {1, 0};
 
@@ -87,11 +87,11 @@ static const SAFEARRAYBOUND ArrayBound = {1, 0};
 void * ehzWebPage(EH_OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 {
 	EH_DISPEXT *DExt=ptr;
-	static BOOL bFirst=TRUE;
-	static SINT iProgress=0;
+	static BOOL $bFirst=TRUE;
+	static INT iProgress=0;
 
 	BYTE *lpAlloc;
-	EH_WEBPAGE *psWebPage;
+	EH_WEBPAGE * psWebPage;
 
 	if (!objCalled) return NULL;
 	psWebPage=objCalled->pOther;
@@ -102,7 +102,7 @@ void * ehzWebPage(EH_OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 		//
 		case WS_CREATE:
 
-			if (bFirst) {
+			if ($bFirst) {
 
 				WNDCLASSEX	wc;
 
@@ -120,7 +120,7 @@ void * ehzWebPage(EH_OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 				wc.hbrBackground = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
 
 				RegisterClassEx(&wc);
-				bFirst=FALSE;
+				$bFirst=FALSE;
 
 			}
 
@@ -140,7 +140,7 @@ void * ehzWebPage(EH_OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 											psWebPage);
 			//SetWindowLong(psWebPage->hWnd,GWL_USERDATA,(LONG) psWebPage);
 			objCalled->hWnd=psWebPage->hWnd;
-			_ieCreate(psWebPage,FALSE);//&objCalled->sIe, HWND hwnd, BOOL bGetTag
+			_ieCreate(psWebPage,FALSE);
 			iProgress++;
 			break;
 
@@ -478,13 +478,13 @@ HRESULT STDMETHODCALLTYPE WebEvents_Invoke(DWebBrowserEvents2 FAR* This,
   // The variant member that we use for each argument is determined by the argument
   // type of the event function. eg. If an event has the argument long x we would
   // use the lVal member of the VARIANT struct.
-//	SINT iWPIndex;
+//	INT iWPIndex;
 	EH_WEBPAGE *psWebPage;
   _DWebBrowserEvents2Ex *lpD=(_DWebBrowserEvents2Ex *) This;
   CHAR szServ[1024],*psz;
 
   psWebPage=_WebPageSearch(lpD->hWnd);
-
+  // printf("#%s:%d" CRLF,psWebPage->lpObj->nome,dispIdMember);
   // Here is our message map, where we map dispids to function calls.
   switch (dispIdMember) 
   {
@@ -1020,7 +1020,7 @@ HRESULT STDMETHODCALLTYPE UI_ShowContextMenu(IDocHostUIHandler FAR* This, DWORD 
 	// } IDocHostUIHandlerEx;
 	//
 	// Of course, we'd need a unique IDocHostUIHandlerEx object for each window, so
-	// EmbedBrowserObjectBuilder() would have to allocate one of those too. And that's
+	// _EmbedBrowserObjectBuilder() would have to allocate one of those too. And that's
 	// what we'd pass to our browser object (and it would in turn pass it to us
 	// here, instead of 'This' being a IDocHostUIHandler *).
 
@@ -1343,7 +1343,7 @@ HRESULT STDMETHODCALLTYPE Storage_Stat(IStorage FAR* This, STATSTG * pstatstg, D
  * The browser object calls this when it wants a pointer to one of our
  * IOleClientSite, IDocHostUIHandler, or IOleInPlaceSite structures. They
  * are all accessible via the _IOleClientSiteEx struct we allocated in
- * EmbedBrowserObjectBuilder() and passed to DoVerb() and OleCreate().
+ * _EmbedBrowserObjectBuilder() and passed to DoVerb() and OleCreate().
  *
  * This =		A pointer to whatever _IOleClientSiteEx struct we passed to
  *				OleCreate() or DoVerb().
@@ -1361,7 +1361,7 @@ HRESULT STDMETHODCALLTYPE Site_QueryInterface(IOleClientSite FAR* This, REFIID r
 {
 	// It just so happens that the first arg passed to us is our _IOleClientSiteEx struct we allocated
 	// and passed to DoVerb() and OleCreate(). Nevermind that 'This' is declared is an IOleClientSite *.
-	// Remember that in EmbedBrowserObjectBuilder(), we allocated our own _IOleClientSiteEx struct, and lied
+	// Remember that in _EmbedBrowserObjectBuilder(), we allocated our own _IOleClientSiteEx struct, and lied
 	// to OleCreate() and DoVerb() -- passing our _IOleClientSiteEx struct and saying it was an
 	// IOleClientSite struct. It's ok. An _IOleClientSiteEx starts with an embedded IOleClientSite, so
 	// the browser didn't mind. So that's what the browser object is passing us now. The browser doesn't
@@ -1514,7 +1514,7 @@ HRESULT STDMETHODCALLTYPE InPlace_GetWindow(IOleInPlaceSite FAR* This, HWND FAR*
 	// Return the HWND of the window that contains this browser object. We stored that
 	// HWND in our _IOleInPlaceSiteEx struct. Nevermind that the function declaration for
 	// Site_GetWindow says that 'This' is an IOleInPlaceSite *. Remember that in
-	// EmbedBrowserObjectBuilder(), we allocated our own _IOleInPlaceSiteEx struct which
+	// _EmbedBrowserObjectBuilder(), we allocated our own _IOleInPlaceSiteEx struct which
 	// contained an embedded IOleInPlaceSite struct within it. And when the browser
 	// called Site_QueryInterface() to get a pointer to our IOleInPlaceSite object, we
 	// returned a pointer to our _IOleClientSiteEx. The browser doesn't know this. But
@@ -1552,7 +1552,7 @@ HRESULT STDMETHODCALLTYPE InPlace_GetWindowContext(IOleInPlaceSite FAR* This, LP
 	// Give the browser the pointer to our IOleInPlaceFrame struct. We stored that pointer
 	// in our _IOleInPlaceSiteEx struct. Nevermind that the function declaration for
 	// Site_GetWindowContext says that 'This' is an IOleInPlaceSite *. Remember that in
-	// EmbedBrowserObjectBuilder(), we allocated our own _IOleInPlaceSiteEx struct which
+	// _EmbedBrowserObjectBuilder(), we allocated our own _IOleInPlaceSiteEx struct which
 	// contained an embedded IOleInPlaceSite struct within it. And when the browser
 	// called Site_QueryInterface() to get a pointer to our IOleInPlaceSite object, we
 	// returned a pointer to our _IOleClientSiteEx. The browser doesn't know this. But
@@ -1657,7 +1657,7 @@ HRESULT STDMETHODCALLTYPE Frame_GetWindow(IOleInPlaceFrame FAR* This, HWND FAR* 
 	// Give the browser the HWND to our window that contains the browser object. We
 	// stored that HWND in our IOleInPlaceFrame struct. Nevermind that the function
 	// declaration for Frame_GetWindow says that 'This' is an IOleInPlaceFrame *. Remember
-	// that in EmbedBrowserObjectBuilder(), we allocated our own IOleInPlaceFrameEx struct which
+	// that in _EmbedBrowserObjectBuilder(), we allocated our own IOleInPlaceFrameEx struct which
 	// contained an embedded IOleInPlaceFrame struct within it. And then we lied when
 	// Site_GetWindowContext() returned that IOleInPlaceFrameEx. So that's what the
 	// browser is passing us. It doesn't know that. But we do. So we can recast it and
@@ -1735,7 +1735,7 @@ HRESULT STDMETHODCALLTYPE Frame_TranslateAccelerator(IOleInPlaceFrame FAR* This,
 //
 // NOTE: The pointer to the browser object must have been stored in the
 // window's USERDATA field. In other words, don't call UnEmbedBrowserObject().
-// with a HWND that wasn't successfully passed to EmbedBrowserObjectBuilder().
+// with a HWND that wasn't successfully passed to _EmbedBrowserObjectBuilder().
 void UnEmbedBrowserObject(HWND hwnd)
 {
 	//IOleObject	**browserHandle;
@@ -1759,13 +1759,13 @@ void UnEmbedBrowserObject(HWND hwnd)
 	}
 
 	// You must have called this for a window that wasn't successfully passed to 
-	// EmbedBrowserObjectBuilder(). Bad boy!
+	// _EmbedBrowserObjectBuilder(). Bad boy!
 	_ASSERT(0);
 }
 
 
 
-/***************************** EmbedBrowserObjectBuilder() **************************
+/***************************** _EmbedBrowserObjectBuilder() **************************
  * Puts the browser object inside our host window, and save a pointer to this
  * window's browser object in the window's GWL_USERDATA field.
  *
@@ -1785,7 +1785,7 @@ void UnEmbedBrowserObject(HWND hwnd)
  * the browser can call our functions in our struct's VTables.
  */
 
-long EmbedBrowserObjectBuilder(HWND hwnd,EH_WEBPAGE	*psWebPage)
+long _EmbedBrowserObjectBuilder(HWND hwnd,EH_WEBPAGE * psWebPage)
 {
 	IOleObject			*browserObject;
 	IWebBrowser2		*webBrowser2;
@@ -1875,7 +1875,7 @@ long EmbedBrowserObjectBuilder(HWND hwnd,EH_WEBPAGE	*psWebPage)
 		// Ok, we now have the pointer to the browser object in 'browserObject'. Let's save this in the
 		// memory block we allocated above, and then save the pointer to that whole thing in our window's
 		// USERDATA field. That way, if we need multiple windows each hosting its own browser object, we can
-		// call EmbedBrowserObjectBuilder() for each one, and easily associate the appropriate browser object with
+		// call _EmbedBrowserObjectBuilder() for each one, and easily associate the appropriate browser object with
 		// its matching window and its own objects containing per-window data.
 		*((IOleObject **) ptr) = browserObject;
 		psWebPage->pBrowserResource=ptr;
@@ -1968,9 +1968,9 @@ long EmbedBrowserObjectBuilder(HWND hwnd,EH_WEBPAGE	*psWebPage)
  * width =			Width.
  * height =			Height.
  *
- * NOTE: EmbedBrowserObjectBuilder() must have been successfully called once with the
+ * NOTE: _EmbedBrowserObjectBuilder() must have been successfully called once with the
  * specified window, prior to calling this function. You need call
- * EmbedBrowserObjectBuilder() once only, and then you can make multiple calls to
+ * _EmbedBrowserObjectBuilder() once only, and then you can make multiple calls to
  * this function to resize the browser object.
  */
 
@@ -2005,7 +2005,7 @@ void ResizeBrowser(HWND hwnd, DWORD width, DWORD height)
 }
 
 
-void PrintDocument(HWND hwnd,SINT iMode)
+void PrintDocument(HWND hwnd,INT iMode)
 {
 	//IOleObject		*browserObject;
 	IWebBrowser2	*webBrowser2;
@@ -2177,9 +2177,9 @@ void PrintDocument(HWND hwnd,SINT iMode)
  *				4 = Refresh the page.
  *				5 = Stop the currently loading page.
  *
- * NOTE: EmbedBrowserObjectBuilder() must have been successfully called once with the
+ * NOTE: _EmbedBrowserObjectBuilder() must have been successfully called once with the
  * specified window, prior to calling this function. You need call
- * EmbedBrowserObjectBuilder() once only, and then you can make multiple calls to
+ * _EmbedBrowserObjectBuilder() once only, and then you can make multiple calls to
  * this function to display numerous pages in the specified window.
  */
 
@@ -2255,21 +2255,21 @@ void DoPageAction(HWND hwnd, DWORD action)
 //
 // RETURNS: 0 if success, or non-zero if an error.
 //
-// NOTE: EmbedBrowserObjectBuilder() must have been successfully called once with the
+// NOTE: _EmbedBrowserObjectBuilder() must have been successfully called once with the
 // specified window, prior to calling this function. You need call
-// EmbedBrowserObjectBuilder() once only, and then you can make multiple calls to
+// _EmbedBrowserObjectBuilder() once only, and then you can make multiple calls to
 // this function to display numerous pages in the specified window.
 
 //
 // _ieWritePage()
 //
-long _ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,SINT iParam)
+long _ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,INT iParam)
 {	
 	SAFEARRAY		*sfArray;
 	
 	VARIANT			*pVar;
 	BSTR			bstr=NULL;
-	SINT iLevelError;
+	INT iLevelError;
 	_IEI *			psIe=&psWebPage->sIe;
 
 	if (!psWebPage) return (-1);
@@ -2357,16 +2357,16 @@ long _ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,SINT iParam)
 //
 // RETURNS: 0 if success, or non-zero if an error.
 //
-// NOTE: EmbedBrowserObjectBuilder() must have been successfully called once with the
+// NOTE: _EmbedBrowserObjectBuilder() must have been successfully called once with the
 // specified window, prior to calling this function. You need call
-// EmbedBrowserObjectBuilder() once only, and then you can make multiple calls to
+// _EmbedBrowserObjectBuilder() once only, and then you can make multiple calls to
 // this function to display numerous pages in the specified window.
 //
 
 //
 // _ieWritePage()
 //
-long _ieNavigatePage(EH_WEBPAGE *psWebPage, CHAR * pszWebPage,SINT iParam)
+long _ieNavigatePage(EH_WEBPAGE *psWebPage, CHAR * pszWebPage,INT iParam)
 {
 	VARIANT			myURL;
 	WCHAR * pwcUrl;
@@ -2415,9 +2415,9 @@ long _ieNavigatePage(EH_WEBPAGE *psWebPage, CHAR * pszWebPage,SINT iParam)
 	return(-5);
 }
 
-static void _LWaiting(EH_WEBPAGE *psWebPage,SINT iParam)
+static void _LWaiting(EH_WEBPAGE *psWebPage,INT iParam)
 {
-	SINT a=0;
+	INT a=0;
 	if (iParam&WP_WAITING)
 	{
 	  while (psWebPage->iStatusLoading&2) 
@@ -2627,7 +2627,7 @@ DWORD ConnectWebEvents(HWND hwnd)
 	return dwAdviseCookie;
 }
 
-
+/*
 void EventBuildConnector(HWND hwnd)
 {
 	if ( dwGlobalCookieWB==0 )
@@ -2650,7 +2650,7 @@ void EventBuildConnector(HWND hwnd)
 		//MessageBox( hwnd, "Gestore eventi WB disattivato", "Eventi WB", 0);
 	}		
 }
-
+*/
 
 //
 // _browserWindowProc()
@@ -2665,10 +2665,11 @@ LRESULT CALLBACK _browserWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
 			// Embed the browser object into our host window. We need do this only
 			// once. Note that the browser object will start calling some of our
 			// IOleInPlaceFrame and IOleClientSite functions as soon as we start
-			// calling browser object functions in EmbedBrowserObjectBuilder().
+			// calling browser object functions in _EmbedBrowserObjectBuilder().
 			pCreate=(LPCREATESTRUCT) lParam;
-			if (EmbedBrowserObjectBuilder(hwnd,(void *) pCreate->lpCreateParams)) return(-1); // Creo l'oggetto
-			EventBuildConnector( hwnd ); // Aggancio il gestore degli eventi
+			if (_EmbedBrowserObjectBuilder(hwnd,(void *) pCreate->lpCreateParams)) return(-1); // Creo l'oggetto
+			//EventBuildConnector( hwnd ); // Aggancio il gestore degli eventi
+			ConnectWebEvents( hwnd );
 
 			// Another window created with an embedded browser object
 			//++WindowCount;
@@ -2684,6 +2685,7 @@ LRESULT CALLBACK _browserWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
 
 			// Detach the browser object from this window, and free resources.
 			UnEmbedBrowserObject(hwnd);
+			DestroyWebEvents( hwnd, 1);
 			// One less window
 			//--WindowCount;
 
@@ -2751,10 +2753,10 @@ static IDispatch * _getItemInterface(EH_WEBPAGE * psWebPage,CHAR *pszInputName,B
 //
 // _JavaLikeGetValue()
 //
-static CHAR * _JavaLikeGetValue(EH_WEBPAGE *psWebPage,SINT iMode,CHAR *pszFormInputName)
+static CHAR * _JavaLikeGetValue(EH_WEBPAGE *psWebPage,INT iMode,CHAR *pszFormInputName)
 {
 	HRESULT hr;
-	SINT	hdlForm=-1;
+	INT	hdlForm=-1;
 	CHAR *	pszInputName;
 	CHAR *	pszReturn=NULL;
 	BOOL fFound=FALSE;
@@ -2931,13 +2933,13 @@ static BOOL	_JavaLikeSetValue(EH_WEBPAGE * psWebPage,BYTE * pszInputName,void * 
 //
 // _formArrayMaker()
 //
-static SINT _formArrayMaker(HWND hwnd,CHAR *lpFormName)
+static INT _formArrayMaker(HWND hwnd,CHAR *lpFormName)
 {
 	HRESULT hr;
-	SINT hdlForm=-1;
+	INT hdlForm=-1;
 	S_ARMAKER sArMaker;
 	EH_WEBPAGE *psWebPage=_WebPageSearch(hwnd);
-	SINT i;
+	INT i;
 
 	if (!_ieCreate(psWebPage,TRUE))
 	{
@@ -3051,7 +3053,7 @@ static BYTE * _HtmlBuilderAlloc(BYTE *lpSource)
 //
 // WPCallJScript()
 //
-BOOL WPCallJScript(CHAR *lpObjName,CHAR *lpFunction,CHAR *lpResult,SINT iResultBufferSize,SINT iArgs,...) {
+BOOL WPCallJScript(CHAR *lpObjName,CHAR *lpFunction,CHAR *lpResult,INT iResultBufferSize,INT iArgs,...) {
 
 	//	_IEI sIe;
 	HRESULT hr;
@@ -3060,7 +3062,7 @@ BOOL WPCallJScript(CHAR *lpObjName,CHAR *lpFunction,CHAR *lpResult,SINT iResultB
 	EXCEPINFO excepInfo;
 	UINT nArgErr;
 	va_list Arg;
-	SINT i;
+	INT i;
 	EH_OBJ *psObj;
 	EH_WEBPAGE *psWebPage;
 
@@ -3189,7 +3191,7 @@ BOOL WPSetVar(CHAR *pObjName,CHAR *pFormInput,CHAR *pArgs,...)
 //
 // _FormSetField()
 //
-static void _FormSetField(EH_WEBPAGE *psWebPage,SINT iMode,CHAR *lpFormName) {
+static void _FormSetField(EH_WEBPAGE *psWebPage,INT iMode,CHAR *lpFormName) {
 
 	CHAR *	pszInputName=NULL;
 	CHAR *	pszInputValue=NULL;
@@ -3237,7 +3239,7 @@ static EH_WEBPAGE * _WebPageSearch(HWND hWnd)
 //
 // WPObjectReady()
 //
-BOOL WPObjectReady(CHAR *lpObjName,CHAR *lpFunction,SINT iTimeOutSec)
+BOOL WPObjectReady(CHAR *lpObjName,CHAR *lpFunction,INT iTimeOutSec)
 {
 	HRESULT hr;
 	DISPID dispid = 0;

@@ -100,7 +100,7 @@ BOOL Isapi_FilePutOut(EXTENSION_CONTROL_BLOCK *pECB,SINT iStatus,CHAR *lpStatus,
 		switch (iMode)
 		{
 		 case 1: // HTML Zippato
-			Isapi_SendHeaderToClient(pECB,iStatus,lpStatus,"Content-Type: text/html" CRLF "Content-Encoding: gzip" CRLF "Content-Lenght: %d" CRLF CRLF,dwSize);
+			Isapi_SendHeaderToClient(pECB,iStatus,lpStatus,"Content-Type: text/html" CRLF "Content-Encoding: gzip" CRLF "Content-Length: %d" CRLF CRLF,dwSize);
 			break;
 		 
 		 default:
@@ -108,19 +108,19 @@ BOOL Isapi_FilePutOut(EXTENSION_CONTROL_BLOCK *pECB,SINT iStatus,CHAR *lpStatus,
 			//Isapi_SendHeaderToClient(pECB,iStatus,lpStatus,"Content-Type: text/html" "\n\n"); // "Connection:Keep-Alive"
 			 Isapi_SendHeaderToClient(pECB,iStatus,lpStatus,
 									  "Content-Type: text/html" CRLF 
-									  "Content-Lenght: %d" CRLF CRLF
+									  "Content-Length: %d" CRLF CRLF
 						//			  "Connection:Keep-Alive\n"
 									  ,dwSize);
 			break;
 
 		 case 3: // Jpg
-			Isapi_SendHeaderToClient(pECB,iStatus,lpStatus,"Content-Type: image/jpeg" CRLF "Content-Lenght: %d" CRLF CRLF ,dwSize);
+			Isapi_SendHeaderToClient(pECB,iStatus,lpStatus,"Content-Type: image/jpeg" CRLF "Content-Length: %d" CRLF CRLF ,dwSize);
 			break;
 
 		 case 4: // Html
 			 Isapi_SendHeaderToClient(pECB,iStatus,lpStatus,
 									  "Content-Type: text/html" CRLF 
-									  "Content-Lenght: %d" CRLF CRLF 
+									  "Content-Length: %d" CRLF CRLF 
 									  ,dwSize);
 			break;
 		}

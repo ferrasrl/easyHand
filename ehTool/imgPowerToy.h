@@ -44,7 +44,7 @@ SINT IMGFactCalcH(IMGHEADER *ImgHead,SIZE *lpsDest,SINT *lpiPerc);
 SINT IMGAutoLevel(SINT hdlImageNew);
 SINT ColorConvert(CHAR *lpColore);
 
-BOOL JPGReadSize(CHAR *imageFileName,SINT *HdlImage,BOOL *lpfStop,SINT *lpiErr,SINT iModeError,SIZE sDest);
+BOOL JPGReadSize(CHAR *imageFileName,SINT *HdlImage,BOOL *lpfStop,SINT *lpiErr,SINT iModeError,SIZE * psDest);
 
 #ifdef __cplusplus
 }

@@ -25,6 +25,7 @@ typedef struct {
 typedef struct {
 
 	CHAR		szName[50]; // nome del campo
+	CHAR		szTypeText[300]; // nome del campo
 	EN_FLDTYPE	enFldType;	// ALFA,NOTE
 	INT			iSize; // Grandezza in byte
 	INT			iDecimal; // Numero decimali 
@@ -91,7 +92,7 @@ BOOL		mysTableSync(S_MYSQL_SECTION * psecSource,CHAR * pszTableSource,
 					 INT		iBlockRecord,
 					 BOOL		bShowProgress,
 					 BOOL		bOperatorAsk); 
-BOOL		mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWORD * pdwUpdate);
+BOOL		mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWORD * pdwUpdate,DWORD * pdwErrors);
 
 void	 mysSchemaSync(	CHAR *	pszSchemaSource,
 						CHAR *	pszSchemaTarget,

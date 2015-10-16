@@ -120,7 +120,6 @@ INT			mys_sum(DYN_SECTION_FUNC CHAR *lpField,CHAR *Mess,...); // News 8/2007
 int			mys_query(DYN_SECTION_FUNC CHAR *lpQuery); // Effettuo un query
 int			mys_queryarg(DYN_SECTION_FUNC CHAR *Mess,...);
 int			mys_queryargBig(DYN_SECTION_FUNC DWORD dwSizeMemory,CHAR *Mess,...);
-EH_MYSQL_RS mys_queryrow(DYN_SECTION_FUNC CHAR *Mess,...); // Metodo rapido ad una riga
 
 
 //
@@ -138,7 +137,16 @@ EH_MYSQL_RS mys_queryrow(DYN_SECTION_FUNC CHAR *Mess,...); // Metodo rapido ad u
 	#else
 		#define	mys_store_result(a) mys_store_result_dbg(a,__FILE__,__LINE__)
 	#endif
+
+	EH_MYSQL_RS mys_queryrow_dbg(DYN_SECTION_FUNC CHAR * pszProg,INT iLine, CHAR * pszMess, ...); // Richiesta del ResultSet
+	#ifndef _MYSQL_MT
+		#define	mys_queryrow(...) mys_queryrow_dbg(__FILE__,__LINE__, __VA_ARGS__)
+	#else
+		#define	mys_queryrow(a,...) mys_queryrow_dbg(a,__FILE__,__LINE__, __VA_ARGS__)
+	#endif
+
 #else
+	EH_MYSQL_RS mys_queryrow(DYN_SECTION_FUNC CHAR *Mess,...); // Metodo rapido ad una riga
 	EH_MYSQL_RS mys_store_result(DYN_SECTION_FUN); // Richiesta del ResultSet
 #endif
 
@@ -146,12 +154,13 @@ BOOL		mys_fetch_row(EH_MYSQL_RS psRS); // Loop sulle righe
 void *		mys_free_result(EH_MYSQL_RS psRS); // Libero le risorse del result
 
 int			mys_fldfind(EH_MYSQL_RS psRS,CHAR * lpField,BOOL bNoError);
-CHAR *		mys_fldptrEx(EH_MYSQL_RS pRes,CHAR * lpField,CHAR * pDefault);
+CHAR *		mys_fldptrEx(EH_MYSQL_RS pRes,CHAR * lpField,CHAR * pDefault,BOOL bNoError);
 SIZE_T		mys_fldlen(EH_MYSQL_RS pRes,CHAR * lpField);
 DWORD		mys_lastid(DYN_SECTION_FUN);
-#define		mys_fldptr(pRes,fieldName) mys_fldptrEx(pRes,fieldName,NULL)
-#define		mys_fldint(pRes,fieldName) atoi(mys_fldptrEx(pRes,fieldName,"0"))
-#define		mys_fldnum(pRes,fieldName) atof(mys_fldptrEx(pRes,fieldName,"0"))
+DWORD		mys_affectedRow(DYN_SECTION_FUN);
+#define		mys_fldptr(pRes,fieldName) mys_fldptrEx(pRes,fieldName,NULL,false)
+#define		mys_fldint(pRes,fieldName) atoi(mys_fldptrEx(pRes,fieldName,"0",false))
+#define		mys_fldnum(pRes,fieldName) atof(mys_fldptrEx(pRes,fieldName,"0",false))
 
 
 //char   *mys_fptr(DYN_SECTION_FUNC CHAR *lpField);

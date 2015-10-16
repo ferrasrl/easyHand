@@ -9,6 +9,7 @@
 
 #include "/easyhand/inc/easyhand.h"
 #include "/easyhand/ehtool/ehpsc.h"
+#define EHPC_MAX_LINE 1500
 
 static SINT BinScan(CHAR *Memo,CHAR *FindText,SINT LenFind,SINT Start,WORD Len)
 {
@@ -433,7 +434,7 @@ SINT EHPSClient(SINT cmd,CHAR *Find,CHAR *str)
 							 else
 							 MaxLen=PosF-Pos+3;
 
-						if (MaxLen>300)
+						if (MaxLen>EHPC_MAX_LINE)
 						{CHAR Serv[200];
 						 //SINT y;
 						 sprintf(Serv,"DEL:Control [%-15.15s..] Len[%d] PosF=%d UPF=%d",
@@ -555,7 +556,7 @@ SINT EHPSClient(SINT cmd,CHAR *Find,CHAR *str)
 					//MaxLen=PosF-Pos+3;
 					//printf("FindText [%s] MaxLen [%d]\n",FindText,MaxLen); getch();
 
-					if (MaxLen>300)
+					if (MaxLen>EHPC_MAX_LINE)
 						{CHAR Serv[200];
 						 sprintf(Serv,"Controllare campo [%s] Len[%d]",FindText,MaxLen);
 						 win_info(Serv);

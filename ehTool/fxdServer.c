@@ -21,8 +21,8 @@ static BOOL LFHDAdbImport(DRVMEMOINFO *dmiFxd,SINT idParent,CHAR *lpFileName);
 FHD_PROPERTY sFhdProperty;
 
 #define FHDMAXRECORD 10000
-CHAR * arFhdTypeList[]={"ALFA","NUME","DATA","INT16","FLOAT","FLAG","COB-D","COB-N","AUTOINC","VARCHAR","UINT32","GEOMETRY","POINT","BINARY","TIMESTAMP",NULL}; // arFhdTypeList
-CHAR * FhdTypeListXml[]={"VARCHAR","T_NUMBER","T_DATE","INT16","FLOAT","BOOL","COB-D","COB-N","AUTOINC","BLOB","UINT32","GEOMETRY","POINT","BINARY","TIMESTAMP",NULL};
+CHAR * arFhdTypeList[]={"ALFA","NUME","DATA","INT16","FLOAT","FLAG","COB-D","COB-N","AUTOINC","VARCHAR","UINT32","GEOMETRY","POINT","BINARY","TIMESTAMP","[comment]",NULL}; // arFhdTypeList
+CHAR * arFhdTypeListXml[]={"VARCHAR","T_NUMBER","T_DATE","INT16","FLOAT","BOOL","COB-D","COB-N","AUTOINC","BLOB","UINT32","GEOMETRY","POINT","BINARY","TIMESTAMP","[comment]",NULL};
 static CHAR *FHDEncoding(BYTE *lp);
 static CHAR *FHDDecoding(BYTE *lp);
 
@@ -1027,7 +1027,7 @@ void FHD_DDFMaker(void)
 
 						case ADB_INT:
 						case ADB_BOOL:
-						case ADB_INT32:
+						case ADB_UINT32:
 								ddfField.bDataTypeCode=UNSIGNED_BINARY_TYPE; // 14 Intero a 16bit
 								break;
 
@@ -1505,13 +1505,14 @@ void FHD_DDFReport(CHAR *lpDbPath)
 
 #endif
 
-SINT FHD_EnumType(CHAR *lpType)
+INT FHD_EnumType(CHAR *lpType)
 {
-	SINT a;
+	INT a;
 	for (a=0;;a++)
 	{
 		if (arFhdTypeList[a]==NULL) return -1;
-		if (!strcmp(lpType,arFhdTypeList[a])) return a;
+		if (!strcmp(lpType,arFhdTypeList[a])) 
+			return a;
 	}
 	//win_infoarg("iEnumType ? : [%s]",lpType);
 	//return -1;
@@ -2066,7 +2067,7 @@ static void FXD_SaveFolder(FILE *pf1,_DMI *pdmi,SINT idxFolder)
 					//FHD_FieldDecode(sFxd.szOldCode,&sFFI); // Leggo
 					//FHD_FieldEncode(sFxd.szOldCode,&sFFI); // Rifaccio
 					fprintf(pf1,"%s\t<field name=\"%s\">" CRLF,szTabs2,sFxd.szName);
-					fprintf(pf1,"%s\t\t<type text=\"%s\">%d</type>" CRLF,szTabs2,FhdTypeListXml[sFxd.psFieldInfo->iType],sFxd.psFieldInfo->iType);
+					fprintf(pf1,"%s\t\t<type text=\"%s\">%d</type>" CRLF,szTabs2,arFhdTypeListXml[sFxd.psFieldInfo->iType],sFxd.psFieldInfo->iType);
 					if (sFxd.psFieldInfo->iType!=9) fprintf(pf1,"%s\t\t<size>%d</size>" CRLF,szTabs2,sFxd.psFieldInfo->iSize);
 					if (sFxd.psFieldInfo->iDecimal>0) fprintf(pf1,"%s\t\t<decimal>%d</decimal>" CRLF,szTabs2,sFxd.psFieldInfo->iDecimal);
 					if (sFxd.psFieldInfo->bCaseInsensible) fprintf(pf1,"%s\t\t<case>%d</case>" CRLF,szTabs2,sFxd.psFieldInfo->bCaseInsensible);

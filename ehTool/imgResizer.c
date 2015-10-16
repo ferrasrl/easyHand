@@ -46,11 +46,11 @@ static CHAR *LNoSpaceCue(CHAR *lp)
 
 BOOL imgResizer(CHAR *	lpFile, 
 				CHAR *	lpAdd, 
-				INT	iX,INT iY,
-				INT	iQuality,
+				INT		iX,INT iY,
+				INT		iQuality,
 				INT		iOrientation,
 				BOOL	fMakeEver,
-				INT	iResampling)
+				INT		iResampling)
 {
 	CHAR szNewFile[255];
 	CHAR szExt[10];
@@ -104,18 +104,21 @@ BOOL imgResizer(CHAR *	lpFile,
 //
 // imgResizerEx()
 //
-BOOL imgResizerEx(CHAR *	lpFileSource,		// Nome del file sorgente
-				  CHAR *	lpFileDest,			// Stringa da aggiungere al nome del file
-				  SIZE		sDim,				// Dimensioni della foto finale
+BOOL imgResizerEx(UTF8 *	pszFileSource,		// Nome del file sorgente
+				  UTF8 *	pszFileDest,			// Stringa da aggiungere al nome del file
+				  SIZE *	psDimFix,			// Dimensioni della foto finale
+				  SIZE *	psMin,			// Dimensioni massime della foto finale (new 2015)
+				  SIZE *	psMax,			// Dimensioni massime della foto finale (new 2015)
 				  INT		iQuality,			// 10>100 Qualità del JPG
 				  double	dPhotoPerc,			// Percentuale dell'immagine da occupare 25= 1/4
 				  BOOL		fMakeEver,			// T/F: Costruisce sempre
 				  INT		iResampling,		// Tipo di ricampionamento TRS_LANCZOS=10
-				  EN_IMGPT	iPhotoAdatta,		// Tipo di adattamento alla foto
-												// 0= Proporzionale
-												// 1= Best in fit (Adatta al formato)
-												// 2= adatta al corto
-												// 3= adatta al lungo
+				  EN_IMGPT	enPhotoAdatta,		// Tipo di adattamento alla foto (vedi EN_IMGPT)
+												// 0 = Proporzionale
+												// 1 = Best in fit (Adatta al formato)
+												// 2 = adatta al corto
+												// 3 = adatta al lungo
+												// 5 = Taglia
 
 				  INT		cBackColor,			// Colore di background (per riempire gli spazi vuoti)
 				  INT		iAlignH,			// Allineamento foto orizzontale 0=Centrale, 1=Left, 2=Right
@@ -128,6 +131,7 @@ BOOL imgResizerEx(CHAR *	lpFileSource,		// Nome del file sorgente
 
 				  CHAR *	lpLogoFile,			// Logo del file da fondere all'immagine (può non esserci)
 				  double	dLogoPerc,			// Percentuale dell'immagine da occupare 25= 1/4
+				  SIZE *	psLogoFix,			// Dimensioni fise del logo (non proporzionali alla foto) (new 2015)
 				  INT		iLogoAlignH,		// Allineamento foto orizzontale 0=Centrale, 1=Left, 2=Right
 				  INT		iLogoAlignV,		// Allineamento foto verticale 0=Centrale, 1=Top, 2=Down
 				  INT		iLogoOffsetX,		// Correzione su allineamento Orizzontale
@@ -139,20 +143,23 @@ BOOL imgResizerEx(CHAR *	lpFileSource,		// Nome del file sorgente
 {
 	IMG_RESIZE sImgResize;
 	_(sImgResize);
-	sImgResize.pszFileSource=lpFileSource;
-	sImgResize.pszFileDest=lpFileDest;
-	memcpy(&sImgResize.sDim,&sDim,sizeof(SIZE));
+	sImgResize.pszFileSource=pszFileSource;
+	sImgResize.pszFileDest=pszFileDest;
+	memcpy(&sImgResize.sFix,psDimFix,sizeof(SIZE));
+	sImgResize.psMin=psMin;
+	sImgResize.psMax=psMax;
+//	memcpy(&sImgResize.sMax,&sDimMax,sizeof(SIZE));
 	sImgResize.iQuality=iQuality;
 	sImgResize.fMakeEver=fMakeEver;
 	sImgResize.iResampling=iResampling;
 	sImgResize.iOrientation=iOrientation;
-	sImgResize.iPhotoAdatta=iPhotoAdatta;
+	sImgResize.enPhotoAdatta=enPhotoAdatta;
 	sImgResize.cBackColor=cBackColor;
 	sImgResize.bAutoLevel=fAutoLevel;
 	sImgResize.lpText=lpText;
 	sImgResize.bQuickLoading=true;
 
-	sImgResize.sPhoto.dPercSize=dPhotoPerc;
+	sImgResize.sPhoto.dPerc=dPhotoPerc;
 	sImgResize.sPhoto.iAlignHor=iAlignH;
 	sImgResize.sPhoto.iAlignVer=iAlignV;
 	sImgResize.sPhoto.iOffsetX=iPhotoOffsetX;
@@ -168,7 +175,8 @@ BOOL imgResizerEx(CHAR *	lpFileSource,		// Nome del file sorgente
 		sImgResize.sLogo.iOffsetX=iLogoOffsetX;
 		sImgResize.sLogo.iOffsetY=iLogoOffsetY;
 		sImgResize.sLogo.iAlpha=iLogoAlpha;
-		sImgResize.sLogo.dPercSize=dLogoPerc;
+		sImgResize.sLogo.dPerc=dLogoPerc;
+		sImgResize.sLogo.psSizeFix=psLogoFix;
 	}
 	return imgResize(&sImgResize);
 }
@@ -178,24 +186,26 @@ BOOL imgResizerEx(CHAR *	lpFileSource,		// Nome del file sorgente
 //
 // imgResize(()
 //
-BOOL imgResize(IMG_RESIZE *psImgResize)
+BOOL imgResize(IMG_RESIZE * psImgResize)
 {
 	CHAR *lpMess="";
 	INT fTrack=FALSE;
 	INT iErr;
 	EN_FILE_TYPE enImageType=0;
     IMGHEADER ImgHead;
-	POINT pArea;
+	POINT ptArea;
+	POINT ptPhoto;
 	RECT srRectSource,srRectLogo;
 
 	SIZE sDest; // Dimensione destinazione
 	RECT rDest; // Rettangolo destinazione
 
-	INT hdlImage;
-	INT hdlImageNew;
-	INT hdlImageEnd;
-	SIZE sPhotoDest;
-	DWORD dw;
+	INT		hdlImage;
+	INT		hdlImageNew;
+	INT		hdlImageEnd;
+	SIZE	sPhotoDest;
+	DWORD	dw;
+	BOOL	bFillBack;
 
 	if (!psImgResize->pszFileSource) return TRUE;
 
@@ -255,22 +265,27 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 		return TRUE;
 	}
 	
-	sPhotoDest.cx=(INT) (psImgResize->sDim.cx*psImgResize->sPhoto.dPercSize/100);
-	sPhotoDest.cy=(INT) (psImgResize->sDim.cy*psImgResize->sPhoto.dPercSize/100);
+
+	sPhotoDest.cx=(INT) (psImgResize->sFix.cx*psImgResize->sPhoto.dPerc/100);
+	sPhotoDest.cy=(INT) (psImgResize->sFix.cy*psImgResize->sPhoto.dPerc/100);
 
 	// 
 	// B) Calcolare le nuove dimensioni
 	//
-	IMGCalcSize(&ImgHead,      // Dimensioni del sorgente
-				sPhotoDest,	   // Area disponibile
-				psImgResize->iPhotoAdatta,  // Tipo di adattamento
+	IMGCalcSize(&ImgHead,		// Dimensioni del sorgente
+				&sPhotoDest,	// Area disponibile
+				psImgResize->psMin,
+				psImgResize->psMax,
+				psImgResize->enPhotoAdatta,  // Tipo di adattamento
 				psImgResize->sPhoto.iAlignHor,	   // Allineamento orizzontale
 				psImgResize->sPhoto.iAlignVer,	   // Allineamento verticale
 				&sDest,		   // Dimensioni della destinazione
 				&rDest,
 				&srRectSource); 	   // Posizionamento in destinazione
-	if (!sPhotoDest.cy||!sPhotoDest.cx) memcpy(&sPhotoDest,&sDest,sizeof(sDest));
+	if (!sPhotoDest.cy||!sPhotoDest.cx) 
+		memcpy(&sPhotoDest,&sDest,sizeof(sDest));
 
+	memcpy(&psImgResize->sDest,&sDest,sizeof(sDest));
 	//
 	// C) Carica il sorgente in memoria
 	//
@@ -284,8 +299,10 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 			// Lettura veloce
 			//
 			if (psImgResize->bQuickLoading) {
+
 				INT iPerc,iFactor;
-				SIZE sizSource;
+				SIZE sizSource,sAp1;
+				RECT sAp2;
 				sizSource.cx=ImgHead.bmiHeader.biWidth;
 				sizSource.cy=ImgHead.bmiHeader.biHeight;
 				iFactor=JPGGetFactor(&sizSource,&sPhotoDest,&iPerc);
@@ -298,12 +315,14 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 					if (hdlImage>-1) {
 						psImgHead=(IMGHEADER *) memoLock(hdlImage);
 						IMGCalcSize(psImgHead,      // Dimensioni del sorgente
-									sPhotoDest,	   // Area disponibile
-									psImgResize->iPhotoAdatta,  // Tipo di adattamento
+									&sPhotoDest,	   // Area disponibile
+									psImgResize->psMin,
+									psImgResize->psMax,
+									psImgResize->enPhotoAdatta,  // Tipo di adattamento
 									psImgResize->sPhoto.iAlignHor,	   // Allineamento orizzontale
 									psImgResize->sPhoto.iAlignVer,	   // Allineamento verticale
-									&sDest,		   // Dimensioni della destinazione
-									&rDest,
+									&sAp1,		   // Dimensioni della destinazione
+									&sAp2,
 									&srRectSource); 	   // Posizionamento in destinazione				
 									}
 						memoUnlockEx(hdlImage,"a1");
@@ -434,16 +453,24 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 	// E) Creare un'immagine con il colore di background scelto	 
 	//	  2012 release: se trasparente rimane tale
 	//
+	bFillBack=true;
 	if (ImgHead.enPixelType!=IMG_PIXEL_RGB_ALPHA) {
 
-		hdlImageEnd=IMGCreate(IMG_PIXEL_RGB,"newImage",sPhotoDest.cx,sPhotoDest.cy,NULL,FALSE);
+		if (psImgResize->enPhotoAdatta!=IMGPT_MAX_SIDE) 
+			hdlImageEnd=IMGCreate(IMG_PIXEL_RGB,"newImage",sPhotoDest.cx,sPhotoDest.cy,NULL,FALSE);
+			else
+			{hdlImageEnd=IMGCreate(IMG_PIXEL_RGB,"newImage",sDest.cx,sDest.cy,NULL,FALSE); bFillBack=false;}
 
 	} else {
 
-		hdlImageEnd=IMGCreate(IMG_PIXEL_RGB_ALPHA,"newImage",sPhotoDest.cx,sPhotoDest.cy,NULL,FALSE);
+		if (psImgResize->enPhotoAdatta!=IMGPT_MAX_SIDE) 
+			hdlImageEnd=IMGCreate(IMG_PIXEL_RGB_ALPHA,"newImage",sPhotoDest.cx,sPhotoDest.cy,NULL,FALSE);
+			else
+			{hdlImageEnd=IMGCreate(IMG_PIXEL_RGB_ALPHA,"newImage",sDest.cx,sDest.cy,NULL,FALSE); }
 	
 	}
-	IMGFill(hdlImageEnd,psImgResize->cBackColor);
+	
+	if (bFillBack) IMGFill(hdlImageEnd,psImgResize->cBackColor);
 
 	// ------------------------------------------------------------------------
 	// E2) Applico gli autolivelli se richiesto
@@ -460,27 +487,37 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 	//
 	//	Ricalcolo il posizionamento
 	//
-	if (psImgResize->iPhotoAdatta) {
-		RectCalcSize(sDest,		// Dimensioni del sorgente
-				  psImgResize->sDim,			// Dimensione Area destinazione
-				  IMGPT_NO, // Tipo di adattamento
-				  psImgResize->sPhoto.iAlignHor,		// Allineamento orizzontale
-				  psImgResize->sPhoto.iAlignVer,		// Allineamento verticale
-				  &sDest,		// Dimensioni della destinazione
-				  &rDest,
-				  NULL); 		// Posizionamento in destinazione
-	 } else ZeroFill(rDest);
+	if (psImgResize->enPhotoAdatta!=IMGPT_MAX_SIDE) {
 
-	// ------------------------------------------------------------------------
-	// F) Inserire il sorgente nella destinazione
-	//
-	pArea.x=rDest.left+psImgResize->sPhoto.iOffsetX;//iPhotoOffsetX;
-	pArea.y=rDest.top+psImgResize->sPhoto.iOffsetY;//iPhotoOffsetY;
+		if (psImgResize->enPhotoAdatta) {
+
+			RectCalcSize(	&sDest,		// Dimensioni del sorgente
+							&psImgResize->sFix,			// Dimensione Area destinazione finale
+							psImgResize->psMin,			// Dimensione Area destinazione finale
+							psImgResize->psMax,			// Dimensione Area destinazione finale
+							IMGPT_NO, // Tipo di adattamento
+							psImgResize->sPhoto.iAlignHor,		// Allineamento orizzontale
+							psImgResize->sPhoto.iAlignVer,		// Allineamento verticale
+							&psImgResize->sDest,		// Dimensioni della destinazione
+							&rDest,
+							NULL); 		// Posizionamento in destinazione
+			memcpy(&sDest,&psImgResize->sDest,sizeof(SIZE));
+
+		 } else _(rDest);
+
+		// ------------------------------------------------------------------------
+		// F) Inserire il sorgente nella destinazione
+		//
+		ptPhoto.x=rDest.left+psImgResize->sPhoto.iOffsetX;
+		ptPhoto.y=rDest.top+psImgResize->sPhoto.iOffsetY;
+
+	} else {ptPhoto.x=0; ptPhoto.y=0;}
 
 	IMGCopy(hdlImageEnd, // --> La destinazione
 			hdlImageNew, // <-- Il sorgente
-			pArea,		 // La posizione
+			ptPhoto,		 // La posizione
 			psImgResize->sPhoto.iAlpha);
+	
 	memoFree(hdlImageNew,"Img1");
 	memoFree(hdlImage,"Img1"); // Libero memoria immagine
 	hdlImage=-1;
@@ -510,12 +547,20 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 		memcpy(&ImgLogoHead,memoLock(hdlLogo),sizeof(IMGHEADER));
 		memoUnlockEx(hdlLogo,"A3");
 
-		sLogoDest.cx=(INT) (ImgLogoHead.bmiHeader.biWidth*psImgResize->sPaint.dPercSize/100);
-		sLogoDest.cy=(INT) (ImgLogoHead.bmiHeader.biHeight*psImgResize->sPaint.dPercSize/100);
+		if (psImgResize->sPaint.psSizeFix) {
+
+			memcpy(&sLogoDest,psImgResize->sLogo.psSizeFix,sizeof(SIZE));
+
+		} else {
+			sLogoDest.cx=(INT) (ImgLogoHead.bmiHeader.biWidth*psImgResize->sPaint.dPerc/100);
+			sLogoDest.cy=(INT) (ImgLogoHead.bmiHeader.biHeight*psImgResize->sPaint.dPerc/100);
+		}
 
 		// b) Calcolo le nuove dimensioni
 		IMGCalcSize(&ImgLogoHead,      // Dimensioni del sorgente
-					sLogoDest,		   // Area disponibile
+					&sLogoDest,		   // Area disponibile
+					psImgResize->psMin,
+					psImgResize->psMax,
 					IMGPT_AL_FORMATO,  // Tipo di adattamento
 					0,	   // Allineamento orizzontale
 					0,	   // Allineamento verticale
@@ -539,26 +584,26 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 		}
 	
 		// Applico
-		for (pArea.y=(psImgResize->sPaint.iOffsetY-sLogoDest.cy);pArea.y<psImgResize->sDim.cy;pArea.y+=sLogoDest.cy)
+		for (ptArea.y=(psImgResize->sPaint.iOffsetY-sLogoDest.cy);ptArea.y<psImgResize->sDest.cy;ptArea.y+=sLogoDest.cy)
 		{
 			INT iOffset=psImgResize->sPaint.iOffsetX-sLogoDest.cx;
 
-			for (pArea.x=iOffset;pArea.x<psImgResize->sDim.cx;pArea.x+=sLogoDest.cx)
+			for (ptArea.x=iOffset;ptArea.x<psImgResize->sDest.cx;ptArea.x+=sLogoDest.cx)
 			{
-				POINT pArea2;
+				POINT ptArea2;
 				// printf("Copio: %d,%d (%d)",pArea.x,pArea.y,iLogoAlpha);
 				IMGCopy(hdlImageEnd,	// La destinazione
 						hdlLogoNew,		// Il sorgente
-						pArea,			// La posizione
+						ptArea,			// La posizione
 						psImgResize->sPaint.iAlpha);
 
 				if (psImgResize->iEchoPaint)
 				{
-					pArea2.x=pArea.x+sLogoDest.cx/4;
-					pArea2.y=pArea.y+sLogoDest.cy/4;
+					ptArea2.x=ptArea.x+sLogoDest.cx/4;
+					ptArea2.y=ptArea.y+sLogoDest.cy/4;
 					IMGCopy(hdlImageEnd,	// La destinazione
 							hdlLogoNew,		// Il sorgente
-							pArea2,			// La posizione
+							ptArea2,			// La posizione
 							psImgResize->sPaint.iAlpha+psImgResize->iEchoPaint);
 				}
 			}
@@ -582,37 +627,69 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 		SIZE sLogoDest;
 		RECT rLogoDest;
 		
-		// a) Carico il PNG in memoria
 		if (!PNGReadFile(psImgResize->sLogo.szFile,&hdlLogo,&iErr,FALSE))
 		{
-			printf("ko");
-			printf("%s: errore in PNGReadFile() %d",psImgResize->sLogo.szFile,iErr);
+			printf("ko: %s: errore in PNGReadFile() %d",psImgResize->sLogo.szFile,iErr);
 			ehLogWrite("%s: errore in PNGReadFile() %d",psImgResize->sLogo.szFile,iErr);
 			memoFree(hdlImageEnd,"Img2");
-			return TRUE;
+			return true;
 		}
 
 		memcpy(&sImgLogoHead,memoLock(hdlLogo),sizeof(IMGHEADER));
 		memoUnlockEx(hdlLogo,"A4");
 
-		if (psImgResize->sLogo.dPercSize<1) psImgResize->sLogo.dPercSize=100;
-		sLogoDest.cx=(INT) (psImgResize->sDim.cx*psImgResize->sLogo.dPercSize/100);
-		sLogoDest.cy=(INT) (psImgResize->sDim.cy*psImgResize->sLogo.dPercSize/100);
+		if (psImgResize->sLogo.psSizeFix) {
+			
+			memcpy(&sLogoDest,psImgResize->sLogo.psSizeFix,sizeof(SIZE));
+		
+		} else {
 
-		// b) Calcolo le nuove dimensioni
-		IMGCalcSize(&sImgLogoHead,      // Dimensioni del sorgente
-					sLogoDest,		   // Area disponibile
-					IMGPT_AL_FORMATO,  // Tipo di adattamento
-					0,	   // Allineamento orizzontale
-					0,	   // Allineamento verticale
-					&sLogoDest,		   // Dimensioni della destinazione
-					&rLogoDest,
-					&srRectLogo); 	   // Posizionamento in destinazione
+			if (psImgResize->sLogo.dPerc<1) psImgResize->sLogo.dPerc=100;
+			if (psImgResize->sLogo.bPosWhere) // Posiziono con riferimento alla foto
+			{
+				sLogoDest.cx=(INT) (sDest.cx*psImgResize->sLogo.dPerc/100);
+				sLogoDest.cy=(INT) (sDest.cy*psImgResize->sLogo.dPerc/100);
+			
+			}
+			else {
+				sLogoDest.cx=(INT) (psImgResize->sDest.cx*psImgResize->sLogo.dPerc/100);
+				sLogoDest.cy=(INT) (psImgResize->sDest.cy*psImgResize->sLogo.dPerc/100);
+			}
+		}
+		
+		//
+		// Se serve ridimensiono il logo
+		//
+		if (sImgLogoHead.bmiHeader.biWidth!=sLogoDest.cx||
+			sImgLogoHead.bmiHeader.biHeight!=sLogoDest.cy) {
 
-		// c) Creo (ridimensionando) il nuovo Ping
-		hdlLogoResized=IMGResampling(hdlLogo,NULL,sLogoDest.cx,sLogoDest.cy,psImgResize->iResampling);
-		memoFree(hdlLogo,"Img1"); // Libero memoria immagine
-		hdlLogo=-1;
+				// b) Calcolo le nuove dimensioni
+				IMGCalcSize(&sImgLogoHead,      // Dimensioni del sorgente
+							&sLogoDest,		   // Area disponibile
+							NULL,
+							NULL,
+							IMGPT_AL_FORMATO,  // Tipo di adattamento
+							0,	   // Allineamento orizzontale
+							0,	   // Allineamento verticale
+							&sLogoDest,		   // Dimensioni della destinazione
+							&rLogoDest,
+							&srRectLogo); 	   // Posizionamento in destinazione
+
+				// c) Creo (ridimensionando) il nuovo Ping
+				
+				if (sLogoDest.cy<16) 
+					hdlLogoResized=IMGRemaker(hdlLogo,NULL,sLogoDest.cx,sLogoDest.cy,TRUE,psImgResize->iResampling);
+					else
+					hdlLogoResized=IMGResampling(hdlLogo,NULL,sLogoDest.cx,sLogoDest.cy,psImgResize->iResampling);
+
+				memoFree(hdlLogo,"Img1"); // Libero memoria immagine
+				hdlLogo=-1;
+		} else {
+
+			hdlLogoResized=hdlLogo;
+			hdlLogo=-1;
+		
+		}
 
 		if (hdlLogoResized<0)
 		{
@@ -630,19 +707,20 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 		switch (psImgResize->sLogo.iAlignHor)
 		{
 			case 1: // Left
-				if (psImgResize->sLogo.bPosWhere) pArea.x=rDest.left; else pArea.x=0; 
+				if (psImgResize->sLogo.bPosWhere) ptArea.x=rDest.left; else ptArea.x=0; 
 				break;
 
 			case 2: // Right
 				if (psImgResize->sLogo.bPosWhere) 
-						pArea.x=rDest.right-sLogoDest.cx;
+						ptArea.x=rDest.right-sLogoDest.cx;
 						else
-						pArea.x=psImgResize->sDim.cx-sLogoDest.cx;
+						ptArea.x=psImgResize->sDest.cx-sLogoDest.cx;
 				break;
 
 			default:
 			case 0: // Centra (Default)
-				pArea.x=((psImgResize->sDim.cx-sLogoDest.cx)/2);
+//				pArea.x=((psImgResize->sDim.cx-sLogoDest.cx)/2);
+				ptArea.x=rDest.left+((sDest.cx-sLogoDest.cx)/2);
 				break;
 		}
 
@@ -652,28 +730,31 @@ BOOL imgResize(IMG_RESIZE *psImgResize)
 		switch (psImgResize->sLogo.iAlignVer)
 		{
 			case 1: // Top
-				if (psImgResize->sLogo.bPosWhere) pArea.y=rDest.top; else pArea.y=0;
+				if (psImgResize->sLogo.bPosWhere) ptArea.y=rDest.top; else ptArea.y=0;
 				break;
 
 			case 2: // Bottom
-				if (psImgResize->sLogo.bPosWhere) pArea.y=rDest.bottom-sLogoDest.cy; else pArea.y=psImgResize->sDim.cy-sLogoDest.cy; // C'era un +1 cazzo
+				if (psImgResize->sLogo.bPosWhere) ptArea.y=rDest.bottom-sLogoDest.cy; else ptArea.y=sPhotoDest.cy-sLogoDest.cy; // C'era un +1 cazzo
 				break;
 
 			default:
 			case 0: // Centra (Default)
-				pArea.y=((psImgResize->sDim.cy-sLogoDest.cy)/2);
+//				pArea.y=((psImgResize->sDim.cy-sLogoDest.cy)/2);
+				ptArea.y=rDest.top+((sDest.cy-sLogoDest.cy)/2);
 				break;
 		}
 		
-		pArea.x+=psImgResize->sLogo.iOffsetX;//iLogoOffsetX;
-		pArea.y+=psImgResize->sLogo.iOffsetY;//iLogoOffsetY;
+		ptArea.x+=psImgResize->sLogo.iOffsetX;//iLogoOffsetX;
+		ptArea.y+=psImgResize->sLogo.iOffsetY;//iLogoOffsetY;
 
 		// printf("Copio: %d,%d (%d)",pArea.x,pArea.y,iLogoAlpha);
 		IMGCopy(hdlImageEnd, // La destinazione
 				hdlLogoResized, // Il sorgente
-				pArea,		 // La posizione
+				ptArea,		 // La posizione
 				psImgResize->sLogo.iAlpha); //(double) 100);//psImgResize->sLogo.iAlpha);  <-- da controllare il valore dell' alpha
 
+//		if (strstr(psImgResize->pszFileDest,"\\big"))
+//			printf("qui");
 
 		// e) Libero le risorse impegnate
 		memoFree(hdlLogoResized,"Logo1"); // Libero memoria immagine

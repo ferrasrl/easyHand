@@ -116,9 +116,10 @@ static struct {
 	HFONT		hFontBase;
 	POINT		ptOffset;
 
-	BYTE *		lpItemBuffer;
-	LONG		lItemBufferSize;
-	LONG		lItemBufferCount;
+//	BYTE *		lpItemBuffer;
+	//LONG		lItemBufferSize;
+	//LONG		lItemBufferCount;
+	EH_LST		lstRowBuffer;
 
 	BOOL		bUserAbort;
 	HWND		hDlgPrint;
@@ -139,6 +140,13 @@ static struct {
 
 
 } _sPd={0,-1};
+
+typedef struct {
+
+	DWORD	iSize;
+	BYTE *	pbData;
+
+} S_DOI; // Doc Object Info
 
 static	EH_PWD	_sPower;
 
@@ -167,7 +175,7 @@ static void		_LWinStart(void);
 static BOOL		_addItem(PWD_TE uType,PWD_RECT *prumObj,void *psObj,INT iSizeObj);
 static BOOL		_addItemMem(PWD_TE uType,PWD_RECT *prumObj,void *psObj,INT iSizeObj);
 
-static void		_LItemReposition(void);
+static void		_itemsReposition(void);
 
 
 typedef enum {
@@ -193,7 +201,7 @@ static S_FAC *	_fontPowerCreate(	HDC			hdc,
 									BOOL		bDcAlign,
 									TEXTMETRIC * psTextMetrics);
 
-static void		_LFontAmbientDestroy(S_FAC *psFac);
+static void	*	_fontAmbientDestroy(S_FAC *psFac);
 static void		_LdcBoxDotted(HDC hdc,INT x,INT y,INT x2,INT y2,LONG Color);
 static void		_LTempWrite(void *pb,SIZE_T iLen);
 static void		_fontEnumeration(BOOL bFontAlloc);
@@ -248,7 +256,7 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 	INT iAuto=0;
 	double dTotPerc=0;
 	PWD_FONT_RES * psFontRes=NULL;
-
+	EH_DATATYPE enType;
 	INT iFieldPerRiga;
 
 //	PDO_TEXT		sText;
@@ -291,11 +299,14 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 			_sPower.iPagStyle=1;				// Formato numero di pagina
 
 
-			_sPower.fLineHorzField=FALSE;//TRUE;		// Stampa separazioni orizzontali
-			_sPower.colLineVert=pwdGray(.8);//RGB(128,128,128));
-			_sPower.colLineHorz=pwdGray(.8);//RGB(128,128,128));
+			_sPower.fLineHorzField=false;//TRUE;		// Stampa separazioni orizzontali
+			_sPower.colLineVert=pwdGray(.8);
+			_sPower.umLineVertWidth=pwdUm(PUM_STD,1);
+			_sPower.colLineHorz=pwdGray(.8);
+			
 			_sPower.iLineHorzStyle=PS_SOLID;
-			_sPower.colTitleBack=pwdGray(.6);//RGB(128,128,128));
+			_sPower.umLineHorzWidth=pwdUm(PUM_STD,1);
+			_sPower.colTitleBack=pwdGray(.6);
 			_sPower.colTitleText=PDC_WHITE;
 
 			_sPower.fLineVertField=true;		// Stampa separazione verticali
@@ -564,6 +575,7 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 			_sPower.lstFontRes=lstDestroy(_sPower.lstFontRes);
 			if (_sPd.lstElement) _sPd.lstElement=lstDestroy(_sPd.lstElement);
 			if (_sPower.dmiFont.Hdl>-1) DMIClose(&_sPower.dmiFont,"Font");
+			if (_sPower.psLastItemWrite) ehFreePtr(&_sPower.psLastItemWrite);
 			break;
 	
 	//-----------------------------------------------------------------------
@@ -580,17 +592,20 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 			psField=(PWD_FIELD *) ptr;
 			memset(psField,0,sizeof(PWD_FIELD));
 			psField->iRowsSize=1; // Altezza di default
-			switch (info)
+			enType=info;
+			switch (enType)
 			{
-				case ALFA:
+				case _ALFA:
+				case _TEXT:
 
 					psField->fFix=FALSE;
 					psField->enAlign=PDA_LEFT;
 					psField->iTipo=ALFA;
 					psField->enTitleAlign=PDA_LEFT;
+					if (enType==_TEXT) psField->iRowsSize=LR_ROWSDYNAMIC;
 					break;
 
-				case NUME:
+				case _NUMBER:
 
 					psField->fFix=TRUE;
 					psField->enAlign=PDA_RIGHT;
@@ -944,15 +959,6 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 					   _sPower.funcNotify(WS_DO,0,&sNotify);
 				 }
 
-				   /*
-				   _(LRALink);
-				   LRALink.iType=LRA_FOOT;
-				   LRALink.rRect.left=_sPower.rPage.left;
-				   LRALink.rRect.top=_sPower.umBodyBottom;//>rPage.bottom-_sPower.yCueDot;
-				   LRALink.rRect.right=_sPower.rPage.right;
-				   LRALink.rRect.bottom=_sPower.rPage.bottom;
-				   (*_sPower.HookSubProc)(WS_DO,0,&LRALink);
-				   */
 
 			}
 			
@@ -1032,7 +1038,7 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 			{
 				pwdLine(pwdRectFill(&rumChar,_sPower.rumPage.left,_sPower.umRowCursor,_sPower.rumPage.right,_sPower.umRowCursor),
 						_sPower.colLineHorz,//arField[0]->colText,
-						pwdUm(PUM_PT,1),//(_sPower.iLinePerRiga>1)?2:1,
+						_sPower.umLineHorzWidth,//pwdUm(PUM_PT,1),//(_sPower.iLinePerRiga>1)?2:1,
 						_sPower.iLineHorzStyle);
 						
 			}
@@ -1087,15 +1093,17 @@ void * PowerDoc(EN_MESSAGE enCmd,LONG info,void *ptr)
 //
 // pwdColAdd()
 //
-PWD_FIELD * pwdColAdd(INT iType,PWD_ALIGN enAlign,double dPerc,CHAR * pszName) 
+PWD_FIELD * pwdColAdd(EH_DATATYPE enType,PWD_ALIGN enAlign,double dPerc,CHAR * pszName) 
 {
 	PWD_FIELD	pwdField; 
-	PowerDoc(WS_SETFLAG,iType,&pwdField); 
+	PowerDoc(WS_SETFLAG,enType,&pwdField); 
 	strcpy(pwdField.szTitolo,pszName); 
 	pwdField.enAlign=pwdField.enTitleAlign=enAlign;
+	if (pwdField.enTitleAlign==PDA_JUSTIFY) pwdField.enTitleAlign=PDA_LEFT;
 	pwdField.xPercSize=dPerc; 
 	return PowerDoc(WS_ADD,LR_ADDFIELD,&pwdField);
 }
+
 
 //
 // pwdGetField()
@@ -1275,6 +1283,7 @@ void pwdSetEx(INT iCol,void * pValue,PWD_COLOR colText,PWD_COLOR colBack,EH_TSTY
 			sText.pszText=pszText;
 			umTextHeight=pwdGetTextInRectAlt(&rumChar,&sText,&iRows); // Altezza del testo in UM
 
+			rumChar.bottom=rumChar.top+umTextHeight;
 // 					printf(" -> \"%s\" = %d | %.2f (%.2f)" CRLF,sText.pszText,iRows,umTextHeight,sText.umCharHeight);
 			//
 			// E) SI: Inserisco l'oggetto
@@ -1303,7 +1312,7 @@ void pwdSetEx(INT iCol,void * pValue,PWD_COLOR colText,PWD_COLOR colBack,EH_TSTY
 				PowerDoc(WS_LINK,0,NULL); 
 
 				// .2 Rimappo tutti i componenti inseriti della linea corrente
-				_LItemReposition();
+				_itemsReposition();
 
 				// Calcolo in che ultima linea virtuale sono
 //						if (_sPower.umRowPadded>0) _sPower.iRowLastVirtualLine=(INT) (umTextHeight/_sPower.umRowPadded);
@@ -2485,7 +2494,6 @@ static void _LFileTempLoad(void)
 				//
 				// Rimappo i puntatori al testo e font
 				//
-//				psText=(PDO_TEXT * ) psItem->psObj;
 				psText=pwdGetObj(psItem);;
 				//pb=(BYTE *) psText+sizeof(PDO_TEXT);//psText=(BYTE *) psItem+sizeof(PWD_ITEM);
 				psText->pszText=(BYTE *) psText+sizeof(PDO_TEXT);
@@ -2493,10 +2501,7 @@ static void _LFileTempLoad(void)
 				break;
 
 			case PDT_PATH:
-				
 				break;
-
-
 
 		}
 
@@ -2832,18 +2837,18 @@ static void * _itemBuilder(PWD_TE		uType,
 }
 
 //
-// _addItem()  Aggiunge un idem su disco
+// _addItem()  Aggiunge un item su disco
 // 
 static BOOL	_addItem(PWD_TE uType,PWD_RECT *prumObj,void *psObj,INT iSizeObj) {
 
 	INT iSize;
 	PWD_ITEM * psItem;
-	if (_sPower.psLastItemWrite) ehFree(_sPower.psLastItemWrite);
+	if (_sPower.psLastItemWrite) ehFreePtr(&_sPower.psLastItemWrite);
 	psItem=_itemBuilder(uType,prumObj,psObj,iSizeObj,&iSize);
 
 	_sPower.psLastItemWrite=psItem;
 	_LTempWrite(psItem,iSize);
-//	ehFree(psItem);
+	// ehFree(psItem);
 	return false;
 
 }
@@ -2862,14 +2867,21 @@ static BOOL	_addItemMem(PWD_TE uType,PWD_RECT *prumObj,void *psObj,INT iSizeObj)
 
 	INT iSize;
 	BYTE *pbResult;
+	S_DOI sDoi;
+
 	pbResult=_itemBuilder(uType,prumObj,psObj,iSizeObj,&iSize);
 	
+	if (!_sPd.lstRowBuffer) _sPd.lstRowBuffer=lstCreate(sizeof(S_DOI));
+	sDoi.iSize=iSize;
+	sDoi.pbData=pbResult;
+	lstPush(_sPd.lstRowBuffer,&sDoi);
+
+	/*
 	// Se è la prima volta
 	if (_sPd.lItemBufferSize==0) 
 		{_sPd.lItemBufferSize=2048;  // Buffer iniziale 2k
 		 _sPd.lItemBufferCount=0;
-		 _sPd.lpItemBuffer=ehAlloc(_sPd.lItemBufferSize);
-	//	 if (_sPd.lpItemBuffer==NULL) ehExit("_addItemMem: out of memory A");
+		 _sPd.lpItemBuffer=ehAllocZero(_sPd.lItemBufferSize);
 		}
 	
 	// Se andiamo fuori dal buffer
@@ -2877,37 +2889,81 @@ static BOOL	_addItemMem(PWD_TE uType,PWD_RECT *prumObj,void *psObj,INT iSizeObj)
 	{
 		DWORD dwOldMemo=_sPd.lItemBufferSize;
 		_sPd.lItemBufferSize=_sPd.lItemBufferCount+iSize+128;
-//		_sPd.lpItemBuffer=realloc(_sPd.lpItemBuffer,_sPd.lItemBufferSize);
 		_sPd.lpItemBuffer=ehRealloc(_sPd.lpItemBuffer,dwOldMemo,_sPd.lItemBufferSize);
+		memset(_sPd.lpItemBuffer,0,dwOldMemo);
 		if (_sPd.lpItemBuffer==NULL) ehExit("_addItemMem: out of memory B");
 	}
 	
 	memcpy(_sPd.lpItemBuffer+_sPd.lItemBufferCount,pbResult,iSize);
 	_sPd.lItemBufferCount+=iSize;
 	ehFree(pbResult);
+	*/
+
 	return FALSE;
 }
 
 static void _flushBuffer(BOOL fOutput)
 {
+	S_DOI * psDoi;
+
+	if (!_sPd.lstRowBuffer) return;
+	
+	for (lstLoop(_sPd.lstRowBuffer,psDoi)) {
+		if (fOutput) _LTempWrite(psDoi->pbData,psDoi->iSize);
+		ehFree(psDoi->pbData);
+	}
+
+	_sPd.lstRowBuffer=lstDestroy(_sPd.lstRowBuffer);
+
+	/*
 	if (!_sPd.lpItemBuffer) return;
 	if (fOutput) {_LTempWrite(_sPd.lpItemBuffer,_sPd.lItemBufferCount);}
 	ehFreePtr(&_sPd.lpItemBuffer);
 	_sPd.lItemBufferSize=0;
+	*/
 }
 
 //
 //
 //
-static void _LItemReposition(void)
+static void _itemsReposition(void)
 {
-	BYTE *pt=_sPd.lpItemBuffer; 
+//	BYTE *pt=_sPd.lpItemBuffer; 
+	S_DOI * psDoi;
 	PWD_ITEM	*	psItem;
+	PWD_VAL y;
+	PDO_TEXT * psText;
 
-	if (pt==NULL) ehExit("_LItemReposition:Null");
+//	if (pt==NULL) ehExit("_itemsReposition:Null");
 
-	while (pt<(_sPd.lpItemBuffer+_sPd.lItemBufferCount))
-	{
+	for (lstLoop(_sPd.lstRowBuffer,psDoi)) {
+
+		psItem=(PWD_ITEM *) psDoi->pbData;
+		psItem->iPage=_sPower.iPageCount; // Setta la pagina attuale
+		switch(psItem->enType)
+		{
+			case PDT_TEXT:    
+				psText=pwdGetObj(psItem);
+				y=psItem->rumObj.bottom-psItem->rumObj.top;
+				psItem->rumObj.top=_sPower.umRowCursor+_sPower.rumFieldPadding.top;
+				psItem->rumObj.bottom=psItem->rumObj.top+y;
+				psText->umY=_sPower.umRowCursor+_sPower.rumFieldPadding.top;
+				break;
+
+			case PDT_TEXTBOX: 
+				psText=pwdGetObj(psItem);
+				y=psItem->rumObj.bottom-psItem->rumObj.top;
+				psItem->rumObj.top=_sPower.umRowCursor+_sPower.rumFieldPadding.top;
+				psItem->rumObj.bottom=psItem->rumObj.top+y;
+				break;
+
+			default:
+			   ehExit("LRE:???");
+		}
+	}
+	/*
+//	while (pt<(_sPd.lpItemBuffer+_sPd.lItemBufferCount))
+//	{
 		psItem=(PWD_ITEM *) pt;
 
 		psItem->iPage=_sPower.iPageCount; // Setta la pagina attuale
@@ -2917,14 +2973,14 @@ static void _LItemReposition(void)
 			case PDT_TEXT:    
 			case PDT_TEXTBOX:  
 				psItem->rumObj.top=_sPower.umRowCursor+_sPower.rumFieldPadding.top;
-				break;
+				break; 
 
 			default:
 			   ehExit("LRE:???");
 		}
 		pt+=sizeof(PWD_ITEM)+psItem->iLenItem;
 	}
-
+	*/
 }
 
 
@@ -2967,7 +3023,11 @@ static void _drawBodyPrepare(void) {
 			if (!_sPd.lstElement->psCurrent->psNext) rumRect.right+=pwdUm(PUM_STD,1); 
 			rumRect.top=_sPower.umHeadBottom;
 			rumRect.bottom=_sPower.umBodyTop;
-			pwdRect(&rumRect,PDC_TRASP,psFld->colTitBack,0);
+//			pwdRect(&rumRect,PDC_TRASP,psFld->colTitBack,0);
+			if (_sPower.enLayStyle==PWD_LAYTYPE2)
+				pwdRect(&rumRect,PDC_BLACK,psFld->colTitBack,0);
+			else
+				pwdRect(&rumRect,PDC_TRASP,psFld->colTitBack,0);
 
 //			pwdTextInRect(&rumRect,psFld->colTitText,STYLE_BOLD,psFld->enTitleAlign,_sPower.pszFontTitleDefault,_sPower.umTitleHeight,0,psFld->szTitolo,false);
 			//
@@ -3029,7 +3089,7 @@ static void _drawBodyPrepare(void) {
 										rumRect.left,
 										rumRect.bottom),
 										_sPower.colLineVert,
-										pwdUm(PUM_STD,1),
+										_sPower.umLineVertWidth,//pwdUm(PUM_STD,1),
 										PS_SOLID);
 
 				}
@@ -3039,7 +3099,7 @@ static void _drawBodyPrepare(void) {
 									rumRect.right,
 									rumRect.bottom),
 									_sPower.colLineVert,
-									pwdUm(PUM_STD,1),
+									_sPower.umLineVertWidth,//pwdUm(PUM_STD,1),
 									PS_SOLID);
 
 			}
@@ -3062,6 +3122,7 @@ static void _drawLayout(void)
 		break;
 
 	case PWD_LAYTYPE0:
+	case PWD_LAYTYPE2:
 
 		// -------------------------------------------------------
 		// LayOut Tipo 0 : Standard DOS
@@ -3144,7 +3205,9 @@ static void _drawLayout(void)
 		rumRect.right=_sPower.rumPage.right;
 		rumRect.top=_sPower.umHeadBottom;//-pwdUm(PUM_STD,6);
 		rumRect.bottom=_sPower.umHeadBottom;
-		pwdLine(&rumRect,_sPower.colLineVert,pwdUm(PUM_STD,1),PS_SOLID);
+		pwdLine(&rumRect,_sPower.colLineVert,
+			_sPower.umLineVertWidth,//pwdUm(PUM_STD,1),
+			PS_SOLID);
 
 		//			  memset(&sBox,0,sizeof(sBox));
 		// Al top della pagina
@@ -3152,14 +3215,19 @@ static void _drawLayout(void)
 		rumRect.right=_sPower.rumPage.right;
 		rumRect.top=_sPower.umBodyTop;//-pwdUm(PUM_STD,3);
 		rumRect.bottom=_sPower.umBodyTop;
-		pwdLine(&rumRect,_sPower.colLineVert,pwdUm(PUM_STD,1),PS_SOLID);
+		pwdLine(&rumRect,_sPower.colLineVert,
+			_sPower.umLineVertWidth,//pwdUm(PUM_STD,1),
+			PS_SOLID);
 
 		//
 		// Linea in basso che chiude il corpo
 		//
 		rumRect.top=_sPower.umBodyBottom;//-pwdUm(PUM_STD,3);
 		rumRect.bottom=_sPower.umBodyBottom;
-		pwdLine(&rumRect,_sPower.colLineVert,pwdUm(PUM_STD,1),PS_SOLID);
+		pwdLine(&rumRect,
+				_sPower.colLineVert,_sPower.umLineVertWidth,
+				//pwdUm(PUM_STD,1),
+				PS_SOLID);
 
 		_drawBodyPrepare();
 		break;
@@ -3523,7 +3591,7 @@ static void _drawText(PWD_DRAW * psDraw)//BOOL Printer,HDC psDraw->hDC,PDO_CHARE
 				uFormat);
 	// _textInRect(psDraw->hDC,&psDraw->recObj,psText,psFac->pwcText,TRUE,&iRows);
 	SetTextAlign(psDraw->hDC,iVerticalOld);
-	_LFontAmbientDestroy(psFac);
+	_fontAmbientDestroy(psFac);
 	*/
 }
 
@@ -3561,7 +3629,7 @@ static void _drawTextBox(PWD_DRAW * psDraw)// BOOL Printer,HDC psDraw->hDC,PDO_C
 //	psFac=_fontPowerCreate(psDraw->hDC,psText,true,NULL);
 //	_textInRect(psDraw->hDC,&psDraw->recObj,psText,psFac->pwcText,TRUE,&iRows);
 	_textInRect(psDraw,true);
-//	_LFontAmbientDestroy(psFac);
+//	_fontAmbientDestroy(psFac);
 }
 */
 
@@ -3620,7 +3688,7 @@ PWD_TXI * pwdTextInfoCreate(PDO_TEXT * psText,PWD_RECT * pumRect) {
 
 	PWD_TXI *	psTi=ehNew(PWD_TXI);
 	WCHAR *		pwcText,* pwBegin, * pwEnd;
-	S_FAC *		psFac;
+	S_FAC *		psFac=NULL;
 	INT			yStart;
 	INT			iBreakCount;
 	BOOL		bCRLF;
@@ -3664,7 +3732,6 @@ PWD_TXI * pwdTextInfoCreate(PDO_TEXT * psText,PWD_RECT * pumRect) {
 
 		// Non ne sono sicuro .... (se vuoto ritorno l'altezza di uno spazio
 		if (wcsEmpty(pwcText)) {
-
 			// Vuoto ?
 		}
 
@@ -3748,7 +3815,8 @@ PWD_TXI * pwdTextInfoCreate(PDO_TEXT * psText,PWD_RECT * pumRect) {
 
 		psTi->sumText.cx= pwdUm(PUM_DTX,psTi->sizText.cx);
 		psTi->sumText.cy= pwdUm(PUM_DTY,psTi->sizText.cy);
-		_LFontAmbientDestroy(psFac);
+//		if (psTi->lstRow->iLength>1)
+//			printf("qui");
 	}
 	else {
 	
@@ -3763,6 +3831,7 @@ PWD_TXI * pwdTextInfoCreate(PDO_TEXT * psText,PWD_RECT * pumRect) {
 	
 	}
  	DeleteDC(hdc);
+	psFac=_fontAmbientDestroy(psFac);
 	
 	return psTi;
 }
@@ -3877,9 +3946,14 @@ void _drawTextBox(PWD_DRAW * psDraw)
 		}
 		SetTextAlign(hdc,uMode);
 		TextOutW(hdc, xStart, yStart, pwc, wcslen(pwc)) ;
-		iRow++;
+		iRow++; yStart+=(iCharHeight+iInterlinea);
 	
 	}
+
+	pwdTextInfoDestroy(psTi);
+
+	psFac=_fontAmbientDestroy(psFac);
+
 /*
 
 	//
@@ -4751,12 +4825,7 @@ void pwdText(PWD_VAL	umX,
 {
 
 	PDO_TEXT	sObj;
-	
-//	PWD_RECT sumRect;
-//	PWD_SIZE sumSize;
 	PWD_TXI sTi;
-//	S_FAC *psFac;
-//	HDC hdc;
 	
 	if (strEmpty(pszStr)) return; 
 
@@ -4816,7 +4885,7 @@ void pwdText(PWD_VAL	umX,
 	sumRect.bottom=sumRect.top+sumSize.cy;
 	
 	_addItem(PDT_TEXT,&sumRect,&sObj,sizeof(sObj));
-	_LFontAmbientDestroy(psFac);
+	_fontAmbientDestroy(psFac);
 	*/
 
 }
@@ -5000,7 +5069,7 @@ void pwdTextJs(PWD_VAL umX,PWD_VAL umY,CHAR * pszJsParams,CHAR *pszText)
 	sumRect.bottom=sumRect.top+sumSize.cy;
 	
 	_addItem(PDT_TEXT,&sumRect,&sText,sizeof(sText));
-	_LFontAmbientDestroy(psFac);
+	_fontAmbientDestroy(psFac);
 	jsonDestroy(psJs);
 
 }
@@ -5373,7 +5442,7 @@ PWD_VAL pwdGetTextInRectAlt(PWD_RECT * pumRect,PDO_TEXT * psText,INT * lpiRows) 
 
 	y=_textInRect(hdc,&recArea,psText,psFac->pwcText,FALSE,lpiRows);//,INT iMaxRows);
 
-	_LFontAmbientDestroy(psFac);
+	_fontAmbientDestroy(psFac);
 	DeleteDC(hdc);
 	if (!y) //y=(INT) pwdUm(_DTYD,psText->umCharHeight);
 		y=_textInRect(hdc,&recArea,psText,L" ",FALSE,lpiRows);//,INT iMaxRows);
@@ -5786,11 +5855,13 @@ static S_FAC * _fontPowerCreate(HDC hdc,
 }
 
 
-static void _LFontAmbientDestroy(S_FAC *psFac) {
+static void * _fontAmbientDestroy(S_FAC *psFac) {
 
+	if (!psFac) return NULL;
 	ehFreePtr(&psFac->pwcText);
 	if (psFac->hFont) DeleteObject(psFac->hFont);//_sPd.hFontBase);
 	ehFree(psFac);
+	return NULL;
 }
 
 //
@@ -7411,7 +7482,7 @@ static BOOL _pdfBuilder(INT PageStart,INT PageEnd)
 #endif
 
 #ifdef _DEBUG
-	_sPower.bPdfShow=true;
+//	_sPower.bPdfShow=true;
 #endif
 
 	ehFreePtrs(1,&pbTableEncode);

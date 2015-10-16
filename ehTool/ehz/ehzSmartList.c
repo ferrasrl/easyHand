@@ -276,9 +276,6 @@ void * ehzSmartList(EH_OBJPARAMS)
 static void _initialize(void) {
 
 	WNDCLASSEX	wc;
-//	WNDCLASSW	wndClassW;
-//	WNDCLASS	wndClass;
-
 
 	//
 	// Funzione principale del Form

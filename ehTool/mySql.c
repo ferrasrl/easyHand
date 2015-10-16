@@ -204,7 +204,7 @@ INT mys_count(DYN_SECTION_FUNC CHAR * pszFormat,...)
 	if (iLen<0) ehError();
 	va_end(Ah);
 	strIns(pszQuery,"SELECT COUNT(*) FROM ");
-
+ 
 	mySection->dwQueryCounter++;
 	if (mysql_query(mySection->mySql, pszQuery))
 	{
@@ -296,7 +296,7 @@ int mys_query(DYN_SECTION_FUNC CHAR *pQuery)
 #ifdef _CONSOLE
 	if (mySection->bDebug) {ehPrintf("%s" CRLF,pQuery);}
 #else
-	if (mySection->bDebug) {ehPrint("%s" CRLF,pQuery);}
+	if (mySection->bDebug) {printf("%s" CRLF,pQuery);}
 #endif
 	pRealQuery=pQuery;
 	if (mySection->pSqlSchema) {
@@ -367,7 +367,12 @@ int mys_queryarg(DYN_SECTION_FUNC CHAR *Mess,...)
 // mys_queryrow()
 // Legge una sola riga (query+fetch)
 //
+//EH_MYSQL_RS mys_queryrow(DYN_SECTION_FUNC CHAR *Mess,...)
+#ifdef EH_MEMO_DEBUG
+EH_MYSQL_RS mys_queryrow_dbg(DYN_SECTION_FUNC CHAR *pFile,INT iLine, CHAR *Mess,...)
+#else
 EH_MYSQL_RS mys_queryrow(DYN_SECTION_FUNC CHAR *Mess,...)
+#endif
 {
 	DYN_SECTION_GLOBALPTR
 	EH_MYSQL_RS rsSet;
@@ -385,6 +390,9 @@ EH_MYSQL_RS mys_queryrow(DYN_SECTION_FUNC CHAR *Mess,...)
 	rsSet=mys_store_result(); // Richiedo il risultato
 #else
 	rsSet=mys_store_result(DYN_SECTION); // Richiedo il risultato
+#endif
+#ifdef EH_MEMO_DEBUG
+	memDebugUpdate(rsSet,pFile,iLine);
 #endif
 	if (rsSet)
 	{
@@ -457,11 +465,9 @@ int mys_queryargBig(DYN_SECTION_FUNC DWORD dwSizeMemory,CHAR *pszFormat,...)
 //int mys_ffind(DYN_SECTION_FUNC CHAR *lpField,BOOL bNoError)
 int mys_fldfind(EH_MYSQL_RS rsSet,CHAR *lpField,BOOL bNoError)
 {
-//	DYN_SECTION_GLOBALPTR
 	int i;
-    for (i=0; i<rsSet->iFields; i++)
-	{
-		if (!strcmp(lpField,rsSet->arFields[i].name)) return i;
+    for (i=0; i<rsSet->iFields; i++) {
+		if (!strCaseCmp(lpField,rsSet->arFields[i].name)) return i; // case !!!
 	}
 	if (atoi(lpField)>0) return atoi(lpField)-1; // New
 	if (!bNoError) 
@@ -500,9 +506,9 @@ int I_mys_find(MYSQL_RES *myRes,CHAR *lpField,BOOL bNoError)
 //
 // mys_fldptr()
 //
-CHAR * mys_fldptrEx(EH_MYSQL_RS psRS,CHAR * lpField,CHAR * pDefault)
+CHAR * mys_fldptrEx(EH_MYSQL_RS psRS,CHAR * lpField,CHAR * pDefault,BOOL bNoError)
 {
-	INT i=mys_fldfind(psRS,lpField,FALSE); if (i<0) return pDefault;
+	INT i=mys_fldfind(psRS,lpField,bNoError); if (i<0) return pDefault;
 	if (!psRS->myRow) ehError(); // Controllare sei hai fatto la fetch..
 	if (!psRS->myRow[i]) return pDefault;
 	return psRS->myRow[i];
@@ -586,6 +592,13 @@ DWORD mys_lastid(DYN_SECTION_FUN) {
 
 	DYN_SECTION_GLOBALPTR
 	return (INT) mysql_insert_id(mySection->mySql); // Evento sospeso da chiudere (se si registra l'utente)
+
+}
+
+DWORD mys_affectedRow(DYN_SECTION_FUN) {
+
+	DYN_SECTION_GLOBALPTR
+	return (INT) mysql_affected_rows(mySection->mySql); // Evento sospeso da chiudere (se si registra l'utente)
 
 }
 
@@ -826,11 +839,11 @@ CHAR * mysTimeZoneField(CHAR * pszBuffer,
 	}
 
 
-	mys_queryarg("SELECT IDCODE,CODINT FROM fasce WHERE (IDCOMP=%d AND CODINT IN (%s))",ID_MOBY,lstCode);
+	mys_queryarg("SELECT uid,CODINT FROM fasce WHERE (IDCOMP=%d AND CODINT IN (%s))",ID_MOBY,lstCode);
 	myRS=mysql_store_result(sMYS.mySql);
 	while (mys_fetch_row(myRS))
 	{
-		CHAR *pIdCode=mys_geptr(myRS,"IDCODE");
+		CHAR *pIdCode=mys_geptr(myRS,"uid");
 		CHAR *pCodInt=mys_getp(myRS,"CODINT");
 		sprintf(szServ,"%s|%s",pIdCode,pCodInt);
 	}

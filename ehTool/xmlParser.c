@@ -19,7 +19,7 @@
 
 // #include "/easyhand/ehtool/main/armaker.h"
 
-static void _xmlScan(XMLDOC *lpXml,CHAR **lpSource,INT iParent);
+static void _xmlScan(XMLDOC *psDoc,CHAR **lpSource,INT iParent);
 static CHAR * _getEntity(CHAR **lppSource,INT *lpiSize,EN_XMLTAG_IS *lpiType,BYTE **lpSourcePoint);
 static INT _lineNumberSearch(BYTE *pSource,CHAR *pLimit);
 static void _lineCountUpdate(BYTE *pStart,BYTE *pEnd);
@@ -29,7 +29,7 @@ static INT iCurrentLine=0;
 //
 // xmlParser()
 //
-void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
+void * xmlParser(XMLDOC * psDoc,INT cmd,INT info,void *ptr)
 {
 	CHAR *lp;
 	BYTE *pb;
@@ -46,50 +46,51 @@ void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
 //	S_ARMAKER sArMaker;
 	BOOL bAllChildren;
 	INT iElement,idxStart;
+	CHAR * psz;
 
 	switch (cmd)
 	{
 		case WS_OPEN: // Apro un documento XML
 
-			if (lpXml->hdlDOM) xmlParser(lpXml,WS_CLOSE,0,NULL);
+			if (psDoc->hdlDOM) xmlParser(psDoc,WS_CLOSE,0,NULL);
 			switch (info&1)
 			{
 				case XMLOPEN_FILE: // ptr è un nome di un file
 					// Alloco in memoria il file
-					lpXml->hdlDOM=fileLoad(ptr,RAM_AUTO);
-					if (lpXml->hdlDOM<0) ehExit("Errore in lettura %s = %d",ptr,lpXml->hdlDOM);
-					strcpy(lpXml->szFile,ptr);
-					lpXml->lpDOM=memoLock(lpXml->hdlDOM);
+					psDoc->hdlDOM=fileLoad(ptr,RAM_AUTO);
+					if (psDoc->hdlDOM<0) ehExit("Errore in lettura %s = %d",ptr,psDoc->hdlDOM);
+					strcpy(psDoc->szFile,ptr);
+					psDoc->lpDOM=memoLock(psDoc->hdlDOM);
 					break;
 
 				case XMLOPEN_PTR: // é il file XML
-					lpXml->hdlDOM=memoAlloc(RAM_AUTO,strlen(ptr)+1,"XML");
-					strcpy(lpXml->szFile,"");
-					lpXml->lpDOM=memoLock(lpXml->hdlDOM);
-					strcpy(lpXml->lpDOM,ptr);
+					psDoc->hdlDOM=memoAlloc(RAM_AUTO,strlen(ptr)+1,"XML");
+					strcpy(psDoc->szFile,"");
+					psDoc->lpDOM=memoLock(psDoc->hdlDOM);
+					strcpy(psDoc->lpDOM,ptr);
 					break;
 			}
 
 			// Parser del XML per creare l'array degli Elementi
-			DMIReset(&lpXml->dmiElement);
-			DMIOpen(&lpXml->dmiElement,RAM_AUTO,100+info,sizeof(XMLELEMENT),"xmlElement");
+			DMIReset(&psDoc->dmiElement);
+			DMIOpen(&psDoc->dmiElement,RAM_AUTO,100+info,sizeof(XMLELEMENT),"xmlElement");
 
-			pb=lpXml->lpDOM; iCurrentLine=1;
+			pb=psDoc->lpDOM; iCurrentLine=1;
 			pb=strstr(pb,"<"); if (!pb) ehError();
-			_xmlScan(lpXml,&pb,-1);
-			lpXml->arElement=DMILock(&lpXml->dmiElement,NULL);//memoLock(lpXml->dmiElement.Hdl); // Chiudo dopo la scansione
+			_xmlScan(psDoc,&pb,-1);
+			psDoc->arElement=DMILock(&psDoc->dmiElement,NULL);//memoLock(psDoc->dmiElement.Hdl); // Chiudo dopo la scansione
 			break;
 
 		case WS_CLOSE: // Chiudo il gestore dei documenti XML
-			for (a=0;a<lpXml->dmiElement.Num;a++)
+			for (a=0;a<psDoc->dmiElement.Num;a++)
 			{
-				//DMIRead(&lpXml->dmiElement,a,&xmlElement);
-				xmlElementFree(&lpXml->arElement[a]);
+				xmlElementFree(&psDoc->arElement[a]);
 			}
 
-			if (lpXml->arId) ehFree(lpXml->arId);
-			DMIClose(&lpXml->dmiElement,"xmlElement"); lpXml->arElement=NULL;
-			memoFree(lpXml->hdlDOM,"xmlParser"); lpXml->hdlDOM=0;
+			if (psDoc->arId) ehFree(psDoc->arId);
+			ehFreePtrs(3,&psDoc->pszXml,&psDoc->pszVersion,&psDoc->pszEncoding);
+			DMIClose(&psDoc->dmiElement,"xmlElement"); psDoc->arElement=NULL;
+			memoFree(psDoc->hdlDOM,"xmlParser"); psDoc->hdlDOM=0;
 
 			break;
 
@@ -97,8 +98,8 @@ void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
 			break;
 
 		case WS_FIND:
-			idx=(INT) xmlParser(lpXml,WS_FINDKEY,info,ptr); if (idx<0) return NULL;
-			return &lpXml->arElement[idx];
+			idx=(INT) xmlParser(psDoc,WS_FINDKEY,info,ptr); if (idx<0) return NULL;
+			return &psDoc->arElement[idx];
 
 		case WS_FINDKEY: // Ritorna l'indice dell'elemento nell'array in memoria
 
@@ -108,7 +109,7 @@ void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
 				ehError();
 			if (info>0)
 			{
-				DMIRead(&lpXml->dmiElement,info,&xmlElement);
+				DMIRead(&psDoc->dmiElement,info,&xmlElement);
 				a=info; iLevel=xmlElement.iLevel;
 			}
 			else
@@ -137,8 +138,8 @@ void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
 				a--;
 				for (;a>-1;a--)
 				{
-					if (lpXml->arElement[a].iLevel==iLevel) {iIndex=a; break;}
-					if (lpXml->arElement[a].iLevel<iLevel) break;
+					if (psDoc->arElement[a].iLevel==iLevel) {iIndex=a; break;}
+					if (psDoc->arElement[a].iLevel<iLevel) break;
 				}
 				ehFree(lpMemo);
 				return (INT *) iIndex;
@@ -153,10 +154,10 @@ void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
 			if (!*lpElem) // Voglio il primo figlio
 			{
 				iIndex=-1;
-				for (;a<lpXml->dmiElement.Num;a++)
+				for (;a<psDoc->dmiElement.Num;a++)
 				{
-					if (lpXml->arElement[a].iLevel==iLevel) {iIndex=a; break;}
-					if (lpXml->arElement[a].iLevel<iLevelStart) break;
+					if (psDoc->arElement[a].iLevel==iLevel) {iIndex=a; break;}
+					if (psDoc->arElement[a].iLevel<iLevelStart) break;
 				}
 				ehFree(lpMemo);
 				return (INT *) iIndex;
@@ -168,10 +169,10 @@ void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
 			if (*lpElem=='>')
 			{
 				iIndex=-1; a++;
-				for (;a<lpXml->dmiElement.Num;a++)
+				for (;a<psDoc->dmiElement.Num;a++)
 				{
-					if (lpXml->arElement[a].iLevel==iLevel) {iIndex=a; break;}
-					if (lpXml->arElement[a].iLevel<iLevelStart) break;
+					if (psDoc->arElement[a].iLevel==iLevel) {iIndex=a; break;}
+					if (psDoc->arElement[a].iLevel<iLevelStart) break;
 				}
 				ehFree(lpMemo);
 				return (INT *) iIndex;
@@ -184,16 +185,16 @@ void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
 				//
 				// Ricerca usando il namespace (new 2008)
 				//
-				if (lpXml->bUseNamespace)
+				if (psDoc->bUseNamespace)
 				{
-					for (;a<lpXml->dmiElement.Num;a++)
+					for (;a<psDoc->dmiElement.Num;a++)
 					{
-						if ((!strcmp(lpXml->arElement[a].pName,lpElem)||!strcmp(lpElem,"*"))&&lpXml->arElement[a].iLevel==iLevel)
+						if ((!strcmp(psDoc->arElement[a].pName,lpElem)||!strcmp(lpElem,"*"))&&psDoc->arElement[a].iLevel==iLevel)
 						{
 							iIndex=a;
 							break;
 						}
-						if (lpXml->arElement[a].iLevel<iLevelStart) {if (lp) *lp='.'; ehFree(lpMemo); return (INT *) iIndex;} // Fine del giro
+						if (psDoc->arElement[a].iLevel<iLevelStart) {if (lp) *lp='.'; ehFree(lpMemo); return (INT *) iIndex;} // Fine del giro
 					}
 				}
 				//
@@ -201,14 +202,20 @@ void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
 				//
 				else
 				{
-					for (;a<lpXml->dmiElement.Num;a++)
+					INT iLevelEnter=psDoc->arElement[a].iLevel;
+					for (;a<psDoc->dmiElement.Num;a++)
 					{
-						//DMIRead(&lpXml->dmiElement,a,&xmlElement); if (!strcmp(xmlElement.szName,lpElem)&&xmlElement.iLevel==iLevel)
-						if ((!strcmp(lpXml->arElement[a].pName,lpElem)||!strcmp(lpElem,"*"))&&lpXml->arElement[a].iLevel==iLevel)
+						//DMIRead(&psDoc->dmiElement,a,&xmlElement); if (!strcmp(xmlElement.szName,lpElem)&&xmlElement.iLevel==iLevel)
+						if ((!strcmp(psDoc->arElement[a].pName,lpElem)||!strcmp(lpElem,"*"))&&psDoc->arElement[a].iLevel==iLevel)
 						{
 							iIndex=a; break;
 						}
-						if (lpXml->arElement[a].iLevel<iLevelStart) {if (lp) *lp='.'; ehFree(lpMemo); return (INT *) iIndex;} // Fine del giro
+						if (psDoc->arElement[a].iLevel<iLevelStart||
+							psDoc->arElement[a].iLevel<iLevel) {
+							if (lp) *lp='.'; 
+							ehFree(lpMemo); 
+							return (INT *) iIndex;
+						} // Fine del giro
 					}
 				}
 
@@ -230,9 +237,12 @@ void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
 		case WS_PROCESS: // Richiede un array di struttura
 
 			//win_infoarg("xmlParser: Richiedo array per %s" CRLF,ptr); getch();
-			idxStart=(INT) xmlParser(lpXml,WS_FINDKEY,info,ptr);
-			if (idxStart<0) return NULL;
+			psz=ptr;
+			idxStart=(INT) xmlParser(psDoc,WS_FINDKEY,info,psz);
+			if (idxStart<0) 
+				return NULL;
 
+			pXml=psDoc->arElement+idxStart; 
 			//printf("Trovato %d %s" CRLF,idx,ptr); getch();
 			iElement=0; 
 			for (iStep=0;iStep<2;iStep++) {
@@ -240,23 +250,22 @@ void * xmlParser(XMLDOC *lpXml,INT cmd,INT info,void *ptr)
 				idx=idxStart;
 				if (iStep==1) arsXml=ehAllocZero((iElement+1)*sizeof(XMLELEMENT *));
 				iElement=0;
-				// ARPtrMakerEx(WS_OPEN,NULL,&sArMaker);
-				pXml=lpXml->arElement+idx; 
+				pXml=psDoc->arElement+idx; 
 				if (iStep==1) {arsXml[iElement]=pXml;}
 				iElement++;
 				// ARPtrMakerEx(WS_ADD,pXml,&sArMaker);
 
 				lpSearch=pXml->pName; iLevelStart=pXml->iLevel;
-				lp=ptr; bAllChildren=FALSE; if (lp[strlen(lp)-1]=='*') bAllChildren=TRUE;
-				for (idx++;idx<lpXml->dmiElement.Num;idx++)
+				lp=ptr; bAllChildren=false; if (lp[strlen(lp)-1]=='*') bAllChildren=true;
+				for (idx++;idx<psDoc->dmiElement.Num;idx++)
 				{
-					pXml=lpXml->arElement+idx;
+					pXml=psDoc->arElement+idx;
 					if (pXml->iLevel>iLevelStart) continue;
 					if (pXml->iLevel<iLevelStart) break;
 					if (bAllChildren||
 						!strcmp(pXml->pName,lpSearch))
 					{
-						pXml=lpXml->arElement+idx;
+						pXml=psDoc->arElement+idx;
 						//ARPtrMakerEx(WS_ADD,pXml,&sArMaker);
 						if (iStep==1) {arsXml[iElement]=pXml;}
 						iElement++;
@@ -531,6 +540,23 @@ static EH_AR XmlAttribParser(BYTE *pszAtt)
 	return ar;
 }
 
+static void _decode(XMLDOC * psDoc, XMLELEMENT * psXml) {
+
+	switch (psDoc->enCharSource) {
+			
+			case ULT_CS_LATIN1:
+				psXml->pwValue=strEncodeEx(1,psXml->lpValue,1,SD_HTML);
+				break;
+	
+			case ULT_CS_UTF8:
+				psXml->pwValue=strEncodeEx(1,psXml->lpValue,2,SD_HTML,SD_UTF8);
+				break;
+
+			default:
+				break;
+	}
+}
+
 //
 //
 //
@@ -562,8 +588,27 @@ static void _xmlScan(XMLDOC * psDoc,CHAR **lpSource,INT iParent)
 		{
 			case IS_A_TAG: // E' un TAG (Elemento)
 
-				// Nome dell'elemento
-				if (!_memicmp(lpEntity,"<?xml",5)) {ehFree(lpEntity); continue;}		// Versione
+				//
+				// Intestazione del XML
+				//
+				if (!_memicmp(lpEntity,"<?xml",5)) {
+
+					psDoc->pszXml=strDup(lpEntity);
+					psDoc->pszVersion=strExtract(lpEntity,"version=\"","\"",true,false);
+					if (!psDoc->pszVersion) psDoc->pszVersion=strExtract(lpEntity,"version=\'","\'",true,false);
+					psDoc->pszEncoding=strExtract(lpEntity,"encoding=\"","\"",true,false);
+					if (!psDoc->pszEncoding) psDoc->pszVersion=strExtract(lpEntity,"encoding=\'","\'",true,false);
+
+					if (psDoc->pszEncoding) {
+						if (!strCaseCmp(psDoc->pszEncoding,"Windows-1252")) psDoc->enCharSource=ULT_CS_LATIN1;
+						else if (!strCaseCmp(psDoc->pszEncoding,"ISO-8859-1")) psDoc->enCharSource=ULT_CS_LATIN1;
+						else if (!strCaseCmp(psDoc->pszEncoding,"utf8")||!strCaseCmp(psDoc->pszEncoding,"utf-8")) psDoc->enCharSource=ULT_CS_UTF8;
+						else printf("\7Encoding XML [%s] non gestito",psDoc->pszEncoding);
+					}
+					psDoc->enCharGet=psDoc->enCharSource;
+					ehFree(lpEntity); 
+					continue;
+				}		// Versione
 
 				// Estraggo Nome elemento
 				if (lpEntity[iSize-2]=='/') {fOpen=FALSE; lpEntity[iSize-2]=0;} else fOpen=TRUE;
@@ -644,6 +689,7 @@ static void _xmlScan(XMLDOC * psDoc,CHAR **lpSource,INT iParent)
 				if (!psDoc->dmiElement.Num) ehExit("xmlError:[%s]",lpEntity);
 				DMIRead(&psDoc->dmiElement,psDoc->dmiElement.Num-1,&xmlElement);
 				xmlElement.lpValue=strDup(lpEntity);
+				_decode(psDoc,&xmlElement);
 				DMIWrite(&psDoc->dmiElement,psDoc->dmiElement.Num-1,&xmlElement);
 				ehFree(lpEntity);
 				break;
@@ -654,6 +700,7 @@ static void _xmlScan(XMLDOC * psDoc,CHAR **lpSource,INT iParent)
 				xmlElement.lpValue=strDup(lpEntity);
 				strReplace(xmlElement.lpValue,STR_CDATA_START,"");
 				strReplace(xmlElement.lpValue,STR_CDATA_END,"");
+				_decode(psDoc,&xmlElement);
 				DMIWrite(&psDoc->dmiElement,psDoc->dmiElement.Num-1,&xmlElement);
 				ehFree(lpEntity);
 				break;
@@ -678,20 +725,20 @@ static void _xmlScan(XMLDOC * psDoc,CHAR **lpSource,INT iParent)
 }
 
 #ifdef EH_MEMO_DEBUG
-CHAR * _xmlGetAttribAllocEx(XMLELEMENT *lpXml,CHAR *lpName,CHAR *pDefault,CHAR *pProgram,INT iLine)
+CHAR * _xmlGetAttribAllocEx(XMLELEMENT *psDoc,CHAR *lpName,CHAR *pDefault,CHAR *pProgram,INT iLine)
 {
 	CHAR *lp,*lpBuf=NULL;
-	lp=xmlGetAttrib(lpXml,lpName);
+	lp=xmlGetAttrib(psDoc,lpName);
 	if (lp) lpBuf=_strDupEx(lp,pProgram,iLine);
 	if (!lpBuf&&pDefault) lpBuf=_strDupEx(pDefault,pProgram,iLine);
 	return lpBuf;
 }
 
 #else
-CHAR * xmlGetAttribAlloc(XMLELEMENT *lpXml,CHAR *lpName,CHAR *pDefault)
+CHAR * xmlGetAttribAlloc(XMLELEMENT *psDoc,CHAR *lpName,CHAR *pDefault)
 {
 	CHAR *lp,*lpBuf=NULL;
-	lp=xmlGetAttrib(lpXml,lpName);
+	lp=xmlGetAttrib(psDoc,lpName);
 	if (lp) lpBuf=strDup(lp);
 	if (!lpBuf&&pDefault) lpBuf=strDup(pDefault);
 	return lpBuf;
@@ -699,17 +746,17 @@ CHAR * xmlGetAttribAlloc(XMLELEMENT *lpXml,CHAR *lpName,CHAR *pDefault)
 #endif
 
 /*
-BYTE *XMLGetAttribSQ(XMLELEMENT *lpXml,CHAR *lpName)
+BYTE *XMLGetAttribSQ(XMLELEMENT *psDoc,CHAR *lpName)
 {
 	CHAR *lps;
 	CHAR *lpe;
 	CHAR szServ[80];
 //	static BYTE szAttrib[600];
 
-	if (!lpXml->lpAttrib) return NULL;
+	if (!psDoc->lpAttrib) return NULL;
 	lp
 	sprintf(szServ," %s=\'",lpName);
-	lps=strstr(lpXml->lpAttrib,szServ); if (!lps) return NULL;
+	lps=strstr(psDoc->lpAttrib,szServ); if (!lps) return NULL;
 	lps+=(strlen(szServ));
 	lpe=strstr(lps,"\'"); if (lpe) *lpe=0; else return NULL;
 	if (strlen(lps)>(sizeof(szAttrib)-1)) ehExit("XMLGetAttribSQ(): Overload Xml Attribute memory");
@@ -719,17 +766,17 @@ BYTE *XMLGetAttribSQ(XMLELEMENT *lpXml,CHAR *lpName)
 }
 	*/
 
-CHAR * xmlGetAttrib(XMLELEMENT *lpXml,CHAR *lpName)
+CHAR * xmlGetAttrib(XMLELEMENT *psDoc,CHAR *lpName)
 {
 	CHAR *lps;
-	if (!lpXml->arAttrib) return NULL;
-//	lps=ARSearch(lpXml->arAttrib,lpName,FALSE);
-	lps=ARIsIn(lpXml->arAttrib,lpName,FALSE);
+	if (!psDoc->arAttrib) return NULL;
+//	lps=ARSearch(psDoc->arAttrib,lpName,FALSE);
+	lps=ARIsIn(psDoc->arAttrib,lpName,FALSE);
 	if (!lps)
 	{
 		CHAR szServ[200];
 		sprintf(szServ,":%s",lpName);
-		lps=ARSearch(lpXml->arAttrib,szServ,FALSE);
+		lps=ARSearch(psDoc->arAttrib,szServ,FALSE);
 	}
 	if (lps) lps+=strlen(lps)+1;
 	return lps;
@@ -738,16 +785,16 @@ CHAR * xmlGetAttrib(XMLELEMENT *lpXml,CHAR *lpName)
 //
 // xmlGetAttribStr() legge una stringa con tutti gli attributi (da liberare con ehFree();
 //
-CHAR *	xmlGetAttribStr(XMLELEMENT *lpXml)
+CHAR *	xmlGetAttribStr(XMLELEMENT *psDoc)
 {
 	CHAR *lps=NULL,*p;
 	EH_AR arNew=ARNew();
 	INT a;
-	if (!lpXml->arAttrib) return NULL;
-	for (a=0;lpXml->arAttrib[a];a++) {
-		p=lpXml->arAttrib[a]+strlen(lpXml->arAttrib[a])+1;
-		ARAddarg(&arNew,"%s=\"%s\"",lpXml->arAttrib[a],p);
-		//dwSize=strlen(lpXml->arAttrib[a])+strlen(p)+4;
+	if (!psDoc->arAttrib) return NULL;
+	for (a=0;psDoc->arAttrib[a];a++) {
+		p=psDoc->arAttrib[a]+strlen(psDoc->arAttrib[a])+1;
+		ARAddarg(&arNew,"%s=\"%s\"",psDoc->arAttrib[a],p);
+		//dwSize=strlen(psDoc->arAttrib[a])+strlen(p)+4;
 	}
 	lps=ARToString(arNew," ","","");
 	return lps;
@@ -756,13 +803,13 @@ CHAR *	xmlGetAttribStr(XMLELEMENT *lpXml)
 
 /*
 	sprintf(szServ," %s=\"",lpName);
-	lps=strstr(lpXml->lpAttrib,szServ);
+	lps=strstr(psDoc->lpAttrib,szServ);
 	if (!lps)
 	{
 		sprintf(szServ,":%s=\"",lpName);
-		lps=strstr(lpXml->lpAttrib,szServ);
+		lps=strstr(psDoc->lpAttrib,szServ);
 	}
-	if (!lps) return XMLGetAttribSQ(lpXml,lpName);
+	if (!lps) return XMLGetAttribSQ(psDoc,lpName);
 	lps+=(strlen(szServ));
 	lpe=strstr(lps,"\""); if (lpe) *lpe=0; else return NULL;
 	if (strlen(lps)>(sizeof(szAttrib)-1)) ehExit("xmlGetAttrib(): Overload Xml Attribute memory");
@@ -772,14 +819,19 @@ CHAR *	xmlGetAttribStr(XMLELEMENT *lpXml)
 }
 	*/
 
-CHAR * xmlGetValue(XMLDOC *lpXml,INT idx,CHAR *pNodeElement)
+CHAR * xmlGetValue(XMLDOC * psDoc,INT idx,CHAR *pNodeElement)
 {
 	XMLELEMENT *pXml;
-	pXml=xmlParser(lpXml, WS_FIND, idx, pNodeElement);
+	pXml=xmlParser(psDoc, WS_FIND, idx, pNodeElement);
 	if (!pXml) return NULL;
 	return pXml->lpValue;
 }
 
+CHAR * xmlGet(XMLELEMENT * pxml,CHAR *pszNodeElement)
+{
+	return xmlGetValue(pxml->psDoc,pxml->idx,pszNodeElement);
+
+}
 INT		xmlGetIdx(XMLELEMENT * pxml) {
 	if (!pxml) return 0; else return pxml->idx;
 }
@@ -834,6 +886,7 @@ XMLELEMENT * xmlElementClone(XMLELEMENT * psXmlOriginal)
 //	if (psXmlReturn->lpAttrib) psXmlReturn->lpAttrib=strDup(psXmlOriginal->lpAttrib);
 	if (psXmlReturn->arAttrib) psXmlReturn->arAttrib=ARDup(psXmlOriginal->arAttrib);
 	if (psXmlReturn->lpValue) psXmlReturn->lpValue=strDup(psXmlOriginal->lpValue);
+	if (psXmlReturn->pwValue) psXmlReturn->pwValue=wcsDup(psXmlOriginal->pwValue);
 	return psXmlReturn;
 }
 
@@ -842,12 +895,15 @@ void * xmlElementFree(XMLELEMENT * psXmlOriginal)
 	BOOL bAlloc;
 	if (!psXmlOriginal) return NULL;
 	bAlloc=psXmlOriginal->bAlloc;
-	if (psXmlOriginal->pName&&psXmlOriginal->pNameOriginal!=psXmlOriginal->pName)
-  		ehFree(psXmlOriginal->pName);
+	if (psXmlOriginal->pName&&
+		psXmlOriginal->pNameOriginal!=psXmlOriginal->pName) {
+  			ehFree(psXmlOriginal->pName);
+	}
 	ehFreeNN(psXmlOriginal->pNameOriginal);
 	ehFreeNN(psXmlOriginal->pNamespace);
 	if (psXmlOriginal->arAttrib) ARDestroy(psXmlOriginal->arAttrib);
 	ehFreeNN(psXmlOriginal->lpValue);
+	ehFreeNN(psXmlOriginal->pwValue);
 	if (bAlloc) ehFree(psXmlOriginal); else memset(psXmlOriginal,0,sizeof(XMLELEMENT));
 	return NULL;
 }
@@ -889,35 +945,35 @@ XMLELEMENT * xmlElementWithAttribute(XMLARRAY arXml,CHAR *pAttributeName,CHAR *p
 //
 // XMLIdBuilder() - 2010
 //
-INT xmlIdBuilder(XMLDOC *lpXml)
+INT xmlIdBuilder(XMLDOC *psDoc)
 {
 	INT a,iCnt=0;
 	CHAR *psz;
-	if (lpXml->arId) ehFree(lpXml->arId);
-	lpXml->arId=ehAllocZero(lpXml->dmiElement.Num*sizeof(INT));
-	for (a=0;a<lpXml->dmiElement.Num;a++)
+	if (psDoc->arId) ehFree(psDoc->arId);
+	psDoc->arId=ehAllocZero(psDoc->dmiElement.Num*sizeof(INT));
+	for (a=0;a<psDoc->dmiElement.Num;a++)
 	{
-		if (!lpXml->arElement[a].arAttrib) continue;
-		psz=xmlGetAttrib(&lpXml->arElement[a],"id");
+		if (!psDoc->arElement[a].arAttrib) continue;
+		psz=xmlGetAttrib(&psDoc->arElement[a],"id");
 		if (psz)
 		{
-			lpXml->arId[iCnt]=a; iCnt++;
+			psDoc->arId[iCnt]=a; iCnt++;
 		}
 	}
-	lpXml->arId[iCnt]=-1;
+	psDoc->arId[iCnt]=-1;
 	return iCnt;
 }
 
 //
 // XMLIdSearch() - 2010
 //
-XMLELEMENT * xmlIdSearch(XMLDOC *lpXml,CHAR *psIdValue)
+XMLELEMENT * xmlIdSearch(XMLDOC *psDoc,CHAR *psIdValue)
 {
 	INT a,iCnt=0;
 	XMLELEMENT *xmlRet;
-	if (!lpXml->arId) ehError();
-	for (a=0;lpXml->arId[a]>-1;a++)	{
-		xmlRet=&lpXml->arElement[lpXml->arId[a]];
+	if (!psDoc->arId) ehError();
+	for (a=0;psDoc->arId[a]>-1;a++)	{
+		xmlRet=&psDoc->arElement[psDoc->arId[a]];
 		if (!strcmp(xmlGetAttrib(xmlRet,"id"),psIdValue)) return xmlRet;
 	}
 	return NULL;
@@ -927,11 +983,11 @@ XMLELEMENT * xmlIdSearch(XMLDOC *lpXml,CHAR *psIdValue)
 // Ritorna l'indirizzo URI del name space indicato
 //
 	/*
-CHAR * XMLNameSpaceLocation(XMLDOC *lpXml,CHAR *pNamespace,INT idx)
+CHAR * XMLNameSpaceLocation(XMLDOC *psDoc,CHAR *pNamespace,INT idx)
 {
 	XMLELEMENT *pElement;
 	BYTE *pBuf,*pNS,*pStart,*pEnd;
-	pElement=&lpXml->arElement[idx];
+	pElement=&psDoc->arElement[idx];
 	for (pStart=pElement->lpAttrib;;)
 	{
 		pStart=strstr(pStart," xmlns:"); if (!pStart) break;

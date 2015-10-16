@@ -25,7 +25,7 @@ static BOOL _TXBHeaderParser(PS_TXB psTxb,CHAR * pszBuffer);
 //   -> Sort Line (Line ordinate)
 //   -> Filter line (line filtrate)
 
-static CHAR * _tagExtract(CHAR * lpx,CHAR * lpTag)
+static CHAR * _tagExtract(CHAR * lpx,CHAR * lpTag) 
 {
 	CHAR szBuf[80];
 	static CHAR szServ[2000];
@@ -49,11 +49,11 @@ static CHAR * _tagExtract(CHAR * lpx,CHAR * lpTag)
 //
 // _cvsString()
 //
-static CHAR * _cvsString(CHAR *pStart,CHAR cChar) {
+static CHAR * _cvsString(EH_LST lst,CHAR * pszSource,CHAR cChar) {
 	
-	CHAR *p,*pDest=pStart;
+	CHAR *p,*pDest=pszSource;
 	
-	for (p=pStart+1;*p;p++) {
+	for (p=pszSource+1;*p;p++) {
 
 		if (*p==cChar)
 		{
@@ -63,8 +63,9 @@ static CHAR * _cvsString(CHAR *pStart,CHAR cChar) {
 		*pDest=*p; pDest++;
 	}
 	*pDest=0;
-	memmove(pDest,p,strlen(p));
-	return pDest;
+	lstPush(lst,pszSource);
+//	memmove(pDest,p,strlen(p));
+	return p; // 1 per l'apice 1 per il separatore
 }
 
 //
@@ -76,104 +77,204 @@ PS_TXB CSVOpen(UTF8 * utfFileName, BOOL bUtf8ToAnsi)
 	CHAR * pFileCsv,*pFile;
 	CHAR * p=NULL;
 
-	INT a,b,iFld;
-	CHAR *	pFinal;
-	CHAR *	lpCol="\1",*lpRow="\2\n";
-	EH_AR	arRow,arFld;
+	INT b,iFld;
+//	CHAR *	pFinal;
+	CHAR *	lpCol="\1",*pszRow="\2\n";
+	EH_AR	arFld;
 	DWORD	dwSize;
 	PS_TXB	hRet;
+	INT		iFldRow;
+	INT		iRowSize,iRow=0;
+	EH_LST	lstFld;
+	EH_LST	lstRow;
+	BOOL	bFirst=false;
+	CHAR *	psz;
+	EH_LST	lstTxb;
+	INT		iFields=0;
 
 	// Caricol il file in memoria
 	pFileCsv=fileStrRead(utfFileName); if (!pFileCsv) return NULL;
 	pFile=ehAllocZero(strlen(pFileCsv)*2); strcpy(pFile,pFileCsv); ehFree(pFileCsv);
-
+	iRowSize=strlen(pszRow);
+	
+	lstFld=lstNew(); lstRow=lstNew();
 	// Trovo doppi apici e sostituisco separatori
 	for (p=pFile;*p;p++) {
 
 		if (*p=='\"') {
-			p=_cvsString(p,'\"');}
-		else if (*p=='\'') {
-			p=_cvsString(p,'\'');}
-
+			p=_cvsString(lstFld,p,'\"');
+			continue;
+		}
+//		else if (*p=='\'') {
+//			p=_cvsString(p,'\'');}
+/*
 		//
 		// Marco la colonna
 		//
-		if (*p==';') {*p=*lpCol;}
-
+		else if (*p==';'||*p==',') {
+//			lstPush(lstFld,lpCol);
+//			*p=*lpCol; 
+			continue;
+		}
+*/
 		//
 		// Marco la riga
 		//
-		if (*p=='\r'||*p=='\n') {
+		else if (*p=='\r'||*p=='\n') {
+
 			if (!memcmp(p,"\r\n",2)) 
 			{
-				strReplace(p,"\r\n",lpRow); 
+			//	strReplace(p,"\r\n",pszRow);  
+				p++;
 			}
 			else if (!memcmp(p,"\n\r",2)) 
 			{
-				strReplace(p,"\n\r",lpRow);
+			//	strReplace(p,"\n\r",pszRow);
+				p++;
 			}
 			else if (*p=='\r') {
-				strReplace(p,"\r",lpRow);
+			//	strReplace(p,"\r",pszRow);
 			}
 			else if (*p=='\n')  {
-				strReplace(p,"\n",lpRow);
+			//	strReplace(p,"\n",pszRow);
 			}
-			p++; //p+=2;
+			//p+=(iRowSize-1); //p+=2;
+			//iRow++;
+			if (!iFields) iFields=lstFld->iLength;
+			if (iFields!=lstFld->iLength)
+				printf("qui");
+			psz=lstToString(lstFld,lpCol,"","");
+			lstPush(lstRow,psz);
+			ehFree(psz); lstClean(lstFld);
+//#ifdef _DEBUG
+			if (!(lstRow->iLength%1024)) printf("%d ...   \r",lstRow->iLength);
+//#endif
 		}
-	}
+		else {
 		
+			CHAR * pszPoint=strstr(p,";");
+			CHAR * pszLF=strstr(p,"\r");
+			CHAR * pszCR=strstr(p,"\r");
+			CHAR * pszEnd;
+			CHAR * pszStr=NULL;
+			pszEnd=pszPoint;
+			if (!pszEnd||pszLF<pszEnd) pszEnd=pszLF;
+			if (!pszEnd||pszCR<pszEnd) pszEnd=pszCR;
+			if (pszEnd) 
+			{
+				pszEnd--;
+				if (pszEnd>=p) pszStr=strTake(p,pszEnd); else pszStr=strDup("");
+				lstPush(lstFld,pszStr);
+				ehFree(pszStr);
+				p=pszEnd+1;
+				continue;
+			}
+		
+		}
+
+	}
+	if (lstFld->iLength) {
+		psz=lstToString(lstFld,lpCol,"","");
+		lstPush(lstRow,psz);
+		ehFree(psz); lstClean(lstFld);		
+	}
+	lstDestroy(lstFld);
 	// puntatore alla stringa finale
-	arRow=ARCreate(pFile,lpRow,NULL); 
-	pFinal=ehAllocZero(strlen(pFile)*2);
-	ehFree(pFile);
+//	arRow=strSplit(pFile,pszRow); 
+	//pFinal=ehAllocZero(strlen(pFile)*2);
+//	ehFree(pFile);
+	lstTxb=lstNew();
 	
 	//
 	// Intesto il file TXB prendendo i dati dal CSV
 	//
-	arFld=ARCreate(arRow[0],lpCol,&iFld);
-	sprintf(pFinal,TXB_HEADER,"ANSI",lpCol,lpRow);
-	for (b=0;b<iFld;b++)
-	{
-		sprintf(strNext(pFinal),"%s,%s%3d%d",
-				strTrim(arFld[b]),
-				"A",0,0);
-		strcat(pFinal,lpCol);
-	}
-	ARDestroy(arFld);
-	strcat(pFinal,lpRow);
+	bFirst=true;
+	for (lstLoop(lstRow,psz)) {
 
+		arFld=strSplit(psz,lpCol); iFld=ARLen(arFld);
+		
+		if (bFirst) {
+			lstPushf(lstTxb,TXB_HEADER,bUtf8ToAnsi?"ANSI":"utf-8",lpCol,pszRow);
+			for (b=0;b<iFld;b++)
+			{
+				lstPushf(lstTxb,"%s,%s%3d%d",
+						strTrim(arFld[b]),
+						"A",0,0);
+				lstPush(lstTxb,lpCol);
+			}
+			lstPush(lstTxb,pszRow);
+			iFldRow=iFld;
+			bFirst=false;
+			
+		} else {
+		
+			if (iFldRow==iFld) {
+
+				for (b=0;b<iFld;b++)
+				{
+					if (bUtf8ToAnsi)
+					{
+						CHAR *pAnsi=strEncodeEx(1,strTrim(arFld[b]),2,SD_UTF8,SE_ANSI);
+						//sprintf(strNext(pFinal),"%s%s",pAnsi,lpCol);
+						lstPush(lstTxb,pAnsi);
+						ehFree(pAnsi);
+					}
+					else
+					{
+						//sprintf(strNext(pFinal),"%s%s",strTrim(arFld[b]),lpCol);
+						lstPush(lstTxb,strTrim(arFld[b]));
+					}
+					lstPush(lstTxb,lpCol);
+				}
+
+				lstPush(lstTxb,pszRow);
+			} else {
+				printf("qui");
+			}
+
+		
+		}
+		ehFree(arFld);
+	
+	}
+/*
 //	if (bEncode) { // se richiesto encoding
 	for (a=1;arRow[a];a++)
 	{
-		arFld=ARCreate(arRow[a],lpCol,&iFld);
-			
-		for (b=0;b<iFld;b++)
-		{
-//			if (b) strcat(pFinal,lpCol);
-			if (bUtf8ToAnsi)
-			{
-				CHAR *pAnsi=strEncodeEx(1,strTrim(arFld[b]),2,SD_UTF8,SE_ANSI);
-				//sprintf(strNext(pFinal),"%s%s",pAnsi,lpCol);
-				strcat(pFinal,pAnsi);
-				ehFree(pAnsi);
-			}
-			else
-			{
-				//sprintf(strNext(pFinal),"%s%s",strTrim(arFld[b]),lpCol);
-				strcat(pFinal,strTrim(arFld[b]));
-			}
-			strcat(pFinal,lpCol);
-		}
+		arFld=strSplit(arRow[a],lpCol); iFld=ARLen(arFld);
+		if (iFldRow==iFld) {
 
-		strcat(pFinal,lpRow);
-		ARDestroy(arFld);
+			for (b=0;b<iFld;b++)
+			{
+	//			if (b) strcat(pFinal,lpCol);
+				if (bUtf8ToAnsi)
+				{
+					CHAR *pAnsi=strEncodeEx(1,strTrim(arFld[b]),2,SD_UTF8,SE_ANSI);
+					//sprintf(strNext(pFinal),"%s%s",pAnsi,lpCol);
+					strcat(pFinal,pAnsi);
+					ehFree(pAnsi);
+				}
+				else
+				{
+					//sprintf(strNext(pFinal),"%s%s",strTrim(arFld[b]),lpCol);
+					strcat(pFinal,strTrim(arFld[b]));
+				}
+				strcat(pFinal,lpCol);
+			}
+
+			strcat(pFinal,pszRow);
+		}
+		ehFree(arFld);
 	}
 	ARDestroy(arRow);
-
-	dwSize=strlen(pFinal);
+*/
+	psz=lstToString(lstTxb,"","","");
+	dwSize=strlen(psz);
+	lstDestroy(lstTxb);
+	lstDestroy(lstRow);
 
 #ifdef _DEBUG
-	fileStrWrite("c:\\prova.txb",pFinal);
+	fileStrWrite("c:\\prova.txb",psz);
 #endif
 
 #ifdef UNICODE
@@ -183,12 +284,135 @@ PS_TXB CSVOpen(UTF8 * utfFileName, BOOL bUtf8ToAnsi)
 		hRet=txbOpenMemo(szFileName,pFile,dwSize,TRUE);
 	}
 #else
-	hRet=txbOpenMemo(fileName(utfFileName),pFinal,dwSize,TRUE);
+	hRet=txbOpenMemo(fileName(utfFileName),psz,dwSize,true);
 #endif
 
 //	ehFree(pFinal);
 	return hRet;
 }
+
+//
+// _txtOpen()
+//
+PS_TXB txtOpen(UTF8 * utfFileName,CHAR * pszFileHeaderEncode,INT bUtf8ToAnsi)
+{
+	// Leggo il file CSV e lo trasformo un TXB
+	CHAR * p=NULL;
+
+	INT b,iFld;
+//	CHAR *	pFinal;
+	CHAR *	lpCol="\1",*pszRow="\2\n";
+	EH_AR	arFld;
+	DWORD	dwSize;
+	PS_TXB	hRet;
+	INT		iFldRow;
+	INT		iRow=0;
+	EH_LST	lstFld;
+	EH_LST	lstRow;
+	BOOL	bFirst=false;
+	CHAR *	psz;
+	EH_LST	lstTxb;
+	EH_AR ar;
+	INT		a;
+
+	// Caricol il file in memoria
+//	pFileCsv=fileStrRead(utfFileName); if (!pFileCsv) return NULL;
+//	pFile=ehAllocZero(strlen(pFileCsv)*2); strcpy(pFile,pFileCsv); ehFree(pFileCsv);
+//	iRowSize=strlen(pszRow);
+
+	ar=ARFromTxt(utfFileName,true);
+		
+	lstFld=lstNew(); lstRow=lstNew();
+	for (a=0;ar[a];a++) {
+
+		EH_AR arf=strSplit(ar[a],"\t");	
+		for (b=0;arf[b];b++) {
+			lstPush(lstFld,arf[b]);
+		}
+		ehFree(arf);
+		psz=lstToString(lstFld,lpCol,"","");
+		lstPush(lstRow,psz);
+		ehFree(psz); lstClean(lstFld);
+	
+	}
+	ARDestroy(ar);
+	
+	lstDestroy(lstFld);
+	lstTxb=lstNew();
+	
+	//
+	// Intesto il file TXB prendendo i dati dal CSV
+	//
+	bFirst=true;
+	for (lstLoop(lstRow,psz)) {
+
+		arFld=strSplit(psz,lpCol); iFld=ARLen(arFld);
+		
+		if (bFirst) {
+			lstPushf(lstTxb,TXB_HEADER,bUtf8ToAnsi?"ANSI":pszFileHeaderEncode,lpCol,pszRow);
+			for (b=0;b<iFld;b++)
+			{
+				lstPushf(lstTxb,"%s,%s%3d%d",
+						strTrim(arFld[b]),
+						"A",0,0);
+				lstPush(lstTxb,lpCol);
+			}
+			lstPush(lstTxb,pszRow);
+			iFldRow=iFld;
+			bFirst=false;
+			
+		} else {
+		
+			if (iFldRow==iFld) {
+
+				for (b=0;b<iFld;b++)
+				{
+					if (bUtf8ToAnsi)
+					{
+						CHAR *pAnsi=strEncodeEx(1,strTrim(arFld[b]),2,SD_UTF8,SE_ANSI);
+						//sprintf(strNext(pFinal),"%s%s",pAnsi,lpCol);
+						lstPush(lstTxb,pAnsi);
+						ehFree(pAnsi);
+					}
+					else
+					{
+						//sprintf(strNext(pFinal),"%s%s",strTrim(arFld[b]),lpCol);
+						lstPush(lstTxb,strTrim(arFld[b]));
+					}
+					lstPush(lstTxb,lpCol);
+				}
+
+				lstPush(lstTxb,pszRow);
+			}
+		
+		}
+		ehFree(arFld);
+	
+	}
+
+	psz=lstToString(lstTxb,"","","");
+	dwSize=strlen(psz);
+	lstDestroy(lstTxb);
+	lstDestroy(lstRow);
+
+#ifdef _DEBUG
+	fileStrWrite("c:\\prova.txb",psz);
+#endif
+
+#ifdef UNICODE
+	{
+		CHAR szFileName[200];
+		UnicodeToChar(szFileName,fileName(utfFileName));
+		hRet=txbOpenMemo(szFileName,pFile,dwSize,TRUE);
+	}
+#else
+	hRet=txbOpenMemo(fileName(utfFileName),psz,dwSize,true);
+#endif
+
+//	ehFree(pFinal);
+	return hRet;
+}
+
 
 //
 // txbOpenOnFile()
@@ -293,10 +517,10 @@ BOOL txbClose(PS_TXB htx) {
 //
 // txbOpenMemo()
 //
-PS_TXB txbOpenMemo(CHAR *lpTxbName,
-				   CHAR *pszSource,
-				   DWORD dwSize,
-				   BOOL bUseSource)  // TRUE = psSource non viene "duplicato" ma viene usata la memoria pszSource (fa in modo di non allocare due volte) 
+PS_TXB txbOpenMemo(UTF8 *	lpTxbName,
+				   CHAR *	pszSource,
+				   DWORD	dwSize,
+				   BOOL		bUseSource)  // TRUE = psSource non viene "duplicato" ma viene usata la memoria pszSource (fa in modo di non allocare due volte) 
 {
 	PS_TXB psTxb;
 	CHAR * lp, * p;
@@ -316,14 +540,19 @@ PS_TXB txbOpenMemo(CHAR *lpTxbName,
 	if (!psTxb->pszSource) ehError();
 	psTxb->pszSource[dwSize]=0;
 	psTxb->pvPointMax=psTxb->pszSource+dwSize; // -1; // Calcolo la posizione massima del puntatore
-	if (_TXBHeaderParser(psTxb,psTxb->pszSource)) {txbClose(psTxb); return NULL;}
+	if (_TXBHeaderParser(psTxb,psTxb->pszSource)) {
+		txbClose(psTxb); 
+		if (bUseSource) 
+			ehFree(pszSource);
+		return NULL;
+	}
 
 	// 
 	// B) Conto le linee per generare l'indice
 	//
 	lp=psTxb->pszDataStart;
 	psTxb->iRealLines=0;
-	while (TRUE)
+	while (true)
 	{
 		lp=strstr(lp,psTxb->szRowSep); if (!lp) break;
 		psTxb->iRealLines++;
@@ -489,7 +718,7 @@ static BOOL _TXBHeaderParser(PS_TXB psTxb,CHAR * pszData) {
 			if (!strcmp(p,"ASCII")) psTxb->iCharType=ULT_CS_ASCII;
 			if (!strcmp(p,"ANSI")) psTxb->iCharType=ULT_CS_ANSI; 
 			if (!strcmp(p,"ISO")) psTxb->iCharType=ULT_CS_LATIN1; // Es. &euro;
-			if (!strcmp(p,"UTF-8")) psTxb->iCharType=ULT_CS_UTF8;
+			if (!strcmp(p,"UTF-8")||!strcmp(p,"UTF8")) psTxb->iCharType=ULT_CS_UTF8;
 		}
 	psTxb->iCharDecoding=psTxb->iCharType;
 
@@ -541,7 +770,9 @@ static BOOL _TXBHeaderParser(PS_TXB psTxb,CHAR * pszData) {
 		*p=0;
 		
 		//win_infoarg("Nome[%s] %d",lp,psTxb->iFieldCount);
-		ar=ARCreate(lp,",",&iFld); if (iFld!=2) ehError();
+		ar=ARCreate(lp,",",&iFld); 
+		if (iFld!=2) 
+			ehError();
 		psTxb->lpFieldInfo[psTxb->iFieldCount].lpName=strDup(ar[0]);
 		psTxb->lpFieldPtr[psTxb->iFieldCount]=NULL;
 
@@ -809,18 +1040,25 @@ CHAR * txbFldPtr(PS_TXB htx,CHAR * lpCampo)
 	// Cerco il campo
 	for (a=0;a<psTxb->iFieldCount;a++)
 	{
-		if (!strcmp(psTxb->lpFieldInfo[a].lpName,lpCampo))
+//		if (!strcmp(psTxb->lpFieldInfo[a].lpName,lpCampo))
+		if (!strCaseCmp(psTxb->lpFieldInfo[a].lpName,lpCampo))
 		{
+
 #ifdef TXB_DEBUG
 			if (!psTxb->lpFieldPtr[a])
 			{
 				ehLogWrite("Il campo %s e' NULL",lpCampo);
 				win_infoarg("Il campo %s e' NULL",lpCampo);
 			}
-#endif
+#endif 
 
 			return psTxb->lpFieldPtr[a];
 		}
+	}
+
+	if (psTxb->bFieldUnknownError)
+	{
+		ehExit("txb:[%s:%s] unknown ?",psTxb->utfNomeFile,lpCampo);
 	}
 
 #ifdef TXB_DEBUG
@@ -958,9 +1196,12 @@ BOOL txbRealGet(PS_TXB htx,INT iLine)
 	PS_TXB psTxb;
 	psTxb=htx; if (psTxb==NULL) ehExit("TXBGet(): htx e' nullo");
 
-	if (iLine>(psTxb->iRealLines-1)) return TRUE;
+	if (iLine>(psTxb->iRealLines-1)) return true;
 	psTxb->iRealCursor=iLine;
-	if (_fillBufferEx(psTxb,TXA_REAL,iLine,FALSE,NULL,"RealGet")) return FALSE; else return TRUE;
+	if (_fillBufferEx(psTxb,TXA_REAL,iLine,FALSE,NULL,"RealGet")) 
+		return false; 
+		else 
+		return true;
 
 }
 
@@ -1314,7 +1555,7 @@ static BOOL LFieldFound(CHAR *lpField,CHAR *lpList)
 						CHAR *lpFieldsInclude, // Includere questi campi separati da pipe = NULL TUTTI
 						CHAR *lpFieldsExclude, // Non includere questi campi separati da pipe = NULL non controllo
 						CHAR *lpAddFields,
-						BOOL (*ExternControl)(INT,LONG,void *))
+						BOOL (*funcNotify)(EH_SRVPARAMS))
 	{
 		INT iCount,iMax;
 		FILE *chOut;
@@ -1364,7 +1605,7 @@ static BOOL LFieldFound(CHAR *lpField,CHAR *lpList)
 				case ADB_COBN: lpTipo="N"; iLen=RecordDest[a].size; iInfo=RecordDest[a].tipo2; break;
 				case ADB_AINC: lpTipo="+"; break;
 				case ADB_BLOB: lpTipo="A"; iLen=0; break;
-				case ADB_INT32: lpTipo="L"; break;
+				case ADB_UINT32: lpTipo="L"; break;
 				default: ehError();
 			}
 			fprintf(chOut,"%s,%s%3d%d%s",
@@ -1374,7 +1615,7 @@ static BOOL LFieldFound(CHAR *lpField,CHAR *lpList)
 		}
 
 		// Se ci sono campi aggiuntivi gli aggiungo in testa
-		if (lpAddFields && ExternControl)
+		if (lpAddFields && funcNotify)
 		{
 			CHAR *lp,*lp2;
 			CHAR *lpCopy=strDup(lpAddFields);
@@ -1396,8 +1637,8 @@ static BOOL LFieldFound(CHAR *lpField,CHAR *lpList)
 		{
 			do
 			{
-				if (ExternControl) {(*ExternControl)(WS_COUNT,iCount,NULL);}
-				if (ExternControl) {if ((*ExternControl)(WS_DO,hdb,NULL)) continue;}
+				if (funcNotify) {funcNotify(WS_COUNT,iCount,NULL);}
+				if (funcNotify) {if (funcNotify(WS_DO,hdb,NULL)) continue;}
 
 				for (a=0;a<HeadDest->Field;a++) 
 				{
@@ -1420,11 +1661,14 @@ static BOOL LFieldFound(CHAR *lpField,CHAR *lpList)
 
 						case ADB_BOOL :
 						case ADB_INT  : 
-						case ADB_INT32: 
 						case ADB_AINC:
 							fprintf(chOut,"%d",adb_FldInt(hdb,RecordDest[a].desc));
 							break;
 			 
+						case ADB_UINT32: 
+							fprintf(chOut,"%u",adb_FldInt(hdb,RecordDest[a].desc));
+							break;
+
 						case ADB_ALFA :
 						case ADB_DATA :
 							//win_infoarg("[%s]",adb_FldPtr(hdb,RecordDest[a].desc));
@@ -1443,7 +1687,7 @@ static BOOL LFieldFound(CHAR *lpField,CHAR *lpList)
 				}
 
 				// Se ci sono campi aggiuntivi li chiedo al processo esterno
-				if (lpAddFields&&ExternControl)
+				if (lpAddFields&&funcNotify)
 				{
 					CHAR *lp,*lp2,*lp3;
 					CHAR *lpCopy=strDup(lpAddFields);
@@ -1453,7 +1697,7 @@ static BOOL LFieldFound(CHAR *lpField,CHAR *lpList)
 						lp2=strstr(lp,"|"); if (lp2) *lp2=0;
 						lp3=lp;
 
-						(*ExternControl)(WS_REALGET,hdb,&lp3);
+						funcNotify(WS_REALGET,hdb,&lp3);
 						fprintf(chOut,"%s",lp3);
 						ehFree(lp3);
 						fprintf(chOut,lpCol);
@@ -1476,9 +1720,15 @@ static BOOL LFieldFound(CHAR *lpField,CHAR *lpList)
 #endif
 
 //
+// txbFldImport()
 //
-//
-BOOL txbFldImport(HDB hdbDest,PS_TXB txbSource,BOOL fCutSpace)
+BOOL txbFldImport(HDB		hdbDest,
+				  PS_TXB	txbSource,
+				  BOOL		fCutSpace,
+				  BOOL		bNotResetUnknow,
+				  CHAR *	pszBlackList,
+				  CHAR *	pszWhiteList,
+				  void *	(*funcNotify)(EH_SRVPARAMS))
 {
 	INT a;
 	CHAR *pt;
@@ -1486,78 +1736,103 @@ BOOL txbFldImport(HDB hdbDest,PS_TXB txbSource,BOOL fCutSpace)
 	struct ADB_REC *RecordDest;
 	CHAR *pdata;
 	INT iError;
+	CHAR * pszFldName;
+	EH_AR arBlack=NULL,arWhite=NULL;
+	S_TXB_EXT sExt;
 
 	HeadDest=ADB_info[hdbDest].AdbHead;
 	RecordDest=(struct ADB_REC *) (HeadDest+1);
-//		win_infoarg("[%s]=[%s]",RecordDest[a].desc,pt);
+
+	if (!strEmpty(pszBlackList)) arBlack=strSplit(pszBlackList,",");
+	if (!strEmpty(pszWhiteList)) arWhite=strSplit(pszWhiteList,",");
 
 	// ---------------------------------------------------------
 	// Loop sul dizionario campi dell'Hdb di destinazione
 	//
-	
+
+	_(sExt);
+	sExt.hdb=hdbDest;
+	sExt.txb=txbSource;
+
 	for (a=0;a<HeadDest->Field;a++) 
 	{
-		pt=txbFldPtr(txbSource,RecordDest[a].desc);
-		adb_FldReset(hdbDest,RecordDest[a].desc);
+		pszFldName=RecordDest[a].desc;
+		if (arBlack) {if (ARIsIn(arBlack,pszFldName,true)) continue;}
+		if (arWhite) {if (!ARIsIn(arWhite,pszFldName,true)) continue;}
+		
+		if (funcNotify) {
+			sExt.pszName=pszFldName;
+			sExt.bReady=false;
+			funcNotify(WS_FIND,0,&sExt);
+			if (sExt.bReady) {
+				pt=sExt.pszValue;
+			} else pt=txbFldPtr(txbSource,RecordDest[a].desc);
+		}
+		else {
+			pt=txbFldPtr(txbSource,RecordDest[a].desc);
+		}
+		if (!bNotResetUnknow) adb_FldReset(hdbDest,RecordDest[a].desc);
+		
 		// ------------------------------------------------------
 		// Nuovo Nome campo inesistente nel file sorgente
 		if (pt) 
 		{
-			//adb_FldReset(hdbDest,RecordDest[a].desc);
-//		}
-//		else
-//		{
-		 switch (RecordDest[a].tipo)
-		 {
-			// da ALFA --> ALFA
-			// da BLOB --> ALFA
-			case ADB_ALFA: // <--- Destinazione
-			
-				 if (fCutSpace) strTrimRight(pt);
-				 if ((INT) strlen(pt)>RecordDest[a].size) pt[RecordDest[a].size]=0; // new 2005
-				 adb_FldWrite(hdbDest,RecordDest[a].desc,pt,0);
-				break;
-			
-			// da BLOB --> BLOB
-			// da ALFA --> BLOB
-			case ADB_BLOB: // Tipo destinazione
+			if (bNotResetUnknow) adb_FldReset(hdbDest,RecordDest[a].desc);
+			switch (RecordDest[a].tipo)
+			{
+				// da ALFA --> ALFA
+				// da BLOB --> ALFA
+				case ADB_ALFA: // <--- Destinazione
+				
+					 if (fCutSpace) strTrimRight(pt);
+					 if ((INT) strlen(pt)>RecordDest[a].size) pt[RecordDest[a].size]=0; // new 2005
+					 adb_FldWrite(hdbDest,RecordDest[a].desc,pt,0);
+					break;
+				
+				// da BLOB --> BLOB
+				// da ALFA --> BLOB
+				case ADB_BLOB: // Tipo destinazione
 				
 				  if (fCutSpace) strTrimRight(pt);
+				  /*
 #ifndef EH_CONSOLE
 				  if (strlen(pt)>1024) win_infoarg("txbFldImport: %s > 1024 ( %d )",RecordDest[a].desc,strlen(pt));
 #endif
+				  */
 				  adb_FldWrite(hdbDest,RecordDest[a].desc,pt,0);
 				  break;
 
-			case ADB_DATA:
-				pdata=adb_FldPtr(hdbDest,RecordDest[a].desc);
-				memcpy(pdata,pt,8); *(pdata+8)=0; // 0 Finale
-				break;
-				
-			case ADB_INT:
-			case ADB_INT32:
-			case ADB_BOOL:
-			case ADB_NUME:
-			case ADB_COBN:
-			case ADB_COBD:
-			case ADB_AINC:
+				case ADB_DATA:
+					pdata=adb_FldPtr(hdbDest,RecordDest[a].desc);
+					memcpy(pdata,pt,8); *(pdata+8)=0; // 0 Finale
+					break;
+					
+				case ADB_INT:
+				case ADB_UINT32:
+				case ADB_BOOL:
+				case ADB_NUME:
+				case ADB_COBN:
+				case ADB_COBD:
+				case ADB_AINC:
 
-				if (adb_FldWriteCheck(hdbDest,RecordDest[a].desc,NULL,atof(pt),TRUE,&iError))
-				{
+					if (adb_FldWriteCheck(hdbDest,RecordDest[a].desc,NULL,atof(pt),TRUE,&iError))
+					{
 #ifndef EH_CONSOLE
-					if (win_ask("Proseguo con l'importazione ?")==ESC) return TRUE;
+						if (win_ask("Proseguo con l'importazione ?")==ESC) return TRUE;
 #endif
-				}
-				else
-				{
-				  adb_FldWrite(hdbDest,RecordDest[a].desc,NULL,atof(pt));
-				}
-				break;
+					}
+					else
+					{
+						adb_FldWrite(hdbDest,RecordDest[a].desc,NULL,atof(pt));
+					}
+					break;
 				
 		 } // Switch
 		} // Else
 	}// For
- return FALSE;
+
+	ehFreePtrs(2,&arBlack,&arWhite);
+	return FALSE;
 }
 
 #endif
@@ -1641,7 +1916,7 @@ PS_TXB txbCreate(UTF8 * utfFileName,
 			default: 
 				ehExit("Tipo campo non gestito: %d",arFld[a].enType);
 				break;
-//			case ADB_INT32: lpTipo="L"; break;
+//			case ADB_UINT32: lpTipo="L"; break;
 		}
 //		psTxb->iFieldCount++;
 		fprintf(ch,"%s,%s%3d%d%s",
@@ -1704,7 +1979,7 @@ void txbArgWrite(PS_TXB lph, // Handle Txb
 
 //			case ADB_BOOL :
 //			case ADB_INT  : 
-//			case ADB_INT32: 
+//			case ADB_UINT32: 
 //			case ADB_AINC:
 			case _ID:
 			case _INTEGER:
@@ -1741,7 +2016,7 @@ void txbArgWrite(PS_TXB lph, // Handle Txb
 
 //			case ADB_BOOL :
 //			case ADB_INT  : 
-//			case ADB_INT32: 
+//			case ADB_UINT32: 
 //			case ADB_AINC:
 			case _ID:
 			case _INTEGER:

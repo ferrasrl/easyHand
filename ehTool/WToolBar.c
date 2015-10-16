@@ -7,113 +7,136 @@
 #include "/easyhand/inc/easyhand.h"
 #include "/easyhand/ehtool/WToolBar.h"
 
-LRESULT CALLBACK ToolProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
-static void GiveToolRect(WTOOLBAR *Tb,SINT x,SINT y,LPRECT lprc);
-static void LMoveKeys(WTOOLBAR *Tb);
-static void LKeySelect(WTOOLBAR *Tb,SINT wID);
-
+LRESULT CALLBACK _funcToolProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
+static void GiveToolRect(S_WTOOLBAR *Tb,INT x,INT y,LPRECT lprc);
+static void _keysMove(S_WTOOLBAR *Tb);
+static void LKeySelect(S_WTOOLBAR *Tb,INT wID);
+/*
 typedef struct {
-  HWND hWnd;
-  WTOOLBAR *Tb;
+
+//	HWND hWnd;
+	WTOOLBAR *	psTb;
+
 } TOOLBARLIST;
+*/
+static struct {
 
+	BOOL	bReady;
+//	TOOLBARLIST arsToolBat[10];
+//	INT		iToolNow;
+	INT		iPres;
+//	RECT	sRect;
+//	POINT	sClick;
+
+} _s={false};
+
+/*
 static BOOL Init=FALSE;
-static TOOLBARLIST TbList[10];
-static SINT ToolNow=-1;
-static SINT pPres=12;
+static TOOLBARLIST arsToolBat[10];
+static INT ToolNow=-1;
+static INT pPres=12;
+*/
 
-
-WTOOLBAR *ToolCreate(WTOOLBAROBJ *ObjBar,SINT KeyLx,SINT KeyLy,SINT KeyNumx)
+S_WTOOLBAR * ToolCreate(S_WTOBJ * arsObj,INT KeyLx,INT KeyLy,INT KeyNumx)
 {
     CHAR *ClassName="Crea6ToolBar";
     WNDCLASSEX wc;
-	SINT Hdl;
-	WTOOLBAR *Tb;
-	SINT a,c;
+	S_WTOOLBAR * psTb;
+	INT c;
 	RECT Rect;
 
-	if (!Init)
+	if (!_s.bReady)
 	{
-	 wc.cbSize        = sizeof(wc);
-	 wc.style         = 0;//CS_DBLCLKS;
+		_(_s);
+//		_s.iToolNow=-1;
+		_s.iPres=12;
 
-	 // Funzione chiamata per la gestione della finestra
-	 wc.lpfnWndProc   = ToolProcedure;
-	 wc.cbClsExtra    = 0;
-	 wc.cbWndExtra    = 0;
-	 wc.hInstance     = sys.EhWinInstance;
-	 wc.hIcon         = NULL;//LoadIcon(hInstance,MAKEINTRESOURCE(IDI_CREA1));
-	 wc.hCursor       = LoadCursor(NULL,IDC_ARROW);
-	 wc.hbrBackground = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
- 	 wc.lpszMenuName  = NULL;
-	 wc.lpszClassName = ClassName;
-	 wc.hIconSm       = NULL; // Small Icone  (NULL = Automatico)
-	 RegisterClassEx(&wc);
+		wc.cbSize        = sizeof(wc);
+		wc.style         = 0;//CS_DBLCLKS;
 
-     for (a=0;a<10;a++) TbList[a].hWnd=NULL;
-	 Init=TRUE;
+		// Funzione chiamata per la gestione della finestra
+		wc.lpfnWndProc   = _funcToolProcedure;
+		wc.cbClsExtra    = 0;
+		wc.cbWndExtra    = 0;
+		wc.hInstance     = sys.EhWinInstance;
+		wc.hIcon         = NULL;//LoadIcon(hInstance,MAKEINTRESOURCE(IDI_CREA1));
+		wc.hCursor       = LoadCursor(NULL,IDC_ARROW);
+		wc.hbrBackground = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
+		wc.lpszMenuName  = NULL;
+		wc.lpszClassName = ClassName;
+		wc.hIconSm       = NULL; // Small Icone  (NULL = Automatico)
+		RegisterClassEx(&wc);
+
+
+		// for (a=0;a<10;a++) _s.arsToolBat[a].hWnd=NULL;
+		_s.bReady=true;
 	}
     
 
 	// Creo memoria per struttura
 	// Conto gli oggetti
-	for (c=0;;c++) {if (ObjBar[c].iType==STOP) break;}
+	for (c=0;;c++) {if (arsObj[c].iType==STOP) break;}
 
 	//
     // Trovo il primo posto disponibile
 	//
-    ToolNow=-1;
-    for (a=0;a<10;a++) {if (TbList[a].hWnd==NULL) {ToolNow=a; break;}}
-    if (ToolNow==-1) ehExit("ToolBar Full");
+//    _s.iToolNow=-1;
+//    for (a=0;a<10;a++) {if (_s.arsToolBat[a].hWnd==NULL) {_s.iToolNow=a; break;}}
+  //  if (_s.iToolNow==-1) ehExit("ToolBar Full");
 
-	Hdl=memoAlloc(RAM_AUTO,sizeof(WTOOLBAR)+(c*sizeof(HWND)),"WToolBar");
-    Tb=memoLock(Hdl);
-    Tb->hMemo=Hdl;
-	Tb->KeyLx=KeyLx;
-	Tb->KeyLy=KeyLy;
-	Tb->KeySx=2;
-	Tb->KeySy=2;
-    Tb->iElement=c; // Numero di bottoni
-	Tb->hWndOwner=WindowNow();//WIN_info[sys.WinInputFocus].hWnd;
-	Tb->hButton=(HWND *) ((TCHAR *) (Tb)+sizeof(WTOOLBAR)); // Metto gli handle in fondo dopo la struttura
-	//Tb->hButtonTT=(HWND *) ((TCHAR *) (Tb->hButton)+(sizeof(HWND)*Tb->Num));
-	Tb->ObjBar=ObjBar;
-	TbList[ToolNow].Tb=Tb;
+//	Hdl=memoAlloc(RAM_AUTO,sizeof(WTOOLBAR)+(c*sizeof(HWND)),"WToolBar");
+//	psTb=memoLock(Hdl);
+	psTb=ehAllocZero(sizeof(S_WTOOLBAR));
+	psTb->KeyLx=KeyLx;
+	psTb->KeyLy=KeyLy;
+	psTb->KeySx=2;
+	psTb->KeySy=2;
+    psTb->iElement=c; // Numero di bottoni
+	psTb->hWndOwner=WindowNow();//WIN_info[sys.WinInputFocus].hWnd;
+//	psTb->arhButton=(HWND *) ((TCHAR *) (psTb)+sizeof(WTOOLBAR)); // Metto gli handle in fondo dopo la struttura
+	psTb->arhButton=ehAllocZero(sizeof(HWND)*psTb->iElement);
+	//psTb->hButtonTT=(HWND *) ((TCHAR *) (psTb->arhButton)+(sizeof(HWND)*psTb->Num));
+	psTb->arsObj=arsObj;
+//	_s.arsToolBat[_s.iToolNow].Tb=Tb;
 
-	Tb->hWnd=CreateWindowEx(WS_EX_NOPARENTNOTIFY|WS_EX_TOOLWINDOW,
-						   ClassName, 
-			               "",
-						   //WS_POPUP|WS_BORDER|WS_VISIBLE|WS_THICKFRAME
-						   WS_CLIPCHILDREN|WS_POPUP|WS_THICKFRAME|WS_BORDER,
-//						   WS_CLIPCHILDREN|WS_OVERLAPPED|WS_THICKFRAME,
-						   0, 90,
-						   100,100,
-						   WIN_info[sys.WinInputFocus].hWnd, 
-						   0,
-						   sys.EhWinInstance, 
-						   NULL);
-	//Rect.top=//GetSystemMetrics(SM_CYEDGE)+ // Bordo 3D
-    //          GetSystemMetrics(SM_CYSIZE)+GetSystemMetrics(SM_CYMENU);
+//	psTb->hWnd=CreateWindowEx(WS_EX_NOPARENTNOTIFY|WS_EX_TOOLWINDOW,
+	psTb->hWnd=CreateWindowEx( WS_EX_NOPARENTNOTIFY|WS_EX_TOOLWINDOW, // |WS_EX_TOOLWINDOW
+							   ClassName, 
+							   "",
+							   //WS_POPUP|WS_BORDER|WS_VISIBLE|WS_THICKFRAME
+	//						   WS_CLIPCHILDREN|WS_POPUP|WS_THICKFRAME|WS_BORDER,
+							   WS_CHILD|WS_THICKFRAME|WS_BORDER,
+							   0, 90,
+							   100,100,
+							   WIN_info[sys.WinInputFocus].hWnd, 
+							   0,
+							   sys.EhWinInstance,
+							   psTb);
 	Rect.top=0; Rect.left=0;
-	GiveToolRect(Tb,KeyNumx,(Tb->iElement/KeyNumx),&Rect);
-	MoveWindow(Tb->hWnd,Rect.left,Rect.top,Rect.right-Rect.left,Rect.bottom-Rect.top,TRUE);
+	GiveToolRect(psTb,KeyNumx,(psTb->iElement/KeyNumx),&Rect);
+	MoveWindow(psTb->hWnd,Rect.left,Rect.top,Rect.right-Rect.left,Rect.bottom-Rect.top,TRUE);
 
-	LMoveKeys(Tb);
-	//LKeySelect(Tb,0);
-	//EnableWindow(Tb->hWnd,FALSE);
-	ShowWindow(Tb->hWnd,SW_SHOW);
-	return Tb;
+	_keysMove(psTb);
+	ShowWindow(psTb->hWnd,SW_SHOW);
+	return psTb;
 }
 
-void ToolDestroy(WTOOLBAR *Tb)
+
+//
+// ToolDestroy()
+// 
+void ToolDestroy(S_WTOOLBAR * psTb)
 {
-  SINT a;
-  DestroyWindow(Tb->hWnd); 
+  DestroyWindow(psTb->hWnd); 
+  ehFree(psTb->arhButton);
+  ehFree(psTb);
+  /*
   for (a=0;a<10;a++)
   {
-	if (TbList[a].hWnd==Tb->hWnd) {TbList[a].hWnd=NULL; break;}
+	if (_s.arsToolBat[a].hWnd==psTb->hWnd) {_s.arsToolBat[a].hWnd=NULL; break;}
   }
-  memoFree(Tb->hMemo,"Crea");
+  memoFree(psTb->hMemo,"Crea");
+  */
 }
 
 
@@ -122,265 +145,274 @@ void ToolDestroy(WTOOLBAR *Tb)
 // Riposiziona i tasti in base alle dimenzioni dell'area client
 // ---------------------------------------------------------------
 
-static void LMoveKeys(WTOOLBAR *Tb)
+static void _keysMove(S_WTOOLBAR * psTb)
 {
- SINT a,x,y;
- SINT WLx;
- RECT Rect;
- SINT adx,ady;
+	INT a,x,y;
+	INT WLx;
 
- GetClientRect(Tb->hWnd,&Rect);  WLx=Rect.right-Rect.left+1;
- x=Tb->KeySx;y=Tb->KeySy;
+	RECT Rect;
+	INT adx,ady;
 
- if (Tb->ClientLx>Tb->ClientLy) {adx=pPres/2;ady=0;} else {adx=0;ady=pPres/2;}
- for (a=0;a<Tb->iElement;a++)
- {
-  // Muovo il Tasto
-  MoveWindow(Tb->hButton[a],x+adx,y+ady,Tb->KeyLx,Tb->KeyLy,FALSE);
-  x=x+Tb->KeyLx; if ((x+Tb->KeyLx+Tb->KeySx)>WLx) {x=Tb->KeySx; y=y+Tb->KeyLy;}
- }
- 
- InvalidateRect(Tb->hWnd,NULL,TRUE);
- for (a=0;a<Tb->iElement;a++)
- {
-  //ShowWindow(hButton[a],SW_SHOW);
-  InvalidateRect(Tb->hButton[a],NULL,TRUE);
- }
- 
- GetWindowRect(Tb->hWnd,&Rect);  
- Tb->WinLx=Rect.right-Rect.left;
- Tb->WinLy=Rect.bottom-Rect.top;
+	GetClientRect(psTb->hWnd,&Rect);  WLx=Rect.right-Rect.left+1;
+	x=psTb->KeySx;y=psTb->KeySy;
+
+	if (psTb->ClientLx>psTb->ClientLy) {adx=_s.iPres/2;ady=0;} else {adx=0;ady=_s.iPres/2;}
+	for (a=0;a<psTb->iElement;a++)
+	{
+		// Muovo il Tasto
+		MoveWindow(psTb->arhButton[a],x+adx,y+ady,psTb->KeyLx,psTb->KeyLy,FALSE);
+		x=x+psTb->KeyLx; if ((x+psTb->KeyLx+psTb->KeySx)>WLx) {x=psTb->KeySx; y=y+psTb->KeyLy;}
+	}
+
+	InvalidateRect(psTb->hWnd,NULL,TRUE);
+	for (a=0;a<psTb->iElement;a++)
+	{
+		//ShowWindow(hButton[a],SW_SHOW);
+		InvalidateRect(psTb->arhButton[a],NULL,TRUE);
+	}
+
+	GetWindowRect(psTb->hWnd,&Rect);  
+	psTb->WinLx=Rect.right-Rect.left;
+	psTb->WinLy=Rect.bottom-Rect.top;
 }
 
 
 // ------------------------------------------
 // Seleziona uno dei tasti ed alza l'altro
 // ------------------------------------------
-static void LKeySelect(WTOOLBAR *Tb,SINT wID)
+static void LKeySelect(S_WTOOLBAR * psTb,INT wID)
 {
-  SINT a;
+  INT a;
   CHAR *Grp;
 
-  if (Tb->ObjBar[wID].iType==O_IRADIB||Tb->ObjBar[wID].iType==O_TBCOLORRADIO)
+  if (psTb->arsObj[wID].iType==O_IRADIB||psTb->arsObj[wID].iType==O_TBCOLORRADIO)
   {
-   Grp=Tb->ObjBar[wID].lpGrp;
-   for (a=0;a<Tb->iElement;a++)
+   Grp=psTb->arsObj[wID].lpGrp;
+   for (a=0;a<psTb->iElement;a++)
    {
       if (a==wID) 
 	  {
-		  Tb->ObjBar[a].fChecked=TRUE;
-		  InvalidateRect(Tb->hButton[a],NULL,TRUE);
+		  psTb->arsObj[a].fChecked=TRUE;
+		  InvalidateRect(psTb->arhButton[a],NULL,TRUE);
 	  }
 	   else
 	  {
-		//SendMessage(hButton[wID],BM_SETCHECK,BST_UNCHECKED,0);
-		if ((Tb->ObjBar[a].fChecked!=FALSE)&&(!strcmp(Tb->ObjBar[a].lpGrp,Grp)))
+		if ((psTb->arsObj[a].fChecked!=FALSE)&&(!strcmp(psTb->arsObj[a].lpGrp,Grp)))
 		{
-		 Tb->ObjBar[a].fChecked=FALSE;
-         //SendMessage(hButton[wID],BM_SETSTATE,FALSE,0);
-		 InvalidateRect(Tb->hButton[a],NULL,TRUE);
+		 psTb->arsObj[a].fChecked=FALSE;
+		 InvalidateRect(psTb->arhButton[a],NULL,TRUE);
 		}
 
-		//SendMessage(hButton[wID],BM_SETSTATE,FALSE,0);
 	  }
    }
   }
 }
 
 
-static void GiveToolRect(WTOOLBAR *Tb,SINT x,SINT y,LPRECT lprc)
+static void GiveToolRect(S_WTOOLBAR * psTb,INT x,INT y,LPRECT lprc)
 {			
-  SINT a;
-  SINT SizePlus=GetSystemMetrics(SM_CXFRAME)*2;
-  for (;;) {if ((x*y)<Tb->iElement) y++; else break;}
+  INT a;
+  INT SizePlus=GetSystemMetrics(SM_CXFRAME)*2;
+  for (;;) {if ((x*y)<psTb->iElement) y++; else break;}
 
-  a=y*Tb->KeyLy+(Tb->KeySy<<1); lprc->bottom=lprc->top+a+SizePlus;
-  a=x*Tb->KeyLx+(Tb->KeySx<<1); lprc->right=lprc->left+a+SizePlus;
+  a=y*psTb->KeyLy+(psTb->KeySy<<1); lprc->bottom=lprc->top+a+SizePlus;
+  a=x*psTb->KeyLx+(psTb->KeySx<<1); lprc->right=lprc->left+a+SizePlus;
   // Aggiungo le presine
-  if (x>y) lprc->right+=pPres; else lprc->bottom+=pPres;
+  if (x>y) lprc->right+=_s.iPres; else lprc->bottom+=_s.iPres;
 }
 
 
-static SINT ToolFind(WTOOLBAR *Tb,CHAR *Name)
+static INT ToolFind(S_WTOOLBAR * psTb,CHAR *Name)
 {
- SINT a;
- for (a=0;a<Tb->iElement;a++)
+ INT a;
+ for (a=0;a<psTb->iElement;a++)
  {
-	 if (!strcmp(strupr(Name),strupr(Tb->ObjBar[a].lpName))) return a;
+	 if (!strcmp(strupr(Name),strupr(psTb->arsObj[a].lpName))) return a;
  }
  return -1;
 }
 
-
-static WTOOLBAR *GiveMeTb(HWND hWnd)
+/*
+static S_WTOOLBAR * GiveMeTb(HWND hWnd)
 {
- SINT a;
+ INT a;
  for (a=0;a<10;a++)
   {
-    if (TbList[a].hWnd==hWnd) return TbList[a].Tb;  
+    if (_s.arsToolBat[a].hWnd==hWnd) return _s.arsToolBat[a].Tb;  
   }
   //ehExit("ToolBar: Hwnd ?");
   ehExit("ToolBar: Hwnd ?");
   return NULL;
 }
-
-static SINT GiveMeId(WTOOLBAR *Tb,HWND hWndButton)
+*/
+static INT _toolBarGetId(S_WTOOLBAR * psTb,HWND hWndButton)
 {
-  SINT a;
-  for (a=0;a<Tb->iElement;a++)
+  INT a;
+  for (a=0;a<psTb->iElement;a++)
   {
-    if (Tb->hButton[a]==hWndButton) return a;
+    if (psTb->arhButton[a]==hWndButton) return a;
   }
   return -1;
 }
 
-static LObjEvent(WTOOLBAR *Tb,SINT wID)
+static void _objEvent(S_WTOOLBAR * psTb,INT wID)
 {
- CHAR szNome[30];
- strcpy(szNome,Tb->ObjBar[wID].lpName);
- if (Tb->ObjBar[wID].iType==O_ICONEB) strcat(szNome,"OFF");
- if (Tb->ObjBar[wID].iType==O_IRADIB) strcat(szNome,"ON");
- obj_addevent(szNome);
+	CHAR szNome[30];
+	strcpy(szNome,psTb->arsObj[wID].lpName);
+	if (psTb->arsObj[wID].iType==O_ICONEB) strcat(szNome,"OFF");
+	if (psTb->arsObj[wID].iType==O_IRADIB) strcat(szNome,"ON");
+	obj_addevent(szNome);
 }
 
 
-static LRESULT CALLBACK ToolProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam)
+
+static LRESULT CALLBACK _funcToolProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam)
 {
-	static BOOL Capture=FALSE;
+//	static BOOL bCapture=false;
+//	static POINT Dif;
 	RECT Rect; 
-	POINT Point;
-	static POINT Dif;
-    SINT Child=0;
+//	POINT Point;
+    INT Child=0;
+	
 	LPDRAWITEMSTRUCT DIs;
-    S_WINSCENA WScena;
+    // S_WINSCENA WScena;
 	CHAR *lpIcone;
-	SINT OldCol;
-    SINT wID;	
-	SINT a,x,y;
+//	INT OldCol;
+    INT wID;	
+	INT a,x,y;
 	PAINTSTRUCT ps;
 	LPRECT lprc;
-	SINT ColBg;
-	WTOOLBAR *Tb;
+	INT ColBg;
+	S_WTOOLBAR * psTb;
 	HDC hDC;
     TOOLINFO ti;
-    SINT SizePlus=GetSystemMetrics(SM_CXFRAME)*2;
-	SINT ilx,ily,slx,sly;
+    INT SizePlus=GetSystemMetrics(SM_CXFRAME)*2;
+	INT ilx,ily,slx,sly;
 	CHAR Buf[10];
-	SINT idx;
+	INT idx;
+	LPCREATESTRUCT psCs;
+	WINDOWPLACEMENT  sWp;
+	
+	psTb=(S_WTOOLBAR *) GetWindowLong(hWnd,GWL_USERDATA);
 
 	switch (message)
 	{
 		case WM_CREATE: 
 
-            if (ToolNow==-1) ehExit("ToolBar Full");
-			Tb=TbList[ToolNow].Tb;
-			TbList[ToolNow].hWnd=hWnd;
-			Tb->hWnd=hWnd;
-			Tb->hWndTT= CreateWindowEx(0, TOOLTIPS_CLASS, (LPSTR) NULL, 
+            //if (_s.iToolNow==-1) ehExit("ToolBar Full");
+
+			psCs=(LPCREATESTRUCT) lParam;
+			psTb=psCs->lpCreateParams;
+			SetWindowLong(hWnd,GWL_USERDATA,(LONG) psTb);
+
+			psTb->hWnd=hWnd;
+			psTb->hWndTT= CreateWindowEx(0, TOOLTIPS_CLASS, (LPSTR) NULL, 
 							           TTS_ALWAYSTIP, 
 							           CW_USEDEFAULT, CW_USEDEFAULT, 
 							           CW_USEDEFAULT, CW_USEDEFAULT, 
-							           Tb->hWnd, (HMENU) NULL, 
+							           psTb->hWnd, (HMENU) NULL, 
 							           sys.EhWinInstance, NULL); 
 
 			// Creo la ToolTip
 			//InitCommonControls();  
-			for (a=0;a<Tb->iElement;a++)
+			for (a=0;a<psTb->iElement;a++)
 			{
-			  Tb->hButton[a]=CreateWindow("Button","",
-                             WS_CHILD|BS_OWNERDRAW|WS_VISIBLE|
-							 //BS_FLAT|
-							 BS_PUSHLIKE|BS_NOTIFY|
-							 BS_VCENTER,						        
-							 0,0,10,10,
-							 hWnd,
-							 //GetForegroundWindow(),
-							 (HMENU) a,
-							 sys.EhWinInstance,
-							 NULL);
+				psTb->arhButton[a]=CreateWindow("Button","",
+					WS_CHILD|BS_OWNERDRAW|WS_VISIBLE|
+					//BS_FLAT|
+					BS_PUSHLIKE|BS_NOTIFY|
+					BS_VCENTER,						        
+					0,0,10,10,
+					hWnd,
+					//GetForegroundWindow(),
+					(HMENU) a,
+					sys.EhWinInstance,
+					NULL);
 
-			 // Inserisco i Nuovi ToolTip
-			 ti.cbSize = sizeof(TOOLINFO);             
-			 ti.uFlags = TTF_IDISHWND|TTF_SUBCLASS; 
-			 ti.hwnd   = hWnd;             
-			 ti.hinst  = 0;//sys.EhWinInstance; 
-			 ti.uId    = (UINT) Tb->hButton[a];             
-			 ti.lpszText    = Tb->ObjBar[a].lpHmz; 
-			 SendMessage(Tb->hWndTT, TTM_ADDTOOL, 0, (LPARAM) (LPTOOLINFO) &ti);
-			 
-			 if (!Tb->ObjBar[a].bEnable) EnableWindow(Tb->hButton[a],FALSE); 
+				// Inserisco i Nuovi ToolTip
+				ti.cbSize = sizeof(TOOLINFO);             
+				ti.uFlags = TTF_IDISHWND|TTF_SUBCLASS; 
+				ti.hwnd   = hWnd;             
+				ti.hinst  = 0;//sys.EhWinInstance; 
+				ti.uId    = (UINT) psTb->arhButton[a];             
+				ti.lpszText    = psTb->arsObj[a].lpHmz; 
+				SendMessage(psTb->hWndTT, TTM_ADDTOOL, 0, (LPARAM) (LPTOOLINFO) &ti);
+
+				if (!psTb->arsObj[a].bEnable) EnableWindow(psTb->arhButton[a],FALSE); 
 			}
 			break;
 
 		case WM_DESTROY: 
-			if ((Tb=GiveMeTb(hWnd))==NULL) break;
-			for (a=0;a<Tb->iElement;a++) DestroyWindow(Tb->hButton[a]);
-            DestroyWindow(Tb->hWndTT);
+//			if ((Tb=GiveMeTb(hWnd))==NULL) break;
+			
+			if (!psTb) break;
+			for (a=0;a<psTb->iElement;a++) DestroyWindow(psTb->arhButton[a]);
+            DestroyWindow(psTb->hWndTT);
 			break;
 
 		case WM_MOVE: break;
 		
 		case WM_SIZE: 
-			if ((Tb=GiveMeTb(hWnd))==NULL) break;
-			GetWindowRect(Tb->hWnd,&Rect);  
-            Tb->WinLx=Rect.right-Rect.left;
-            Tb->WinLy=Rect.bottom-Rect.top;
+			// if ((Tb=GiveMeTb(hWnd))==NULL) break;
+			GetWindowRect(psTb->hWnd,&Rect);  
+            psTb->WinLx=Rect.right-Rect.left;
+            psTb->WinLy=Rect.bottom-Rect.top;
 
-			GetClientRect(Tb->hWnd,&Rect);  
-            Tb->ClientLx=Rect.right-Rect.left;
-            Tb->ClientLy=Rect.bottom-Rect.top;
+			GetClientRect(psTb->hWnd,&Rect);  
+            psTb->ClientLx=Rect.right-Rect.left;
+            psTb->ClientLy=Rect.bottom-Rect.top;
 
-			LMoveKeys(Tb); //return 0;
+			_keysMove(psTb); //return 0;
 			break;
         
 		case WM_EXITSIZEMOVE: 
-			if ((Tb=GiveMeTb(hWnd))==NULL) break;
-			SetFocus(Tb->hWndOwner); 
+//			if ((Tb=GiveMeTb(hWnd))==NULL) break;
+			SetFocus(psTb->hWndOwner); 
 			break;
 
 		case WM_SIZING:
 			//fwSide = wParam;       
             lprc = (LPRECT) lParam;
-			if ((Tb=GiveMeTb(hWnd))==NULL) break;
+//			if ((Tb=GiveMeTb(hWnd))==NULL) break;
 			//dispx(" ->> %d      ",GetSystemMetrics(SM_CYEDGE));
 			switch (wParam)
 			{
-			 case WMSZ_TOP: 
-			 case WMSZ_BOTTOM: 
-			 case WMSZ_BOTTOMLEFT: 
-			 case WMSZ_BOTTOMRIGHT: 
-							   a=lprc->bottom-lprc->top-Tb->KeySy-SizePlus; 
-				               y=(a/Tb->KeyLy); if (y<1) y=1;
-							   x=(Tb->iElement/y); if (x<1) x=1;
-							   for (;;)
-							   {
-								   if ((x*y)<Tb->iElement) x++; else break;
-							   }
-                               
-							   if ((x*y)>(Tb->iElement-x))  {y=((Tb->iElement+x-1)/x);}
+				 case WMSZ_TOP: 
+				 case WMSZ_BOTTOM: 
+				 case WMSZ_BOTTOMLEFT: 
+				 case WMSZ_BOTTOMRIGHT: 
+								   a=lprc->bottom-lprc->top-psTb->KeySy-SizePlus; 
+								   y=(a/psTb->KeyLy); if (y<1) y=1;
+								   x=(psTb->iElement/y); if (x<1) x=1;
+								   for (;;)
+								   {
+									   if ((x*y)<psTb->iElement) x++; else break;
+								   }
+	                               
+								   if ((x*y)>(psTb->iElement-x))  {y=((psTb->iElement+x-1)/x);}
 
-							   break;
-			 case WMSZ_LEFT: 
-			 case WMSZ_RIGHT: 
-			 default:
-							   a=lprc->right-lprc->left-(Tb->KeySx<<1)-SizePlus; 
-							   x=(a/Tb->KeyLx); if (x<1) x=1;
-				               y=(Tb->iElement/x); if (y<1) y=1;
-							   for (;;)
-							   {
-								   if ((x*y)<Tb->iElement) y++; else break;
-							   }
+								   break;
+				 case WMSZ_LEFT: 
+				 case WMSZ_RIGHT: 
+				 default:
+								   a=lprc->right-lprc->left-(psTb->KeySx<<1)-SizePlus; 
+								   x=(a/psTb->KeyLx); if (x<1) x=1;
+								   y=(psTb->iElement/x); if (y<1) y=1;
+								   for (;;)
+								   {
+									   if ((x*y)<psTb->iElement) y++; else break;
+								   }
 							   break;
 			}
 
 
-			if ((y*x)>Tb->iElement)
+			if ((y*x)>psTb->iElement)
 			{
-			  if (x==1) y=Tb->iElement; 
-              if (y==1) x=Tb->iElement;
+			  if (x==1) y=psTb->iElement; 
+              if (y==1) x=psTb->iElement;
 			}
 
-            GiveToolRect(Tb,x,y,lprc);
+            GiveToolRect(psTb,x,y,lprc);
             return TRUE;
 
 		case WM_MEASUREITEM:
@@ -392,135 +424,166 @@ static LRESULT CALLBACK ToolProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARA
 		case WM_DRAWITEM: 
 
 			// DRAWITEMSTRUCT
-			if ((Tb=GiveMeTb(hWnd))==NULL) break;
-			DIs=(LPDRAWITEMSTRUCT) lParam;
-//			dispx("%d- %d",DIs->CtlID,DIs->itemState&ODS_CHECKED);
-
-			WinDirectDC(DIs->hDC,&WScena,NULL);
-			
-			OldCol=ModeColor(TRUE);
-			idx=DIs->CtlID%Tb->iElement;
-            lpIcone=Tb->ObjBar[idx].lpIcone;
-		
-			switch(Tb->ObjBar[idx].iType)
 			{
-			 case O_TBCOLORRADIO:
-                boxp(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,sys.ColorBackGround,SET);
-				if (strlen(lpIcone)==6)
-				{
-					Buf[2]=0;
-					memcpy(Buf,lpIcone,2);   ColBg=xtoi(Buf);
-					memcpy(Buf,lpIcone+2,2); ColBg+=(xtoi(Buf)<<8);
-					memcpy(Buf,lpIcone+4,2); ColBg+=(xtoi(Buf)<<16);
-				}
-				boxp(DIs->rcItem.left+2,DIs->rcItem.top+2,DIs->rcItem.right-3,DIs->rcItem.bottom-3,ColBg,SET); 
+				RECT rc;
+				RECTD rcd;
+				HDC dc;
+				DIs=(LPDRAWITEMSTRUCT) lParam;
+				dc=DIs->hDC;
 
-				if (*lpIcone=='*')
-				{
-                  boxp(DIs->rcItem.left+2,DIs->rcItem.top+2,DIs->rcItem.right-3,DIs->rcItem.bottom-3,sys.arsColor[15],SET); 
-				  line(DIs->rcItem.left+2,DIs->rcItem.top+2,DIs->rcItem.right-3,DIs->rcItem.bottom-3,0,SET);
-				  line(DIs->rcItem.right-3,DIs->rcItem.top+2,DIs->rcItem.left+2,DIs->rcItem.bottom-3,0,SET);
-				}
+	//			dispx("%d- %d",DIs->CtlID,DIs->itemState&ODS_CHECKED);
 
-				if ((DIs->itemState&ODS_SELECTED)||Tb->ObjBar[DIs->CtlID].fChecked)
-				{
-					box(DIs->rcItem.left+2,DIs->rcItem.top+2,DIs->rcItem.right-3,DIs->rcItem.bottom-3,15,XOR); 
-					box3d(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,1);
-					box3d(DIs->rcItem.left+1,DIs->rcItem.top+1,DIs->rcItem.right-2,DIs->rcItem.bottom-2,4);
-				}
-				else
-				{
-				 box3d(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,0);
-				}
-				break;
+				// WinDirectDC(DIs->hDC,&WScena,NULL);
+				
+//				OldCol=ModeColor(TRUE);
+				idx=DIs->CtlID%psTb->iElement;
+				lpIcone=psTb->arsObj[idx].lpIcone;
 			
-			 default:
+				switch(psTb->arsObj[idx].iType)
+				{
+					case O_TBCOLORRADIO:
+						
+						rectCopy(rc,DIs->rcItem); rc.right--; rc.bottom--;
+						dcBoxp(dc,&rc,sys.ColorBackGround);
+					//boxp(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,sys.ColorBackGround,SET);
+						if (strlen(lpIcone)==6)
+						{
+							Buf[2]=0;
+							memcpy(Buf,lpIcone,2);   ColBg=xtoi(Buf);
+							memcpy(Buf,lpIcone+2,2); ColBg+=(xtoi(Buf)<<8);
+							memcpy(Buf,lpIcone+4,2); ColBg+=(xtoi(Buf)<<16);
+						}
+
+						rc.left+=2; rc.top+=2; rc.right--; rc.bottom--;
+						dcBoxp(dc,&rc,ColBg);
+
+						//boxp(DIs->rcItem.left+2,DIs->rcItem.top+2,DIs->rcItem.right-3,DIs->rcItem.bottom-3,ColBg,SET); 
+
+					if (*lpIcone=='*')
+					{
+						dcBoxp(dc,rectFill(&rc,DIs->rcItem.left+2,DIs->rcItem.top+2,DIs->rcItem.right-3,DIs->rcItem.bottom-3),sys.arsColor[15]);
+					  //boxp(DIs->rcItem.left+2,DIs->rcItem.top+2,DIs->rcItem.right-3,DIs->rcItem.bottom-3,sys.arsColor[15],SET); 
+						dcLine(dc,DIs->rcItem.left+2,DIs->rcItem.top+2,DIs->rcItem.right-3,DIs->rcItem.bottom-3,0);
+						dcLine(dc,DIs->rcItem.right-3,DIs->rcItem.top+2,DIs->rcItem.left+2,DIs->rcItem.bottom-3,0);
+					}
+
+					if ((DIs->itemState&ODS_SELECTED)||psTb->arsObj[DIs->CtlID].fChecked)
+					{
+						//box(DIs->rcItem.left+2,DIs->rcItem.top+2,DIs->rcItem.right-3,DIs->rcItem.bottom-3,15,XOR);
+						dcBoxp(dc,rectFill(&rc,DIs->rcItem.left+2,DIs->rcItem.top+2,DIs->rcItem.right-3,DIs->rcItem.bottom-3),sys.arsColor[15]);
+						//box3d(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,1);
+						//box3d(DIs->rcItem.left+1,DIs->rcItem.top+1,DIs->rcItem.right-2,DIs->rcItem.bottom-2,4);
+					}
+					else
+					{
+					 //box3d(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,0);
+					}
+					break;
+				
+				 default:
                 
 
-				if (DIs->itemState&ODS_SELECTED) ColBg=ColorLum(sys.ColorBackGround,-4); else ColBg=sys.ColorBackGround;
-//				if (Tb->ObjBar[DIs->CtlID].fChecked)  ColBg=ColorLumRGB(sys.ColorBackGround,+20,+30,+40);
-				if (Tb->ObjBar[DIs->CtlID].fChecked)  
-				{   SINT a,b;
-					SINT Len=DIs->rcItem.right-DIs->rcItem.left+1;
-				//	ColBg=ColorFusion(sys.ColorBackGround,RGB(0,255,255),70);
-					for (a=0,b=0;a<Len;a++,b+=4)
-					{
-					// X:100:A:(len-1)  
+					if (DIs->itemState&ODS_SELECTED) ColBg=ColorLum(sys.ColorBackGround,-4); else ColBg=sys.ColorBackGround;
+					if (psTb->arsObj[DIs->CtlID].fChecked)  
+					{   INT a,b;
+						INT Len=DIs->rcItem.right-DIs->rcItem.left+1;
+						for (a=0,b=0;a<Len;a++,b+=4)
+						{
+						// X:100:A:(len-1)  
 
-					 boxp(DIs->rcItem.left+a,DIs->rcItem.top,DIs->rcItem.left+a,DIs->rcItem.bottom,ColorFusion(RGB(0,80,200),RGB(0,200,255),a*100/(Len-1)),SET);	
-					}
-					/*
-					ColBg=ColorLum(sys.ColorBackGround,-20);
-					boxp(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.left,DIs->rcItem.bottom,ColBg,SET);	
-					for (a=0,b=0;a<7;a++,b+=16)
-					{
-					 box(DIs->rcItem.left+a,DIs->rcItem.top+a,DIs->rcItem.right-a,DIs->rcItem.bottom-a,
-						  ColorFusion(ColorLum(sys.ColorBackGround,70),ColBg,b),SET);	
-					}
-					*/
+						 //boxp(DIs->rcItem.left+a,DIs->rcItem.top,DIs->rcItem.left+a,DIs->rcItem.bottom,ColorFusion(RGB(0,80,200),RGB(0,200,255),a*100/(Len-1)),SET);	
+							dcBoxp(dc,rectFill(&rc,DIs->rcItem.left+a,DIs->rcItem.top,DIs->rcItem.left+a,DIs->rcItem.bottom),ColorFusion(RGB(0,80,200),RGB(0,200,255),a*100/(Len-1)));
+						}
+						/*
+						ColBg=ColorLum(sys.ColorBackGround,-20);
+						boxp(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.left,DIs->rcItem.bottom,ColBg,SET);	
+						for (a=0,b=0;a<7;a++,b+=16)
+						{
+						 box(DIs->rcItem.left+a,DIs->rcItem.top+a,DIs->rcItem.right-a,DIs->rcItem.bottom-a,
+							  ColorFusion(ColorLum(sys.ColorBackGround,70),ColBg,b),SET);	
+						}
+						*/
 
-				} 
-				else
-				boxp(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,ColBg,SET);
-            
-				if (ico_info(&ilx,&ily,lpIcone)<0) break; //{ilx=1;ily=1;}
-				slx=(Tb->KeyLx-ilx)>>1; sly=(Tb->KeyLy-ily)>>1;
-				
-				if ((DIs->itemState&ODS_SELECTED)||Tb->ObjBar[idx].fChecked)
-				{
-					ico_disp(DIs->rcItem.left+1+slx,DIs->rcItem.top+1+sly,lpIcone);
-					box3d(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,1);
-					box3d(DIs->rcItem.left+1,DIs->rcItem.top+1,DIs->rcItem.right-2,DIs->rcItem.bottom-2,4);
+					} 
+					else
+					//boxp(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,ColBg,SET);
+						dcBoxp(dc,rectFill(&rc,DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1),ColBg);
+	            
+					if (ico_info(&ilx,&ily,lpIcone)<0) break; //{ilx=1;ily=1;}
+					slx=(psTb->KeyLx-ilx)>>1; sly=(psTb->KeyLy-ily)>>1;
+					
+					if ((DIs->itemState&ODS_SELECTED)||psTb->arsObj[idx].fChecked)
+					{
+						//ico_disp(DIs->rcItem.left+1+slx,DIs->rcItem.top+1+sly,lpIcone);
+						dcIcone(dc,DIs->rcItem.left+1+slx,DIs->rcItem.top+1+sly,lpIcone);
+					//	box3d(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,1);
+					//	box3d(DIs->rcItem.left+1,DIs->rcItem.top+1,DIs->rcItem.right-2,DIs->rcItem.bottom-2,4);
+					}
+					else
+					{
+						S_ICONE_EFFECT sEfx;
+						sEfx.enType=IEFX_GRAYSCALE;
+
+						if (DIs->itemState&ODS_DISABLED) //ico_disp3D(DIs->rcItem.left+slx,DIs->rcItem.top+sly,sys.ColorBackGround,lpIcone);
+														 //dcIconeEx(dc,DIs->rcItem.left+slx,DIs->rcItem.top+sly,lpIcone,&sEfx);
+														 dcIconeGray(dc,DIs->rcItem.left+slx,DIs->rcItem.top+sly,lpIcone,sys.Color3DShadow,0);
+														 else
+														 //ico_disp(DIs->rcItem.left+slx,DIs->rcItem.top+sly,lpIcone);
+														 dcIcone(dc,DIs->rcItem.left+slx,DIs->rcItem.top+sly,lpIcone);
+						dcBox(dc,rectFillD(&rcd,DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1),rgba(0,0,0,255),1.0);
+						//box3d(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,0);
+					}
+					
+					break;
 				}
-				else
-				{
-					if (DIs->itemState&ODS_DISABLED) ico_disp3D(DIs->rcItem.left+slx,DIs->rcItem.top+sly,sys.ColorBackGround,lpIcone);
-													 else
-													 ico_disp(DIs->rcItem.left+slx,DIs->rcItem.top+sly,lpIcone);
-					box3d(DIs->rcItem.left,DIs->rcItem.top,DIs->rcItem.right-1,DIs->rcItem.bottom-1,0);
-				}
-				break;
+	//AVANTISSIMO:
+//				ModeColor(OldCol);
+			//WinDirectDC(NULL,&WScena,NULL);
 			}
-//AVANTISSIMO:
-			ModeColor(OldCol);
-			WinDirectDC(NULL,&WScena,NULL);
 			break;
 
 		case WM_LBUTTONDOWN:
 
-			Capture=TRUE; SetCapture(hWnd);
-			 GetWindowRect(hWnd,&Rect);
-			 GetCursorPos(&Point);
-             Dif.x=Point.x-Rect.left;
-             Dif.y=Point.y-Rect.top;
-			 return TRUE;
-			 //break;
+			psTb->bCapture=true;
+			sWp.length=sizeof(sWp);
+			GetWindowPlacement(hWnd,&sWp);
+			//GetWindowRect(hWnd,&psTb->rcShot); // Posizione attuale
+			rectCopy(psTb->rcShot,sWp.rcNormalPosition);
+			GetCursorPos(&psTb->ptStart);
+			SetCapture(hWnd);
+//			Dif.x=Point.x-Rect.left;
+//			Dif.y=Point.y-Rect.top;
+			//return TRUE;
+			break;
 		
 		case WM_LBUTTONUP:
-			if (Capture) {ReleaseCapture();}
-			Capture=FALSE;
-			return TRUE;
+			if (psTb->bCapture) ReleaseCapture();
+			psTb->bCapture=false;
+			break;
+			//return TRUE;
 			//break;
 	
 		case WM_RBUTTONDOWN:
 		case WM_RBUTTONUP:
 		case WM_LBUTTONDBLCLK:
-
 		case WM_ACTIVATEAPP:
+			break;
+
 		case WM_MOUSEMOVE: 
-			if ((Tb=GiveMeTb(hWnd))==NULL) break;
-			if (Capture)
+			if (psTb->bCapture)
 			{
-			 GetCursorPos(&Point);
-			 MoveWindow(hWnd,Point.x-Dif.x,Point.y-Dif.y,Tb->WinLx,Tb->WinLy,TRUE);
+				POINT ptNow;
+				POINT ptDelta;
+				GetCursorPos(&ptNow);
+				ptDelta.x=ptNow.x-psTb->ptStart.x;
+				ptDelta.y=ptNow.y-psTb->ptStart.y;
+//				printf("%d,%d" CRLF,ptDelta.x,ptDelta.y);
+				MoveWindow(hWnd,psTb->rcShot.left+ptDelta.x,psTb->rcShot.top+ptDelta.y,psTb->WinLx,psTb->WinLy,TRUE);
 			}
 			break;
 
         case WM_NCHITTEST: 
-			if ((Tb=GiveMeTb(hWnd))==NULL) break;
-			//if (Capture) {ReleaseCapture();}
-			//Capture=FALSE;
-			//SetFocus(Tb->hWndOwner); 
+//			if ((Tb=GiveMeTb(hWnd))==NULL) break;
 			break;
 
 		// Messaggio di cambio cursore
@@ -531,11 +594,10 @@ static LRESULT CALLBACK ToolProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARA
 			wID = LOWORD(wParam);
 			if (HIWORD(wParam)==BN_CLICKED)
 			{
-			 if ((Tb=GiveMeTb(hWnd))==NULL) break;
-			 //dispx("%d [%s]        ",wID,ObjBar[wID].nome);
-			 LKeySelect(Tb,wID);
-			 LObjEvent(Tb,wID);
-			 SetFocus(Tb->hWndOwner); 
+//				 if ((Tb=GiveMeTb(hWnd))==NULL) break;
+				 LKeySelect(psTb,wID);
+				 _objEvent(psTb,wID);
+				 SetFocus(psTb->hWndOwner); 
 			}
 			
 			break;
@@ -543,24 +605,26 @@ static LRESULT CALLBACK ToolProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARA
 		case WM_PAINT: 
 
 			hDC=BeginPaint(hWnd,&ps); 
+/*
 			if ((Tb=GiveMeTb(hWnd))==NULL) break;
-			WinDirectDC(hDC,&WScena,NULL);
-			if (Tb->ClientLy>Tb->ClientLx)
+			// WinDirectDC(hDC,&WScena,NULL);
+			if (psTb->ClientLy>psTb->ClientLx)
 			{
-			 box3d(0,0,Tb->ClientLx,1,0);
-			 box3d(0,2,Tb->ClientLx,3,0);
-			 box3d(0,Tb->ClientLy-2,Tb->ClientLx,Tb->ClientLy-1,0);
-			 box3d(0,Tb->ClientLy-4,Tb->ClientLx,Tb->ClientLy-3,0);
+			 box3d(0,0,psTb->ClientLx,1,0);
+			 box3d(0,2,psTb->ClientLx,3,0);
+			 box3d(0,psTb->ClientLy-2,psTb->ClientLx,psTb->ClientLy-1,0);
+			 box3d(0,psTb->ClientLy-4,psTb->ClientLx,psTb->ClientLy-3,0);
 			}
 			 else
 			{
-			 box3d(0,0,1,Tb->ClientLy,0);
-			 box3d(2,0,3,Tb->ClientLy,0);
-			 box3d(Tb->ClientLx-2,0,Tb->ClientLx-1,Tb->ClientLy-1,0);
-			 box3d(Tb->ClientLx-4,0,Tb->ClientLx-3,Tb->ClientLy-1,0);
-			 //box3d(2,0,3,Tb->ClientLy,0);
+			 box3d(0,0,1,psTb->ClientLy,0);
+			 box3d(2,0,3,psTb->ClientLy,0);
+			 box3d(psTb->ClientLx-2,0,psTb->ClientLx-1,psTb->ClientLy-1,0);
+			 box3d(psTb->ClientLx-4,0,psTb->ClientLx-3,psTb->ClientLy-1,0);
+			 //box3d(2,0,3,psTb->ClientLy,0);
 			}
 			WinDirectDC(NULL,&WScena,NULL);
+			*/
 			EndPaint(hWnd,&ps);
 			break;
 		//case WM_SETFOCUS: IsFocus=TRUE; break;
@@ -575,9 +639,9 @@ static LRESULT CALLBACK ToolProcedure(HWND hWnd,UINT message,WPARAM wParam,LPARA
 // ---------------------------------------------------
 // Seleziona un tasto senza emettere il messaggio
 // ---------------------------------------------------
-void ToolSelect(WTOOLBAR *Tb,CHAR *Name)
+void ToolSelect(S_WTOOLBAR *Tb,CHAR *Name)
 {
-  SINT Id;
+  INT Id;
   Id=ToolFind(Tb,Name); if (Id<0) return;
   LKeySelect(Tb,Id);
 }
@@ -585,124 +649,117 @@ void ToolSelect(WTOOLBAR *Tb,CHAR *Name)
 // ---------------------------------------------------
 // Seleziona un tasto ed emette il messaggio       
 // ---------------------------------------------------
-void ToolClick(WTOOLBAR *Tb,CHAR *Name)
+void ToolClick(S_WTOOLBAR *Tb,CHAR *Name)
 {
-  SINT Id;
+  INT Id;
   Id=ToolFind(Tb,Name); if (Id<0) return;
   LKeySelect(Tb,Id);
-//  obj_addevent(Tb->ObjBar[Id].lpName);
-  LObjEvent(Tb,Id);
+//  obj_addevent(psTb->arsObj[Id].lpName);
+  _objEvent(Tb,Id);
 }
 
 // ---------------------------------------------------
 // Blocca l'uso di un oggetto
 // ---------------------------------------------------
-void ToolLock(WTOOLBAR *Tb,CHAR *Name)
+void ToolLock(S_WTOOLBAR * psTb,CHAR *Name)
 {
-  SINT Id;
-  Id=ToolFind(Tb,Name); if (Id<0) return;
-  if (!Tb->ObjBar[Id].bEnable) return;
-  Tb->ObjBar[Id].bEnable=FALSE;
-  EnableWindow(Tb->hButton[Id],FALSE); 
+  INT Id;
+  Id=ToolFind(psTb,Name); if (Id<0) return;
+  if (!psTb->arsObj[Id].bEnable) return;
+  psTb->arsObj[Id].bEnable=FALSE;
+  EnableWindow(psTb->arhButton[Id],FALSE); 
 }
 
 // ---------------------------------------------------
 // Sblocca l'uso di un oggetto
 // ---------------------------------------------------
-void ToolUnlock(WTOOLBAR *Tb,CHAR *Name)
+void ToolUnlock(S_WTOOLBAR * psTb,CHAR *Name)
 {
-  SINT Id;
-  Id=ToolFind(Tb,Name); if (Id<0) return;
-  if (Tb->ObjBar[Id].bEnable) return;
-  Tb->ObjBar[Id].bEnable=TRUE;
-  EnableWindow(Tb->hButton[Id],TRUE); 
+  INT Id;
+  Id=ToolFind(psTb,Name); if (Id<0) return;
+  if (psTb->arsObj[Id].bEnable) return;
+  psTb->arsObj[Id].bEnable=TRUE;
+  EnableWindow(psTb->arhButton[Id],TRUE); 
 }
 
-void ToolMove(WTOOLBAR *Tb,UINT Mode,WTOOLBAR *TbRef)
+//
+// ToolMove()
+//
+void ToolMove(S_WTOOLBAR * psTb,UINT Mode,S_WTOOLBAR *TbRef)
 {
-	RECT CliRect;
-	WINDOWINFO sWi;
-	WINDOWPLACEMENT Wp;
+//	RECT CliRect;
+//	WINDOWINFO sWi;
+//	WINDOWPLACEMENT Wp;
 
-	SINT x,y;
-//	RECT rcWin;
- 
- // In riferimento all'area client
- if (Mode&WTB_CLIENT)
- {
-   // Calcolo la posizione assoluta dell'area client
-	Wp.length=sizeof(Wp);
-	GetWindowInfo(Tb->hWndOwner,&sWi);
-	/*
-	//GetWindowPlacement(Tb->hWndOwner,&Wp);
-	//GetClientRect(Tb->hWndOwner,&CliRect);
-	//GetWindowRect(Tb->hWndOwner,&rcWin);
+	INT x=0,y=0;
+	RECT rcCli;
 
-   if (Wp.showCmd==SW_SHOWMAXIMIZED)
-   {
-     CliRect.top+=GetSystemMetrics(SM_CYSIZE);
-   }
-   else
-   {
-    CliRect.top=Wp.rcNormalPosition.top;
-    CliRect.left=Wp.rcNormalPosition.left;
-    CliRect.top+=GetSystemMetrics(SM_CYFRAME)+GetSystemMetrics(SM_CYSIZE);
-    CliRect.left+=GetSystemMetrics(SM_CXFRAME);
-   }
+	GetClientRect(psTb->hWndOwner,&rcCli);
 
-   // Controllo se c'è un menu
-   if (GetMenu(Tb->hWndOwner)!=NULL) CliRect.top+=GetSystemMetrics(SM_CYMENU);
-   CliRect.right+=CliRect.left;
-   CliRect.bottom+=CliRect.top;
-*/
-	if (Mode&WTB_TOP)    y=sWi.rcClient.top;//CliRect.top;
-	if (Mode&WTB_BOTTOM) y=sWi.rcClient.bottom-Tb->WinLy+1;
-	if (Mode&WTB_LEFT)   x=sWi.rcClient.left;
-	if (Mode&WTB_RIGHT)  x=sWi.rcClient.right-Tb->WinLx+1;
-	MoveWindow(Tb->hWnd,x,y,Tb->WinLx,Tb->WinLy,TRUE);
-	return;
- }
+	// In riferimento all'area client
+	if (Mode&WTB_CLIENT)
+	{
 
- // In riferimento ad un'altra tool bar
- if (Mode&WTB_TOOL)
- {
-   GetWindowRect(TbRef->hWnd,&CliRect);
-   if (Mode&WTB_TOP)    
-   {y=CliRect.top;
-    if (Mode&WTB_OVERY) y-=Tb->WinLy;
-   }
-   if (Mode&WTB_BOTTOM) 
-   {y=CliRect.bottom-Tb->WinLy+1;
-    if (Mode&WTB_OVERY) y=CliRect.bottom;
-   }
+		if (Mode&WTB_TOP)    y=rcCli.top;//CliRect.top;
+		if (Mode&WTB_BOTTOM) y=rcCli.bottom-psTb->WinLy+1;
+		if (Mode&WTB_LEFT)   x=rcCli.left;
+		if (Mode&WTB_RIGHT)  x=rcCli.right-psTb->WinLx+1;
+		MoveWindow(psTb->hWnd,x,y,psTb->WinLx,psTb->WinLy,TRUE);
+		return;
+	}
 
-   if (Mode&WTB_LEFT)   
-   {x=CliRect.left; if (Mode&WTB_OVERX) x-=Tb->WinLy;
-   }
+	// In riferimento ad un'altra tool bar
+	if (Mode&WTB_TOOL)
+	{
+		RECT rcTool;
+		WINDOWPLACEMENT sWp;
+		sWp.length=sizeof(sWp);
+		GetWindowPlacement(TbRef->hWnd,&sWp);
+		rectCopy(rcTool,sWp.rcNormalPosition);
 
-   if (Mode&WTB_RIGHT)  
-   {x=CliRect.right-Tb->WinLx+1;
-    if (Mode&WTB_OVERX) x=CliRect.right;
-   }
-   MoveWindow(Tb->hWnd,x,y,Tb->WinLx,Tb->WinLy,TRUE);
-   return;
- }
+		// GetWindowRect(TbRef->hWnd,&rcTool);
+		if (Mode&WTB_TOP)    
+		{	y=rcTool.top;
+			if (Mode&WTB_OVERY) y-=psTb->WinLy;
+		}
+		if (Mode&WTB_BOTTOM) 
+		{	y=rcTool.bottom-psTb->WinLy+1;
+			if (Mode&WTB_OVERY) y=rcTool.bottom;
+		}
+
+		if (Mode&WTB_LEFT)   
+		{	x=rcTool.left; if (Mode&WTB_OVERX) x-=psTb->WinLy;
+		}
+
+		if (Mode&WTB_RIGHT)  
+		{	x=rcTool.right-psTb->WinLx+1;
+			if (Mode&WTB_OVERX) x=rcTool.right;
+		}
+		MoveWindow(psTb->hWnd,x,y,psTb->WinLx,psTb->WinLy,TRUE);
+		return;
+	}
 }
 
-void ToolGetInfo(WTOOLBAR *Tb,WTOOLINFO *Ti)
+//
+// ToolGetInfo()
+//
+void ToolGetInfo(S_WTOOLBAR * psTb,WTOOLINFO *Ti)
 {
  RECT Rect;
- GetWindowRect(Tb->hWnd,&Rect);
+ GetWindowRect(psTb->hWnd,&Rect);
 
  Ti->x=Rect.left;
  Ti->y=Rect.top;
- Ti->Lx=Tb->WinLx;
- Ti->Ly=Tb->WinLy;
+ Ti->Lx=psTb->WinLx;
+ Ti->Ly=psTb->WinLy;
 }
 
-void ToolSet(WTOOLBAR *Tb,WTOOLINFO *Ti)
+//
+// ToolSet()
+//
+void ToolSet(S_WTOOLBAR * psTb,WTOOLINFO *Ti)
 {
-	MoveWindow(Tb->hWnd,Ti->x,Ti->y,Ti->Lx,Ti->Ly,TRUE);
+	MoveWindow(psTb->hWnd,Ti->x,Ti->y,Ti->Lx,Ti->Ly,TRUE);
 }
 
 

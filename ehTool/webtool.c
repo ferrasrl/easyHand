@@ -1430,6 +1430,7 @@ EH_AR FtpDir(CHAR *	lpUserName,        // Indicazione dell'utente
 
 
 
+
 // 
 // FtpGet()
 // Riceve un file utilizzando il protocollo FTP
@@ -1441,7 +1442,7 @@ EH_AR FtpDir(CHAR *	lpUserName,        // Indicazione dell'utente
 
 BOOL FtpGet(CHAR *	lpUserName,        // Indicazione dell'utente 
 			CHAR *	lpPassWord,
-	        CHAR *	lpFtpServer, // Server da Aprire
+	        CHAR *	pszFtpServer, // Server da Aprire
 			CHAR *	lpLocalFileDest,
 	        CHAR *	lpRemoteFileSource,  // Pagina da richiedere
 	        void *	(*funcNotify)(EH_WEB * psWeb,EH_SRVPARAMS), // Funzione di controllo e display
@@ -1455,6 +1456,8 @@ BOOL FtpGet(CHAR *	lpUserName,        // Indicazione dell'utente
 	BOOL iRet=1;
 	BOOL fAllOK=FALSE;
 	INT iError=0;
+	INT iPort;
+	EH_AR ar=NULL;
 
 	EH_WEB sWeb;
 	webPreset(&sWeb,funcNotify,pVoidParam);
@@ -1467,10 +1470,15 @@ BOOL FtpGet(CHAR *	lpUserName,        // Indicazione dell'utente
 	// Se c'è un cambio Server effettuo la connessione 
 	// 
 	if (funcNotify) funcNotify(&sWeb,WS_DO,0,TEXT("Richiesta connessione FTP"));
+		
+	ar=strSplit(pszFtpServer,":");
+	iPort=INTERNET_DEFAULT_FTP_PORT;
+	if (ARLen(ar)>1) {iPort=atoi(ar[1]); pszFtpServer=ar[0];}
+
 
 	if (!(hFtpSession=InternetConnect(hOpen, // Handle della apertura in internet
-									  lpFtpServer, // Nome del server
-									  INTERNET_DEFAULT_FTP_PORT, // Porta di accesso 80=HTTP 21=FTP
+									  pszFtpServer, // Nome del server
+									  iPort, // Porta di accesso 80=HTTP 21=FTP
 									  lpUserName, // User Name
 									  lpPassWord, // Password
 									  INTERNET_SERVICE_FTP, // Servizio richiesto HTTP/FTP ecc...
@@ -1483,7 +1491,7 @@ BOOL FtpGet(CHAR *	lpUserName,        // Indicazione dell'utente
 											else
 											win_infoarg(TEXT("InternetConnecterror: %d [%s:%s:%s]"),
 														osGetError(),
-														lpFtpServer,
+														pszFtpServer,
 														lpUserName,
 														lpPassWord,
 														ERROR_INTERNET_CANNOT_CONNECT);
@@ -1548,6 +1556,8 @@ BOOL FtpGet(CHAR *	lpUserName,        // Indicazione dell'utente
 	iRet=FALSE; fAllOK=TRUE;
 
 MYERRORE:
+	ehFree(ar);
+
 	if (lpiErrorFtp) *lpiErrorFtp=iError;
 
 	// -------------------------------------------
@@ -3440,10 +3450,10 @@ static INT WT_SocketSendControl(FWEBSERVER *psWS,
 			if (!strCaseBegin(pHeader,"Content-Length:"))
 			{
 				p=pHeader+15;//arHeader[i]+15;
-				psWS->dwContentLenght=atoi(p);
+				psWS->dwContentLength=atoi(p);
 				fLoop=TRUE;
-				if (funcNotify) (funcNotify)(WS_REALSET,psWS->dwContentLenght,0); // Dico che non conosco le dimensioni
-				WSBufRealloc(psWS,psWS->dwContentLenght+1); // Dimensioni che servono + 1 ( 0 finale)
+				if (funcNotify) (funcNotify)(WS_REALSET,psWS->dwContentLength,0); // Dico che non conosco le dimensioni
+				WSBufRealloc(psWS,psWS->dwContentLength+1); // Dimensioni che servono + 1 ( 0 finale)
 				bSizeDef=TRUE;
 			}
 
@@ -5038,7 +5048,7 @@ BOOL UrlToFile(CHAR *lpUrl,
 	//
 	if (pszFileSaveUtf)
 	{
-		BOOL fSave=TRUE;
+		BOOL fSave=true;
 		if (fAsciiEqualControl&&bTheFileExist) // Funziona solo con i file ASCII
 		{
 			BYTE *lpFC;
@@ -5125,6 +5135,70 @@ BOOL UrlToFile(CHAR *lpUrl,
 
 	FWebGetFree(&sWS);  
 	return fBuild;
+}
+
+
+BOOL SFTPGet(CHAR *	lpUserName,        // Indicazione dell'utente 
+			CHAR *	lpPassWord,
+	        CHAR *	pszFtpServer, // Server da Aprire
+			CHAR *	lpLocalFileDest,
+	        CHAR *	lpRemoteFileSource,  // Pagina da richiedere
+	        void *	(*funcNotify)(EH_WEB * psWeb,EH_SRVPARAMS), // Funzione di controllo e display
+	        BOOL	fFailIfExists, // TRUE/FALSE Visione dei passaggi di transazione
+			INT *	lpiErrorFtp, 
+			BOOL	bModoAttivo,  // TRUE se si vuole il modo attivo
+			void *	pVoidParam) 
+{
+	
+	CHAR *	pszBuffer;
+//	CHAR szFolder[200];
+	BOOL bRet=false;
+	CHAR * psz;
+	EH_LST	lst=lstNew();
+	CHAR szFileScript[300];
+	
+	CHAR * pszScpFolder="c:\\comFerra\\WinSCP";
+	CHAR * pszScpApp="winscp /script=";
+	
+	lstPush(lst,"option batch abort");
+	lstPush(lst,"option confirm off");
+	lstPush(lst,"open sftp://#[USER]#:#[PASSWORD]#@#[HOST]#/ -hostkey=\"ssh-rsa 2048 xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx\"");
+	lstPush(lst,"option transfer binary");
+	if (lpLocalFileDest)
+		lstPush(lst,"get #[FILES_SOURCE]# #[FILES_DEST]#");
+		else
+		lstPush(lst,"ls #[FILES_SOURCE]#");
+	lstPush(lst,"close");
+	lstPush(lst,"exit");
+	 
+	psz=lstToString(lst,CRLF,"","");
+	pszBuffer=ehAllocZero(32000);
+	strcpy(pszBuffer,psz);
+	ehFree(psz);
+	lstDestroy(lst);
+
+	strReplace(pszBuffer,"#[USER]#",lpUserName);
+	strReplace(pszBuffer,"#[PASSWORD]#",lpPassWord);
+	strReplace(pszBuffer,"#[HOST]#",pszFtpServer);
+
+	//strcpy(szFolder,filePath(lpRemoteFileSource));
+	strReplace(pszBuffer,"#[FILES_SOURCE]#",lpRemoteFileSource);
+//	if (!lpLocalFileDest) lpLocalFileDest="c:\\comferra\\inprod\\SFTP.txt";
+	fileRemove(lpLocalFileDest);
+	strReplace(pszBuffer,"#[FILES_DEST]#",lpLocalFileDest);
+	
+	sprintf(szFileScript,"%s\\ftpScript.txt",pszScpFolder);
+	fileStrWrite(szFileScript,pszBuffer);
+
+	sprintf(pszBuffer,"%s\\%s%s",pszScpFolder,pszScpApp,szFileScript);
+	system(pszBuffer);
+//	printf("[%s]",pszBuffer);
+	if (lpLocalFileDest) {
+	
+		if (!fileCheck(lpLocalFileDest)) bRet=true; // File non trovato
+	}
+	ehFree(pszBuffer);
+	return bRet;
 }
 
 

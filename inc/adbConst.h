@@ -19,12 +19,14 @@ extern "C" {
 	ADB_COBN,		// Cobol Numeric  New 2000
 	ADB_AINC,		// AutoIncrement  New 2000
 	ADB_BLOB,		// TEXT Note da 5 a 32K
-	ADB_INT32,		// Intero a 32 bit
+	ADB_UINT32,		// Intero senza segno a 32 bit
 
 	ADB_GEOMETRY,	// Geometrico
 	ADB_POINT,		// Point
 	ADB_BINARY,		// Dati binary
-	ADB_TIMESTAMP	// TimeStamp (UTC value)
+	ADB_TIMESTAMP,	// TimeStamp (UTC value)
+
+	ADB_COMMENT		// (COMMENT) new 2015 é un campo di commento, non usato realmente
 
 } EN_FLDTYPE;
 	#define HREC LONG

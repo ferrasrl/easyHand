@@ -26,18 +26,18 @@ static struct {
 // Funzioni private locali
 //
 static void				_ehzFormInitialize(void);
-static EH_IPT_INFO *	_LGetForm(HWND hWnd);
+static EH_IPT_INFO *	_fldGetInfo(HWND hWnd);
 static BOOL				_fldDestroy(EH_FORM_FIELD * psFld);
 static void				_fieldsReposition(EHZ_FORM *psForm);
 static void				_getParamParser(EH_FORM_FIELD * psFld,CHAR *pszParam);
 static EH_FORM_FIELD *	_fldSearch(EHZ_FORM *psForm,CHAR *pszName,INT *pIdx,INT iLine);
 static void				_LFocusTab(EHZ_FORM *psForm,INT iDir);
 static void				_keyTabManager(HWND hWnd,WPARAM wParam);
-static void				_LFldSetFocus(EH_FORM_FIELD * psFld);
-static WCHAR *			_LTextFldGet(EH_FORM_FIELD * psFld);
+static void				_fldSetFocus(EH_FORM_FIELD * psFld);
+static WCHAR *			_fldGetText(EH_FORM_FIELD * psFld);
 static WCHAR *			_LNumberFormat(EH_FORM_FIELD * psFld,double dNumber);
 static WCHAR *			_LNumberText(EH_FORM_FIELD * psFld,BOOL bForInput);
-static BOOL				_LSetFld(EHZ_FORM *psForm,EH_FORM_FIELD *psFldvoid, CHAR *pszValue);
+static BOOL				_fldSet(EHZ_FORM *psForm,EH_FORM_FIELD *psFldvoid, CHAR *pszValue);
 static void				_datePickerSetField(EH_FORM_FIELD * psFld);
 static BOOL				_isDataFld(EH_FORM_FIELD * psFld);
 static void				_extNotify(EHZ_FORM * psForm,CHAR * pszEvent,EH_FORM_FIELD * psFld);
@@ -50,7 +50,7 @@ LRESULT CALLBACK _funcFormControl(HWND hWnd,UINT message,WPARAM wParam,LPARAM lP
 LRESULT CALLBACK _funcTitle(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
 LRESULT CALLBACK _funcZone(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
 LRESULT CALLBACK _funcTextField(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam); 
-LRESULT CALLBACK _LfuncSelect(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam); 
+LRESULT CALLBACK _funcSelect(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam); 
 LRESULT CALLBACK _LfuncButton(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam);
 LRESULT CALLBACK _LfuncList(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam); 
 
@@ -109,6 +109,7 @@ void * ehzForm(struct OBJ *objCalled,INT cmd,LONG info,void *ptr)
 	EH_DISPEXT *psDex=ptr;
 	EHZ_FORM *psForm;
 	BOOL bAllocated;
+	CHAR * psz;
 	
 	psForm=objCalled->pOther;
 	if (!sForm.bReady) _ehzFormInitialize();
@@ -140,6 +141,7 @@ void * ehzForm(struct OBJ *objCalled,INT cmd,LONG info,void *ptr)
 
 			objCalled->pOther=ehAllocZero(sizeof(EHZ_FORM));
 			psForm=objCalled->pOther;
+			psForm->lstGarbage=lstNew();
 
 			psForm->enEncode=SE_ANSI;
 			psForm->psObj=objCalled;
@@ -219,9 +221,15 @@ void * ehzForm(struct OBJ *objCalled,INT cmd,LONG info,void *ptr)
 			ARDestroy(psForm->arBlurNotify);
 			*/
 			_this_Reset(psForm);
+			for (lstLoop(psForm->lstGarbage,psz)) {
+				ehFree(psz);
+			}
+			lstDestroy(psForm->lstGarbage);
+
 			fontDestroy(psForm->psFontTitle,TRUE);
 			fontDestroy(psForm->psFontInput,TRUE);
 			ehFreePtr(&objCalled->pOther);
+			
 			break;
 
 		case WS_DO: 
@@ -299,6 +307,7 @@ static BOOL _this_Add(void *this, EN_FORM_IPT iType, CHAR *pszName, CHAR *pszTex
 	sFld.iTitleWidth=-1; // Usa il default
 	sFld.enTitleAlign=DPL_LEFT;
 	sFld.dwTitleParam=DT_VCENTER;
+	sFld.bEnable=true;
 	_getParamParser(&sFld,pszParam);
 
 	idx=psForm->dmiField.Num;
@@ -595,6 +604,9 @@ static BOOL _this_Add(void *this, EN_FORM_IPT iType, CHAR *pszName, CHAR *pszTex
 	if (psFld->psFont&&psFld->wndInput)
 		SendMessageW(psFld->wndInput,WM_SETFONT,(WPARAM) psFld->psFont->hFont,MAKELPARAM(TRUE, 0));
 
+	if (!psFld->bEnable) {
+		EnableWindow(psFld->wndInput,false);
+	}
 	return FALSE;
 }
 //
@@ -719,17 +731,20 @@ static void _getParamParser(EH_FORM_FIELD * psFld,CHAR *pszParam) {
 					psFld->iWidth=atoi(arFld[1]);
 				}
 			}
-			else if (!strcmp(arFld[0],"minWidth")) psFld->iMinWidth=atoi(arFld[1]);
-			else if (!strcmp(arFld[0],"maxWidth")) psFld->iMaxWidth=atoi(arFld[1]);
-			else if (!strcmp(arFld[0],"height")) psFld->iHeight=atoi(arFld[1]);
-			else if (!strcmp(arFld[0],"maxchar")) psFld->iMaxChar=atoi(arFld[1]);
+			else if (!strcmp(arFld[0],"minWidth"))	psFld->iMinWidth=atoi(arFld[1]);
+			else if (!strcmp(arFld[0],"maxWidth"))	psFld->iMaxWidth=atoi(arFld[1]);
+			else if (!strcmp(arFld[0],"height"))	psFld->iHeight=atoi(arFld[1]);
+			else if (!strcmp(arFld[0],"maxchar"))	psFld->iMaxChar=atoi(arFld[1]);
 			else if (!strcmp(arFld[0],"afterWidth")) psFld->iAfterWidth=atoi(arFld[1]);
-			else if (!strcmp(arFld[0],"color")) psFld->colText=colorWeb(arFld[1]);
-			else if (!strcmp(arFld[0],"readonly")) psFld->bReadOnly=!strcmp(arFld[1],"true")?true:false;
-			else if (!strcmp(arFld[0],"exclude")) psFld->bExclude=!strcmp(arFld[1],"true")?true:false;
-			else if (!strcmp(arFld[0],"visible")) psFld->bVisible=!strcmp(arFld[1],"true")?true:false;
-			else if (!strcmp(arFld[0],"row")) psFld->iTextRows=atoi(arFld[1]);
-			else if (!strcmp(arFld[0],"rows")) psFld->iTextRows=atoi(arFld[1]);
+			else if (!strcmp(arFld[0],"color"))		psFld->colText=colorWeb(arFld[1]);
+			else if (!strcmp(arFld[0],"readonly"))	psFld->bReadOnly=!strcmp(arFld[1],"true")?true:false;
+			else if (!strcmp(arFld[0],"exclude"))	psFld->bExclude=!strcmp(arFld[1],"true")?true:false;
+			else if (!strcmp(arFld[0],"visible"))	psFld->bVisible=!strcmp(arFld[1],"true")?true:false;
+			else if (!strcmp(arFld[0],"enable"))	psFld->bEnable=!strcmp(arFld[1],"true")?true:false;
+			else if (!strcmp(arFld[0],"disabled"))	psFld->bEnable=!strcmp(arFld[1],"true")?false:true;
+			else if (!strcmp(arFld[0],"lock"))		psFld->bLock=strcmp(arFld[1],"true")?false:true;
+			else if (!strcmp(arFld[0],"row"))		psFld->iTextRows=atoi(arFld[1]);
+			else if (!strcmp(arFld[0],"rows"))		psFld->iTextRows=atoi(arFld[1]);
 			else if (!strcmp(arFld[0],"format")) 
 			{
 				CHAR *p;
@@ -776,16 +791,31 @@ static void _getParamParser(EH_FORM_FIELD * psFld,CHAR *pszParam) {
 						}
 					}
 					ehFree(arFont);
-
 				}
 				ARDestroy(ar);
 			}
-			else if (!strcmp(arFld[0],"title-width")) psFld->iTitleWidth=atoi(arFld[1]);
-			else if (!strcmp(arFld[0],"title-align")) psFld->enTitleAlign=_alignParser(arFld[1]);
-			else if (!strcmp(arFld[0],"title-style")) psFld->iTitleStyle=atoi(arFld[1]);
-			else if (!strcmp(arFld[0],"title-valign")) psFld->dwTitleParam=_valignParser(arFld[1]);
-			else if (!strcmp(arFld[0],"title-group")) psFld->bTitleGroup=!strcmp(arFld[1],"true")?true:false;
-			else if (!strcmp(arFld[0],"title-close")) psFld->bTitleClose=!strcmp(arFld[1],"true")?true:false;
+			else if (!strcmp(arFld[0],"title-width"))	psFld->iTitleWidth=atoi(arFld[1]);
+			else if (!strcmp(arFld[0],"title-align"))	psFld->enTitleAlign=_alignParser(arFld[1]);
+			else if (!strcmp(arFld[0],"title-style"))	psFld->iTitleStyle=atoi(arFld[1]);
+			else if (!strcmp(arFld[0],"title-valign"))	psFld->dwTitleParam=_valignParser(arFld[1]);
+			else if (!strcmp(arFld[0],"title-group"))	psFld->bTitleGroup=!strcmp(arFld[1],"true")?true:false;
+			else if (!strcmp(arFld[0],"title-close"))	psFld->bTitleClose=!strcmp(arFld[1],"true")?true:false;
+			else if (!strcmp(arFld[0],"crlf")) {
+
+				if (!strCmp(arFld[1],"crlf")) psFld->enCRLF=0;
+				else if (!strCmp(arFld[1],"cr")) psFld->enCRLF=1;
+				else if (!strCmp(arFld[2],"lf")) psFld->enCRLF=2;
+			
+			}
+			else if (!strcmp(arFld[0],"dateFormat")) 
+			{
+				if (!strCmp(arFld[1],"ymd")) psFld->enFdm=FDM_YMD8;
+				else if (!strCmp(arFld[1],"dmy")) psFld->enFdm=FDM_DMY8;
+				else if (!strCmp(arFld[1],"dt")) psFld->enFdm=FDM_DT;
+				else 
+					alert("dateFormat ? [%s] = [%s]",psFld->pszName,arRow[a]);
+
+			}
 #ifdef _DEBUG
 			else 
 				alert("param ? [%s] = [%s]",psFld->pszName,arRow[a]);
@@ -812,6 +842,8 @@ static BOOL _fldDestroy(EH_FORM_FIELD * psFld)
 	if (psFld->wndTitle) DestroyWindow(psFld->wndTitle);
 	if (psFld->wndInput) DestroyWindow(psFld->wndInput);
 	if (psFld->wndAfter) DestroyWindow(psFld->wndAfter);
+	if (psFld->arOption) 
+		ARDestroy(psFld->arOption);
 	if (psFld->funcExtern) 
 	{
 		psFld->funcExtern(&psFld->sObj,WS_CLOSE,0,NULL);
@@ -903,7 +935,7 @@ static void _ehzFormInitialize(void) {
 	wndClass.hInstance=sys.EhWinInstance;
 	wndClass.lpszClassName=WC_EH_FORM_SELECT;
 	sForm.funcSelectOld=wndClass.lpfnWndProc;
-	wndClass.lpfnWndProc=_LfuncSelect;
+	wndClass.lpfnWndProc=_funcSelect;
 	RegisterClass(&wndClass);
 
 	//
@@ -1054,7 +1086,7 @@ LRESULT CALLBACK _funcFormControl(HWND hWnd,UINT message,WPARAM wParam,LPARAM lP
 			{
 			    HDC hdcEdit = (HDC) wParam; 
 			    //HWND hwndEdit = (HWND) lParam; 
-				EH_IPT_INFO * psIptInfo=_LGetForm((HWND) lParam);
+				EH_IPT_INFO * psIptInfo=_fldGetInfo((HWND) lParam);
 				if (psIptInfo) {
 					if (psIptInfo->psFld->colText) {
 						SetTextColor(hdcEdit, psIptInfo->psFld->colText);
@@ -1529,7 +1561,7 @@ static BOOL _this_SetOptions(void *this,CHAR *pszName,EH_AR ar) {
 		{
 			p=ehAlloc(strlen(psFld->arOption[a])+20);
 			sprintf(p,"%s\t%d",psFld->arOption[a],a);
-			strAssign(&psFld->arOption[a],p);
+			strAssign(&psFld->arOption[a],p); ehFree(p);
 			p=strstr(psFld->arOption[a],"\t");
 		}
 		//if (!p) ehExit("form [%s] manca nel campo select il \\t [%s]",pszName,psFld->arOption[a]);
@@ -1569,7 +1601,7 @@ static BOOL _this_Focus(void *this,CHAR *pszName) {
 	INT idx;
 
 	if (!(psFld=_fldSearch(psForm,pszName,&idx,__LINE__))) return TRUE;
-	_LFldSetFocus(psFld);
+	_fldSetFocus(psFld);
 	psForm->idxFocus=idx;
 	psForm->psFldFocus=psFld;
 	return FALSE;
@@ -1585,7 +1617,7 @@ static BOOL	_this_Set(void *this,CHAR *pszName,void *pszValue) {
 	EH_FORM_FIELD * psFld;
 
 	if (!(psFld=_fldSearch(psForm,pszName,NULL,__LINE__))) return TRUE;
-	_LSetFld(psForm,psFld,pszValue);
+	_fldSet(psForm,psFld,pszValue);
 	return FALSE;
 }
 
@@ -1660,7 +1692,7 @@ static BOOL	_this_SetNumber(void *this,CHAR *pszName,double dNumber) {
 //
 static void *_this_Get(void *this,CHAR *pszName) {
 
-	EHZ_FORM *psForm=this;
+	EHZ_FORM * psForm=this;
 	EH_FORM_FIELD * psFld;
 	INT idx;
 	WCHAR *wcsValue=NULL;
@@ -1682,8 +1714,45 @@ static void *_this_Get(void *this,CHAR *pszName) {
 					wcsValue=_LNumberText(psFld,FALSE);
 					break;
 
+				case FLD_TEXTAREA:
+					wcsValue=_fldGetText(psFld);
+					switch (psFld->enCRLF) {
+							case 0: 
+								break;
+
+							case 1: // Solo CR > Trasforma i CR in CRLF
+								
+								{
+									EH_LST lst=lstNew();
+									EH_AR ar;
+									INT a;
+									UTF8 * psz=wcsToUtf(wcsValue);
+									ehFree(wcsValue);
+									ar=strSplit(psz,"\r\n");
+									for (a=0;ar[a];a++) {
+										strcpy(ar[a],strOmit(ar[a],"\r\n"));
+										lstPush(lst,ar[a]);
+									}
+									ehFree(psz);
+									ehFree(ar);
+									psz=lstToString(lst,"\r","",""); 
+									wcsValue=utfToWcs(psz);
+									ehFree(psz);
+									lstDestroy(lst);
+								//	lstPushPtr(psForm->lstGarbage,wcsValue); // Da liberare alla fine
+								}
+								break;
+
+							default:
+								ehError();
+								break;
+
+					}
+					break;
+
+
 				default:
-					wcsValue=_LTextFldGet(psFld);
+					wcsValue=_fldGetText(psFld);
 					break;
 			}
 			break;
@@ -1692,7 +1761,7 @@ static void *_this_Get(void *this,CHAR *pszName) {
 
 			idx=SendMessage(psFld->wndInput,CB_GETCURSEL,0,0);	if (idx<0) break;
 			p=psFld->arOption[idx]; p+=strlen(p)+1;
-			wcsValue=strToWcs(p); //ehFree(p);
+			wcsValue=strToWcs(p); 
 			break;
 
 
@@ -1700,7 +1769,7 @@ static void *_this_Get(void *this,CHAR *pszName) {
 
 			idx=SendMessage(psFld->wndInput,LB_GETCURSEL,0,0);	if (idx<0) break;
 			p=psFld->arOption[idx]; p+=strlen(p)+1;
-			wcsValue=strToWcs(p); //ehFree(p);
+			wcsValue=strToWcs(p); 
 			break;
 
 		case FCLS_BUTTON:
@@ -1846,12 +1915,13 @@ static void _this_Clean(void *this,CHAR * pszFieldFocus,CHAR * lstFldNotClean) {
 //
 // _this_Enable()
 //
-static void _this_Enable(void *this,CHAR *pszName,BOOL bEnable) {
+static void _this_Enable(void * this,CHAR *pszName,BOOL bEnable) {
 
-	EHZ_FORM *psForm=this;
+	EHZ_FORM * psForm=this;
 	EH_FORM_FIELD * psFld;
 	if (!(psFld=_fldSearch(psForm,pszName,NULL,__LINE__))) return ;
-	EnableWindow(psFld->wndInput,bEnable);
+	psFld->bEnable=bEnable;
+	EnableWindow(psFld->wndInput,psFld->bEnable);
 
 }
 
@@ -1914,7 +1984,6 @@ static void	_this_SetFunction(void *this,CHAR *pszName,void * (*funcExtern)(stru
 	EHZ_FORM *psForm=this;
 	EH_FORM_FIELD * psFld;
 	if (!(psFld=_fldSearch(psForm,pszName,NULL,__LINE__))) return;
-	psFld->funcExtern=funcExtern;
 
 	// Oggetto precedente
 	if (psFld->funcExtern) 
@@ -1922,6 +1991,7 @@ static void	_this_SetFunction(void *this,CHAR *pszName,void * (*funcExtern)(stru
 		psFld->funcExtern(&psFld->sObj,WS_CLOSE,0,NULL);
 		psFld->funcExtern(&psFld->sObj,WS_DESTROY,0,NULL);
 	}
+	psFld->funcExtern=funcExtern;
 
 	_(psFld->sObj);
 	psFld->funcExtern(&psFld->sObj,WS_CREATE,0,NULL);
@@ -2068,7 +2138,7 @@ static BOOL	_this_SqlGetRs(void *this,SQL_RS rsSet) {
 			continue;
 		}
 		pFieldValue=sql_ptr(rsSet,psFld->pszName);
-		_LSetFld(psForm,psFld,pFieldValue);
+		_fldSet(psForm,psFld,pFieldValue);
 	}
 
 	return FALSE;
@@ -2879,7 +2949,7 @@ static void	_LFocusTab(EHZ_FORM *psForm,INT iDir) {
 		break;
 	}
 	winSetFocus(psFld->wndInput);
-	_LFldSetFocus(psFld);
+	_fldSetFocus(psFld);
 }
 
 //
@@ -2887,7 +2957,7 @@ static void	_LFocusTab(EHZ_FORM *psForm,INT iDir) {
 //
 static void	_LSetFocusIdx(HWND hWnd) {
 
-	EH_IPT_INFO *psIptInfo=_LGetForm(hWnd);
+	EH_IPT_INFO *psIptInfo=_fldGetInfo(hWnd);
 	WCHAR *pwcs;
 
 	if (!psIptInfo->psFld) return;
@@ -2915,9 +2985,9 @@ static void	_LSetFocusIdx(HWND hWnd) {
 }
 
 //
-// _LGetForm() -> Trova la truttura del Form partendo dalla Hwnd dell' oggetto input
+// _fldGetInfo() -> Trova la truttura del Form partendo dalla Hwnd dell' oggetto input
 //
-static EH_IPT_INFO * _LGetForm(HWND hWnd) {
+static EH_IPT_INFO * _fldGetInfo(HWND hWnd) {
 
 	EH_IPT_INFO *psIptInfo=(EH_IPT_INFO *) GetWindowLong(hWnd,GWL_USERDATA);
 	if (psIptInfo)
@@ -2984,7 +3054,7 @@ LRESULT CALLBACK _funcTextField(HWND hWnd,UINT message,WPARAM wParam,LPARAM lPar
 	WCHAR chChar,*pwcs;
 	double dNumber;
 
-	psIptInfo=_LGetForm(hWnd);
+	psIptInfo=_fldGetInfo(hWnd);
 	if (psIptInfo) psFld=psIptInfo->psFld;
 	
 	switch (message)
@@ -2995,7 +3065,17 @@ LRESULT CALLBACK _funcTextField(HWND hWnd,UINT message,WPARAM wParam,LPARAM lPar
 			ehFreeNN(psIptInfo);
 			break;
 
+		case WM_LBUTTONDOWN:
+		case WM_RBUTTONDOWN:
+		case WM_MOUSEMOVE:
+		case WM_RBUTTONUP:
+			if (psFld->bLock) return false;
+			break;
+
 		case WM_CHAR:
+			
+			if (psFld->bLock) return false; // Input bloccato
+
 			chChar =  wParam;
 			if (chChar==9) return FALSE;
 			else if (chChar==13) 
@@ -3067,13 +3147,29 @@ LRESULT CALLBACK _funcTextField(HWND hWnd,UINT message,WPARAM wParam,LPARAM lPar
 
 
 //
-// _LfuncSelect()
+// _funcSelect()
 //
-LRESULT CALLBACK _LfuncSelect(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) {
+LRESULT CALLBACK _funcSelect(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) {
+
+	EH_FORM_FIELD * psFld=NULL;
+	EH_IPT_INFO * psIptInfo;
+	psIptInfo=_fldGetInfo(hWnd);
+	if (psIptInfo) psFld=psIptInfo->psFld;
 
 	switch (message)
 	{
-		case WM_SETFOCUS: _LSetFocusIdx(hWnd); break;
+		case WM_SETFOCUS: 
+			if (psFld->bLock) return false;
+			_LSetFocusIdx(hWnd); 
+			break;
+
+		case WM_LBUTTONDOWN:
+		case WM_RBUTTONDOWN:
+		case WM_MOUSEMOVE:
+		case WM_RBUTTONUP:
+			if (psFld->bLock) return false;
+			break;
+
 		case WM_KEYDOWN:
 			if (wParam==9) _keyTabManager(hWnd,wParam);
 			break;
@@ -3082,7 +3178,7 @@ LRESULT CALLBACK _LfuncSelect(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam
 	return CallWindowProc(sForm.funcSelectOld,hWnd,message,wParam,lParam);
 }
 
-// _LfuncSelect()
+// _funcSelect()
 //
 LRESULT CALLBACK _LfuncList(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) {
 
@@ -3097,7 +3193,7 @@ LRESULT CALLBACK _LfuncList(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) 
 }
 
 //
-// _LfuncSelect()
+// _funcSelect()
 //
 LRESULT CALLBACK _LfuncButton(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) {
 
@@ -3121,7 +3217,7 @@ LRESULT CALLBACK _LfuncButton(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam
 //
 // LFldSetFocus()
 // 
-static void _LFldSetFocus(EH_FORM_FIELD * psFld) {
+static void _fldSetFocus(EH_FORM_FIELD * psFld) {
 
 	if (psFld->enClass==FCLS_BUTTON)
 		{
@@ -3135,9 +3231,9 @@ static void _LFldSetFocus(EH_FORM_FIELD * psFld) {
 }
 
 //
-// _LTextFldGet() - Text field get
+// _fldGetText() - Text field get
 //
-static WCHAR * _LTextFldGet(EH_FORM_FIELD * psFld) {
+static WCHAR * _fldGetText(EH_FORM_FIELD * psFld) {
 
 	INT iMemo;
 	WCHAR *pwcs;
@@ -3150,9 +3246,9 @@ static WCHAR * _LTextFldGet(EH_FORM_FIELD * psFld) {
 }
 
 //
-// _LSetFld()
+// _fldSet()
 //
-static BOOL	_LSetFld(EHZ_FORM *psForm,EH_FORM_FIELD * psFld,CHAR *pszValue) {
+static BOOL	_fldSet(EHZ_FORM *psForm,EH_FORM_FIELD * psFld,CHAR *pszValue) {
 
 	WCHAR *wcsValue;
 	BYTE *pCode;
@@ -3195,6 +3291,40 @@ static BOOL	_LSetFld(EHZ_FORM *psForm,EH_FORM_FIELD * psFld,CHAR *pszValue) {
 				}
 				wcsValue=strToWcs(p);
 				ehFree(p);
+			}
+
+			else if (psFld->iType==FLD_TEXTAREA) {
+				
+				switch (psFld->enCRLF) {
+						case 0: 
+							break;
+
+						case 1: // Solo CR > Trasforma i CR in CRLF
+							
+							{
+								EH_LST lst=lstNew();
+								EH_AR ar;
+								UTF8 * psz=wcsToUtf(wcsValue);
+								ehFree(wcsValue);
+								ar=strSplit(psz,"\r");
+								for (a=0;ar[a];a++) {
+									strcpy(ar[a],strOmit(ar[a],"\n"));
+									lstPush(lst,ar[a]);
+								}
+								ehFree(psz);
+								ehFree(ar);
+								psz=lstToString(lst,CRLF,"",""); 
+								wcsValue=utfToWcs(psz);
+								ehFree(psz);
+								lstDestroy(lst);
+							}
+							break;
+
+						default:
+							ehError();
+							break;
+
+				}
 			}
 			SetWindowTextW(psFld->wndInput,wcsValue);
 			break;
@@ -3307,7 +3437,7 @@ static WCHAR * _LNumberText(EH_FORM_FIELD * psFld,BOOL bForInput) {
 	WCHAR *pwcs;
 	CHAR *psz,*pv;
 
-	pwcs=_LTextFldGet(psFld);
+	pwcs=_fldGetText(psFld);
 	psz=wcsToStr(pwcs); ehFree(pwcs);
 	while (strReplace(psz,".","")); // <-- Tolgo i punti della separazione delle Virgole
 
@@ -3388,7 +3518,7 @@ static WCHAR * _LNumberText(EH_FORM_FIELD * psFld,BOOL bForInput) {
 					case ADB_INT:		// Intero a 16bit
 					case ADB_BOOL:		// Valore vero o falso
 					case ADB_AINC:		// AutoIncrement  New 2000
-					case ADB_INT32:		// Intero a 32 bit
+					case ADB_UINT32:		// Intero a 32 bit
 						sprintf(szServ,"%d",adb_FldInt(hdb,psFld->pszName));
 						pFieldValue=szServ;
 						break;
@@ -3412,7 +3542,7 @@ static WCHAR * _LNumberText(EH_FORM_FIELD * psFld,BOOL bForInput) {
 			}
 				
 
-			_LSetFld(psForm,psFld,pFieldValue);
+			_fldSet(psForm,psFld,pFieldValue);
 			if (enType==ADB_BLOB) ehFree(pFieldValue);
 		}
 
@@ -3496,7 +3626,7 @@ static WCHAR * _LNumberText(EH_FORM_FIELD * psFld,BOOL bForInput) {
 					case ADB_INT:		// Intero a 16bit
 					case ADB_BOOL:		// Valore vero o falso
 					case ADB_AINC:		// AutoIncrement  New 2000
-					case ADB_INT32:		// Intero a 32 bit
+					case ADB_UINT32:		// Intero a 32 bit
 						adb_FldWrite(hdb,pszAdbField,NULL,atoi(pszFieldValue));
 						break;
 
@@ -3546,7 +3676,7 @@ static WCHAR * _LNumberText(EH_FORM_FIELD * psFld,BOOL bForInput) {
 				else
 				pFieldValue=adb_FldPtr(hdb,psFld->pszName);//sql_ptr(rsSet,psFld->pszName);
 
-			_LSetFld(psForm,psFld,pFieldValue);
+			_fldSet(psForm,psFld,pFieldValue);
 			if (psFldInfo->tipo==ADB_BLOB) ehFree(pFieldValue);
 		}
 */
@@ -3604,7 +3734,7 @@ static WCHAR * _LNumberText(EH_FORM_FIELD * psFld,BOOL bForInput) {
 					case ADB_INT:		// Intero a 16bit
 					case ADB_BOOL:		// Valore vero o falso
 					case ADB_AINC:		// AutoIncrement  New 2000
-					case ADB_INT32:		// Intero a 32 bit
+					case ADB_UINT32:		// Intero a 32 bit
 						bNotEqual=(adb_FldInt(hdb,psFld->pszName)!=atoi(pszFieldValue));
 						break;
 

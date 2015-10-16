@@ -596,11 +596,13 @@ int odbcQuery(EH_ODBC_SECTION * psOdbcSection,CHAR *pQuery)
 	if (strEmpty(pQuery)) ehError();
 
 	if (*pQuery=='?') {bNoErrorStop=true; pQuery++;}
-	if (strstr(pQuery,"{LIB}")&&psOdbcSection->pSqlSchema) // modifica per Crea importazione ehBook
+	if ((strstr(pQuery,"{LIB}")||strstr(pQuery,"[LIB]"))&&
+			psOdbcSection->pSqlSchema) // modifica per Crea importazione ehBook
 	{
 		pRealQuery=ehAlloc(strlen(pQuery)+1024); 
 		strcpy(pRealQuery,pQuery);
 		while (strReplace(pRealQuery,"{LIB}",psOdbcSection->pSqlSchema));
+		while (strReplace(pRealQuery,"[LIB]",psOdbcSection->pSqlSchema));
 		bAlloc=TRUE;
 	}
 	else
@@ -856,7 +858,7 @@ int odbc_fldfind(EH_ODBC_RS pRes,CHAR *lpField,BOOL bNoError)
 	INT i;
 	for (i=0; i<pRes->iFieldNum; i++)
 	{
-		if (!_stricmp(pRes->arDict[i].szName,lpField)) return i;
+		if (!strCaseCmp(pRes->arDict[i].szName,lpField)) return i;
 	}
 	if (atoi(lpField)>0) return atoi(lpField)-1; // Numero di colonna
 	if (!bNoError) ehExit("campo inesistente [%s]",lpField); 
@@ -879,7 +881,7 @@ char * odbc_fldptr(EH_ODBC_RS pRes, CHAR *lpField)
 	}
 	iRow*=pRes->arDict[iField].iSize;
 	pRet=pRes->arDict[iField].arBuffer+iRow; // DA VEDERE
-	if (pRet&&pRes->psOdbcSection->bRightTrim) strTrim(pRet);
+	if (pRet&&pRes->psOdbcSection->bRightTrim) strTrimRight(pRet); // modificato 2015
 	return pRet;
 
 }
@@ -901,7 +903,7 @@ SIZE_T odbc_fldlen(EH_ODBC_RS pRes, CHAR *lpField)
 	if (pRes->arDict[iField].iType==SQL_LONGVARBINARY) return pRes->arDict[iField].arsLen[iRow];
 	iRow*=pRes->arDict[iField].iSize;
 	pRet=pRes->arDict[iField].arBuffer+iRow; // DA VEDERE
-	if (pRet&&pRes->psOdbcSection->bRightTrim) strTrim(pRet);
+	if (pRet&&pRes->psOdbcSection->bRightTrim) strTrimRight(pRet);
 	return strlen(pRet);
 
 }
@@ -2057,7 +2059,7 @@ void odbcSetParam(EH_ODBC_SECTION * psOdbcSection,EN_ODBC_PARAM enParam,DWORD dw
 // http://en.wikipedia.org/wiki/Select_%28SQL%29
 
 //
-// odbc_limit()
+// odbcLimit()
 //
 CHAR * odbcLimit(EH_ODBC_SECTION * psOdbcSection,DWORD dwOffset,DWORD dwLimit)
 {
@@ -2074,6 +2076,15 @@ CHAR * odbcLimit(EH_ODBC_SECTION * psOdbcSection,DWORD dwOffset,DWORD dwLimit)
 				break;
 			}
 			return NULL; // Non si può fare
+
+		case ODBC_PLATFORM_MYSQL:
+		   if (dwLimit==1&&dwOffset==1) return " LIMIT 0,1";
+		   if (dwOffset=1) 
+		   {
+			sprintf(szQuery," LIMIT 0,%d",dwLimit);
+			break;
+		   }
+		   return NULL; // Non si può fare
 
 		default: ehError();
 	}
@@ -2146,7 +2157,7 @@ void odbc_showDict(EH_ODBC_RS pRes) {
 
 		printf("- %s " CRLF,pRes->arDict[i].szName);
 
-		//if (!_stricmp(pRes->arDict[i].szName,lpField)) return i;
+		//if (!strCaseCmp(pRes->arDict[i].szName,lpField)) return i;
 	}
 
 }

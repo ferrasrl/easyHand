@@ -1,5 +1,5 @@
 // -----------------------------------------------------
-// ehWeb9 - API per l'accesso ad Internet
+// eh_internet.h - API per l'accesso ad Internet
 //
 // -----------------------------------------------------
 
@@ -50,7 +50,8 @@ typedef enum
 	
 	WTE_URL_CRACK_ERROR,
 	WTE_URL_SCHEME_UNKNOW, 
-	WTE_URI_NULL 
+	WTE_URI_NULL,
+	WTE_USER_ABORT
 
 } EN_HTTP_ERR;
 
@@ -211,8 +212,9 @@ typedef struct _EH_WEBS {
 //	CHAR *			lpSendOtherHeader; // Altri parametri in header da spedire Es. SOAPAction: "" CRLF
 	EH_LST			lstHeader;		// Altri valori da inserire nell'header
 	CHAR *			lpUserAgent;	// Se non dichiarato = default
-	CHAR *			lpPostArgs;	// In alternativa si indicare qui i dati da inviare in modalità post.
-
+	CHAR *			lpPostArgs;		// In alternativa si indicare qui i dati da inviare in modalità post.
+	CHAR *			pszAccept;		// Accept (NULL Automatico)
+	BOOL			bPostDirect;	// Modalità diversa di invio con parametri sia in URL che in POST
 
 	// New 2007
 	// MULTIPART
@@ -268,6 +270,8 @@ typedef struct _EH_WEBS {
 	// Tempo impiegato
 	time_t			tStart;
 	double			dElapsedTime;	// Tempo impiegato in secondi per caricare la pagina
+	BOOL			bAbortRequest;	// T/F se voglio uscire da una richiesta in corso (usato in multithread)
+	BOOL			bNotRetryWithError; // non riprova due volte in caso di errore
 
 } EH_WEB;
 
@@ -315,6 +319,7 @@ EH_WEB *	webHttpReq(	CHAR *	pszUrl,
 						INT	iTimeoutSec);
 EH_WEB *	webHttpReqEx(EH_WEB * psWebReq,BOOL bAsync);
 void		webHttpReqFree(EH_WEB *);
+BOOL		webHttpReqAbort(EH_WEB *psWeb);
 
 EN_HTTP_ERR webHttpReqEngine(EH_WEB * psWeb);
 CHAR *		webErrorString(EN_HTTP_ERR enError);
@@ -325,6 +330,8 @@ typedef struct {
 	CHAR *pValue;		// Valore del coockie
 	CHAR *pPath;		// Percorso
 	CHAR *pExpires;
+	CHAR *pSecure;
+	CHAR *pDomain;
 } EH_WEB_COOKIE;
 
 void	webCookieCreate(_DMI *pdmiCookie);
@@ -338,7 +345,7 @@ BOOL	webUrlToFile(	CHAR * pszUrl,
 						UTF8 * pszFileSaveUtf,
 						BOOL   fFailExist,		  // T/F fallisce se esiste
 						BOOL   fAsciiEqualControl, // T/F se il file su disco è uguale a quello letto non sovrascrivo  // serve ad esempio per limitare i trasferimenti in FTP
-						BOOL   bHtmlClean,		// T/F se devo togliere ritorni a capo e spazi
+						INT		iHtmlCleanLevel,		// T/F se devo togliere ritorni a capo e spazi
 						_DMI * pdmiCookie,
 						CHAR * pUser,
 						CHAR * pPassword,
@@ -347,10 +354,11 @@ BOOL	webUrlToFileEx(	CHAR *	pszUrl,
 						UTF8 *	pszFileSaveUtf,
 						BOOL	fFailExist,		  // T/F fallisce se esiste
 						BOOL	fAsciiEqualControl, // T/F se il file su disco è uguale a quello letto non sovrascrivo  // serve ad esempio per limitare i trasferimenti in FTP
-						BOOL	bHtmlClean,		// T/F se devo togliere ritorni a capo e spazi
+						INT		iHtmlCleanLevel,		// T/F se devo togliere ritorni a capo e spazi
 						_DMI *	pdmiCookie,
 						CHAR *	pUser,
 						CHAR *	pPassword,
+						CHAR *	szUserAgent,
 						S_WEB_ERR * psError,
 						void * (*funcNotify)(struct _EH_WEBS *psWeb,EN_MESSAGE,LONG,void *),
 						INT iTimeOut);

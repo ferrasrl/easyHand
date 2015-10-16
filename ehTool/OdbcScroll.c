@@ -123,7 +123,7 @@ static void _odbcScrollFreeResource(BOOL bStep) {
 	_p.bReady=false;
 }
 //
-// Driver Odbc
+// OdbcScrol() - Driver Odbc
 //
 void * OdbcScroll(struct OBJ * psObjCaller,EN_MESSAGE enMess,LONG info,CHAR *str)
 {
@@ -400,7 +400,7 @@ void * OdbcScroll(struct OBJ * psObjCaller,EN_MESSAGE enMess,LONG info,CHAR *str
 	case WS_PTREC : //			  			Restituisce pt alla chiave selezionata
 	case WS_GET_SELECTED:
 
-			ZeroFill(rit);
+			_(rit);
 			rit.record=-1;
 
 			if (strEmpty(psOdbc->pszKeyCode)) {efx2(); return NULL;}
@@ -1232,12 +1232,13 @@ static void _LKeyCodeBuilder(CHAR **pStr,S_SQLINFO *psOdbc)
 	if (psOdbc->iKeyCodePart<1) ehError();
 
 	ehFreePtr(pStr);
-	if (psOdbc->iKeyCodePart==1) 
-	{
+	if (psOdbc->iKeyCodePart==1) {
+
 		strAssign(pStr,sql_ptr(psOdbc->rsSet,psOdbc->pszKeyCode));
+
 	}
-	else
-	{
+	else {
+
 		BYTE *pBuf=NULL;
 		INT a,iSize=0;
 		for (a=0;psOdbc->arKeyCodeFld[a];a++) {iSize+=strlen(sql_ptr(psOdbc->rsSet,psOdbc->arKeyCodeFld[a]))+1;}

@@ -18,6 +18,7 @@ typedef enum {
 	E_NUMHEX=2,
 	E_NUMBIN=3,
 	E_TEXT=10,
+	E_TEXT_SUM=11,	// Somma di stringhe probabile
 	E_FORMULANUM=20,
 	E_VARNUM=30,
 	E_VARTEXT=31,
@@ -56,7 +57,8 @@ typedef enum {
 	SER_SINTAX,		// Sintax Errore
 	SER_VAR_UNKNOW,	// Variabile sconosciuta
 	SER_EXTERN,		// Errore verificato in funzione di notifica esterna
-	SER_VAR_EXT_UNKNOW	// Variabile sconosciuta
+	SER_VAR_EXT_UNKNOW,	// Variabile sconosciuta
+	SER_OBJ_UNKNOW
 
 } EN_SER;
 
@@ -80,9 +82,9 @@ typedef struct {
 	SCRIPT_FUNC_EXT;
 
 	// Errori
-
 	EN_SER		enError;	// Errore di ritorno
-	CHAR		szError[400];
+	EH_LST		lstError;
+	//CHAR		szError[400];
 	//EH_LST		lstError;
 	INT			iErrorExtra;	// Informazioni aggiuntiva numeriche per errori esterni
 
@@ -91,6 +93,7 @@ typedef struct {
 	S_SCRIPT_TAG *	arsTag;
 
 	// Altro
+	BOOL		bVerbose;		// T/F se si vuole output di debug
 	EH_LST		lstPos;
 	EH_LST		lstNote;
 	BOOL		bTrace; // Visualizza le righe
@@ -110,13 +113,13 @@ typedef struct {
 
 } S_VAR;
 
-S_SCRIPT *  scriptCreate(S_SCRIPT * psSource);
-S_UNIVAL *  scriptExecute(S_SCRIPT * psScript,CHAR * pszTextScript);
-S_SCRIPT *	scriptDestroy(S_SCRIPT * psScript);
+S_SCRIPT *		scriptCreate(S_SCRIPT * psSource);
+S_UNIVAL *		scriptExecute(S_SCRIPT * psScript,CHAR * pszTextScript);
+S_SCRIPT *		scriptDestroy(S_SCRIPT * psScript);
 
 //S_UNIVAL *  scriptGetValue(S_SCRIPT * psScript,CHAR * pszTextScript);
 S_SCRIPT_TAG * scriptTag(S_SCRIPT_TAG * psArrayTag,EN_TAGTYPE enGroup,CHAR * pszToken);
-S_UNIVAL *  scriptGetValue(S_SCRIPT * psScript,CHAR * pszFormula);
+S_UNIVAL *		scriptGetValue(S_SCRIPT * psScript,CHAR * pszFormula);
 //EH_AR		scriptFuncArg(BYTE *pString,BYTE *pCharStart,BYTE *pCharStop,SINT *piError,SINT *piArgNum); // new 2009
 
 typedef struct {
@@ -125,10 +128,12 @@ typedef struct {
 	CHAR * pszValue;
 } S_ARG_INFO;
 
-EH_LST scriptFuncArg(BYTE *pString,BYTE *pCharStart,BYTE *pCharStop,INT *piError); // 2013
-EH_LST scriptFuncDestroy(EH_LST lst);
+EH_LST		scriptFuncArg(BYTE *pString,BYTE *pCharStart,BYTE *pCharStop,INT *piError, CHAR ** ppEnd); // 2013
+EH_LST		scriptFuncDestroy(EH_LST lst);
+S_UNIVAL *	scriptFuncGet(S_SCRIPT * psScript,EH_LST lstParams,INT idx,EH_DATATYPE enDaTy);
 
-
-CHAR * scriptExtract(CHAR *lpSource,CHAR *lpTesta,CHAR *lpCoda); // Isola
-CHAR * scriptParExtract(CHAR *lpSource); // Ex IsolaPar
-CHAR * scriptNext(CHAR *lpStart,CHAR cCosa); // FindNext
+CHAR *		scriptExtract(CHAR *lpSource,CHAR *lpTesta,CHAR *lpCoda); // Isola
+CHAR *		scriptParExtract(CHAR *lpSource); // Ex IsolaPar
+CHAR *		scriptNext(CHAR *lpStart,CHAR cCosa); // FindNext
+void *		scriptError(S_SCRIPT * psScript,EN_SER enErr,CHAR * pszFormat,...);
+void		scriptShowErrors(S_SCRIPT * psScript);

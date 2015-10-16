@@ -80,9 +80,9 @@ typedef struct {
 //	INT iCheck;
 
 	EN_HTTP_ERR iErrorCode; // Ritorna il codice di errore
-	INT	iSocketErr; // Errore durante l'uso dei socket // Es WSAENETDOWN 10054
+	INT			iSocketErr; // Errore durante l'uso dei socket // Es WSAENETDOWN 10054
 
-	INT	iWebGetError;
+	INT			iWebGetError;
 	CHAR *	pWebGetError;
 
 	CHAR *	lpUri;   // Indirizzo URI indicato originale
@@ -104,7 +104,7 @@ typedef struct {
 	FWS_MP **arMP;
 
 	BYTE *	pPageHeader; // Intestazione
-	DWORD	dwContentLenght;	// Dimensione dei dati, in caso di content-lenght (ex iContentSize)
+	DWORD	dwContentLength;	// Dimensione dei dati, in caso di content-length (ex iContentSize)
 	DWORD	dwDataSize;			// Dimensione allocata della memoria per i dati
 	INT		iDataReaded;		// Dimensione dei dati letti effettivi
 	BYTE *	pData; // Dati letti senza intestazione

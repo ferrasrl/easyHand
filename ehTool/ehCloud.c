@@ -212,6 +212,7 @@ static INT _fileSync(EH_CLOUD * psCloud,EH_FILEDIR * psDir,CHAR * pb,EH_LST lstI
 	//
 	// <-- Richiedo tutti i file remoti che non ho oppure sono cambiati
 	//
+
 	for (a=1;arRemoteFile[a];a++) {
 		if (!strEmpty(arRemoteFile[a])) {
 			EH_ARF arFld=ARFSplit(arRemoteFile[a],"|");
@@ -233,6 +234,7 @@ static INT _fileSync(EH_CLOUD * psCloud,EH_FILEDIR * psDir,CHAR * pb,EH_LST lstI
 		
 		}
 	}
+
 
 	ehFree(arRemoteFile);
 	ehFree(pszFolderBegin);
@@ -286,6 +288,7 @@ BOOL ehcFileSync(EH_CLOUD * psCloud,
 	if (!psWeb->sError.enCode) { // Leggi pagina caricata 
 
 		bRet=_fileSync(psCloud,psDir,psWeb->pData,lstInfo);
+
 	}
 	webHttpReqFree(psWeb);
 	fileDirDestroy(psDir);

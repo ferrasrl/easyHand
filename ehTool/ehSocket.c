@@ -129,7 +129,8 @@ EN_HTTP_ERR ehSocket(S_EH_SOCKET * psSock,EN_MESSAGE enCmd,void *ptr)
 		case WS_SEND:
 			if (enTcpSend(psSock,(S_SOCKET_EVENT *) ptr)) 
 			{
-				iErr=psSock->iErrorCode; break;
+				iErr=psSock->iErrorCode; 
+				break;
 			}
 			iErr=0;
 			break;
@@ -176,7 +177,7 @@ static DWORD WINAPI _socketThreadRice(LPVOID pvoid)
 	bHeaderError=FALSE;
 	psSock->bThreadRun=TRUE;
 	pszBuffer=ehAlloc(RICE_SIZE_BUFFER);
-	while (TRUE)
+	while (true)
 	{
 		 if (psSock->bThreadStop) break;
 		 iReaded=ehTcpRecv(psSock,pszBuffer,RICE_SIZE_BUFFER);
@@ -218,7 +219,7 @@ static DWORD WINAPI _socketThreadRice(LPVOID pvoid)
 		 } // Definisco che un header non può essere più grande di 2048
 
 		 //		 if (!iB) break;
-		 if (iReaded<0) 
+		 else if (iReaded<0) 
 		 {
 			 if (!psSock->iErrorCode) psSock->iErrorCode=WTE_RECV;
 			 psSock->iSocketErr=WSAGetLastError();
@@ -284,7 +285,7 @@ static BOOL enTcpSend(S_EH_SOCKET *psSock,S_SOCKET_EVENT *psEvent)
 		else
 	#endif
 		iToken=iSize; if (iToken>2048) iToken=2048;
-		iWritten = send(psSock->sSocket.fdSocket, pBuf, iToken, 0);//psSock->iSocket_flags);
+		iWritten = send(psSock->sSocket.fdSocket, pBuf, iToken, 0);// psSock->iSocket_flags);
 
 	//	iErr=send(->iSocket,lpBuf,iSize,0);
 		// dispx("%d (%d) ....",iSize,iWritten);
@@ -301,11 +302,13 @@ static BOOL enTcpSend(S_EH_SOCKET *psSock,S_SOCKET_EVENT *psEvent)
 	#endif
 
 			iError=WSAGetLastError();
+			printf("\7Errore: %d [%s:%d]" CRLF,iError,pBuf,iSize);
 			if (iError != WSAEINTR && iError != WSAEWOULDBLOCK)
 			{	psSock->iErrorCode=WTE_SSL_SEND_ERROR;
 				psSock->iSocketErr= iError;
+				
 				ehLogWrite("Errore: %d [%s:%d]",iError,pBuf,iSize);
-				return TRUE;
+				return true;
 			}
 			iWritten = 0; /* and call write() again */
 		 }
@@ -326,7 +329,7 @@ static BOOL enTcpSend(S_EH_SOCKET *psSock,S_SOCKET_EVENT *psEvent)
 	}
 #endif
 
-	return FALSE;
+	return false;
 	  
 /*
 	if (iWritten==SOCKET_ERROR)
@@ -1013,11 +1016,11 @@ static int _tcpGetHost(S_EH_SOCKET *psSock, char * pszAddr, struct in_addr *inad
 				* errno captured is that from hostGetByName() */
 #else
 
-	  if (_sPrivate.bReset) {
+	if (_sPrivate.bReset) {
 		_(_sPrivate);
 		_sPrivate.mtxHost=CreateMutex(NULL,FALSE,NULL); // ATTENZIONE: devo liberarlo in uscita
 		_sPrivate.arHost=ARNew();
-	  }
+	}
 	//
 	// A) Enter critical
 	//

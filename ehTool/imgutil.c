@@ -1707,7 +1707,7 @@ INT JPGReadHeader(UTF8 *imageFileName,IMGHEADER *psImgHead,INT iModeError)
 }
 
 
-BOOL JPGReadFile(TCHAR *imageFileName,INT *piImageHandle,BOOL *pbStop,INT *piErr,BOOL iModeError,EN_PIXEL_TYPE enPixelType)
+BOOL JPGReadFile(UTF8 *imageFileName,INT *piImageHandle,BOOL *pbStop,INT *piErr,BOOL iModeError,EN_PIXEL_TYPE enPixelType)
 {
 	return JPGReadFileEx(imageFileName,piImageHandle,pbStop,-1,-1,piErr,iModeError,enPixelType);
 }
@@ -1716,7 +1716,7 @@ BOOL JPGReadFile(TCHAR *imageFileName,INT *piImageHandle,BOOL *pbStop,INT *piErr
 // JPGReadFileEx()
 // Ritorna TRUE se tutto OK
 //
-BOOL JPGReadFileEx(TCHAR *imageFileName,
+BOOL JPGReadFileEx(UTF8 *imageFileName,
 				   INT *piImageHandle,
 				   BOOL *pbStop,
 				   
@@ -1762,7 +1762,7 @@ BOOL JPGReadFileEx(TCHAR *imageFileName,
 // iQuality      Fattore di qualità dell'immagine
 // 0= errore >0 tutto ok
 //
-BOOL JPGSaveFile(TCHAR *imageFileName,INT HdlImage,INT iQuality)
+BOOL JPGSaveFile(UTF8 * imageFileName,INT HdlImage,INT iQuality)
 {
   FILE * outfile;		/* Il File sorgente */
   INT rt;
@@ -2312,8 +2312,8 @@ static INT LocalIMGRemakerAA(INT HdlImage,RECT *psrRectSource,INT xNew,INT yNew,
 //
 // -----------------------------------------------------------------------------
 #ifndef EH_MOBILE
-INT JPGNewFile(TCHAR *lpFileSource,
-				TCHAR *lpFileDest,
+INT JPGNewFile(UTF8 * lpFileSource,
+				UTF8 * lpFileDest,
 				INT iLx,INT iLy,
 				INT iQuality,
 				BOOL fAntiAlias,
@@ -4479,97 +4479,134 @@ HBITMAP GIFReadLikeBitmap(TCHAR *tsFile)
 //
 // --------------------------------------------------------
 void IMGCalcSize(IMGHEADER * ImgHead,      // Dimensioni del sorgente
-				 SIZE sDim,		   // Area disponibile
+				 SIZE * psFix,		   // Area disponibile (Fissa)
+				 SIZE * psMin,		   // Area disponibile (Massima new 2015)
+				 SIZE * psMax,		   // Area disponibile (Massima new 2015)
 				 INT iPhotoAdatta,  // Tipo di adattamento
 				 INT iAlignH,	   // Allineamento orizzontale
 				 INT iAlignV,	   // Allineamento verticale
-				 SIZE *sDest,		   // Dimensioni della destinazione
-				 RECT *rDest,
-				 RECT *psrSource) 	   // Posizionamento in destinazione
+				 SIZE *	psDest,		   // Dimensioni della destinazione
+				 RECT *	prDest,
+				 RECT * prSource) 	   // Posizionamento in destinazione
 {
 	SIZE sSource;
 	sSource.cx=ImgHead->bmiHeader.biWidth;
 	sSource.cy=ImgHead->bmiHeader.biHeight;
-	RectCalcSize(sSource,sDim,iPhotoAdatta,iAlignH,iAlignV,sDest,rDest,psrSource);
+	RectCalcSize(&sSource,psFix,psMin,psMax,iPhotoAdatta,iAlignH,iAlignV,psDest,prDest,prSource);
 }
 
-void RectCalcSize(SIZE sSource,		// Dimensioni del sorgente
-				  SIZE sAreaDest,		// Dimensione Area destinazione desiderata
-				  EN_IMGPT iPhotoAdatta,// Tipo di adattamento
-				  INT iAlignH,	    // Allineamento richiesto orizzontale
-				  INT iAlignV,	    // Allineamento richiesto verticale
-				  SIZE *lpsDest,		// Dimensioni della destinazione
-				  RECT *lprDest,		// Posizionamento in destinazione
-				  RECT *lprSource) 	    // Rettangolo da prendere nel sorgente
+void RectCalcSize(	SIZE * psSource,				// Dimensioni del sorgente
+					SIZE * psDim,		   // Area disponibile (Fissa)
+					SIZE * psMin,		   // Area disponibile (Massima new 2015)
+					SIZE * psMax,		   // Area disponibile (Massima new 2015)
+					EN_IMGPT enPhotoAdatta,	// Tipo di adattamento
+					INT iAlignH,				// Allineamento richiesto orizzontale
+					INT iAlignV,	    // Allineamento richiesto verticale
+				  
+					// Calcolate
+					SIZE *	psDest,		// Dimensioni della destinazione
+					RECT *	prDest,		// Posizionamento in destinazione
+					RECT *	prSource) 	    // Rettangolo da prendere nel sorgente
 {
 	SIZE sCut;
-	if (sSource.cy<1) sSource.cy=1;
-	if (sSource.cx<1) sSource.cx=1;
+	SIZE sFix;
+
+	if (psSource->cy<1) psSource->cy=1;
+	if (psSource->cx<1) psSource->cx=1;
+
+	memcpy(&sFix,psDim,sizeof(SIZE));
+	if (!sFix.cx&&!sFix.cy) 
+	{
+		memcpy(&sFix,psSource,sizeof(SIZE));
+		if (psMin) {
+			if (sFix.cx<psMin->cx) sFix.cx=psMin->cx;
+			if (sFix.cy<psMin->cy) sFix.cy=psMin->cy;
+		}
+		if (psMax) {
+			if (sFix.cx>psMax->cx&&psMax->cx) sFix.cx=psMax->cx;
+			if (sFix.cy>psMax->cy&&psMax->cy) sFix.cy=psMax->cy;
+		}
+		if (!sFix.cx) sFix.cx=sFix.cy; else if (!sFix.cy) sFix.cy=sFix.cx;
+	}
 
 	// Default setting
-	memset(lpsDest,0,sizeof(SIZE));	memset(lprDest,0,sizeof(RECT));
-	if (lprSource) {memset(lprSource,0,sizeof(RECT)); lprSource->right=sSource.cx-1; lprSource->bottom=sSource.cy-1;}
+	memset(psDest,0,sizeof(SIZE)); 
+	memset(prDest,0,sizeof(RECT));
+	if (prSource) {memset(prSource,0,sizeof(RECT)); prSource->right=psSource->cx-1; prSource->bottom=psSource->cy-1;}
 
 	//
 	// Trova dimensioni della destinazione
 	//
-	switch (iPhotoAdatta)
+	switch (enPhotoAdatta)
 	{
 		case IMGPT_PROPORZIONALE: // Calcola il lato mancante 
-			if ((sAreaDest.cy>0)&&(sAreaDest.cx==0)) sAreaDest.cx=sAreaDest.cy*sSource.cx/sSource.cy;
-			if ((sAreaDest.cx>0)&&(sAreaDest.cy==0)) sAreaDest.cy=sAreaDest.cx*sSource.cy/sSource.cx;
-			lpsDest->cx=sAreaDest.cx;
-			lpsDest->cy=sAreaDest.cy;
+			if ((sFix.cy>0)&&(sFix.cx==0)) sFix.cx=sFix.cy*psSource->cx/psSource->cy;
+			if ((sFix.cx>0)&&(sFix.cy==0)) sFix.cy=sFix.cx*psSource->cy/psSource->cx;
+			psDest->cx=sFix.cx;
+			psDest->cy=sFix.cy;
 			break;
 
 		case IMGPT_AL_FORMATO:
-			lpsDest->cx=sAreaDest.cy*sSource.cx/sSource.cy;
-			if (lpsDest->cx>sAreaDest.cx) 
-				{lpsDest->cy=sAreaDest.cx*sSource.cy/sSource.cx; lpsDest->cx=sAreaDest.cx;}
+		case IMGPT_MAX_SIDE:
+			psDest->cx=sFix.cy*psSource->cx/psSource->cy;
+			if (psDest->cx>sFix.cx) 
+				{psDest->cy=sFix.cx*psSource->cy/psSource->cx; psDest->cx=sFix.cx;}
 				else 
-				{lpsDest->cy=sAreaDest.cy;}
+				{psDest->cy=sFix.cy;}
 			break;
 
 		case IMGPT_AL_CORTO: 
-			if (sSource.cx<sSource.cy) 
-				{lpsDest->cy=sAreaDest.cx*sSource.cy/sSource.cx; lpsDest->cx=sAreaDest.cx;}
+			if (psSource->cx<psSource->cy) 
+				{psDest->cy=sFix.cx*psSource->cy/psSource->cx; psDest->cx=sFix.cx;}
 				else
-				{lpsDest->cx=sAreaDest.cy*sSource.cx/sSource.cy; lpsDest->cy=sAreaDest.cy;}
+				{psDest->cx=sFix.cy*psSource->cx/psSource->cy; psDest->cy=sFix.cy;}
 			break;
 
 		case IMGPT_AL_LUNGO: 
-			if (sSource.cx>sSource.cy) 
-				{lpsDest->cy=sAreaDest.cx*sSource.cy/sSource.cx; lpsDest->cx=sAreaDest.cx;}
+			if (psSource->cx>psSource->cy) 
+				{psDest->cy=sFix.cx*psSource->cy/psSource->cx; psDest->cx=sFix.cx;}
 				else
-				{lpsDest->cx=sAreaDest.cy*sSource.cx/sSource.cy; lpsDest->cy=sAreaDest.cy;}
+				{psDest->cx=sFix.cy*psSource->cx/psSource->cy; psDest->cy=sFix.cy;}
 			break;
 		
 		case IMGPT_NO:
-			memcpy(lpsDest,&sSource,sizeof(SIZE));
+			memcpy(psDest,psSource,sizeof(SIZE));
 			break;
 
 		case IMGPT_PROP_TAGLIA: // Calcola il lato mancante 
-			lpsDest->cx=sAreaDest.cx; lpsDest->cy=sAreaDest.cy;
-			if (!lpsDest->cx||!lpsDest->cy) ehError();
+			psDest->cx=sFix.cx; psDest->cy=sFix.cy;
+			if (!psDest->cx||!psDest->cy) ehError();
 			break;
+
+		default:
+			ehError();
 	}
 
 	//
 	// Trova il posizionamento
 	//
-	switch (iPhotoAdatta)
+	switch (enPhotoAdatta)
 	{
+		case IMGPT_MAX_SIDE:
+			
+			prDest->left=0;
+			prDest->top=0;
+			prDest->right=psDest->cx-1;
+			prDest->bottom=psDest->cy-1;
+			break;
+
 	//	case IMGPT_PROPORZIONALE: break;
 		case IMGPT_PROP_TAGLIA:
 
 			//
 			// Cerco dimensione e posizione nel sorgente
 			//
-			sCut.cx=sSource.cx; sCut.cy=sAreaDest.cy*sSource.cx/sAreaDest.cx; 
-			if (sCut.cy>sSource.cy) {sCut.cx=sAreaDest.cx*sSource.cy/sAreaDest.cy; sCut.cy=sSource.cy;}
+			sCut.cx=psSource->cx; sCut.cy=sFix.cy*psSource->cx/sFix.cx; 
+			if (sCut.cy>psSource->cy) {sCut.cx=sFix.cx*psSource->cy/sFix.cy; sCut.cy=psSource->cy;}
 
-			lprDest->right=sAreaDest.cx-1; lprDest->bottom=sAreaDest.cy-1;
-			if (!lprSource) ehError();
+			prDest->right=sFix.cx-1; prDest->bottom=sFix.cy-1;
+			if (!prSource) ehError();
+
 			// 
 			// Allineamento Orizzontale
 			//
@@ -4577,18 +4614,18 @@ void RectCalcSize(SIZE sSource,		// Dimensioni del sorgente
 			{
 				default:
 				case 0: // Centra (Default)
-					lprSource->left=(sSource.cx-sCut.cx)>>1;
+					prSource->left=(psSource->cx-sCut.cx)>>1;
 					break;
 
 				case 1: // Left
-					lprSource->left=0;
+					prSource->left=0;
 					break;
 
 				case 2: // Right
-					lprSource->left=sSource.cx-sCut.cx+1;
+					prSource->left=psSource->cx-sCut.cx+1;
 					break;
 			}
-			lprSource->right=lprSource->left+sCut.cx-1;
+			prSource->right=prSource->left+sCut.cx-1;
 
 			// -------------------------------------------
 			// Allinamento Verticale
@@ -4597,23 +4634,24 @@ void RectCalcSize(SIZE sSource,		// Dimensioni del sorgente
 			{
 				default:
 				case 0: // Centra (Default)
-					lprSource->top=(sSource.cy-sCut.cy)>>1;
+					prSource->top=(psSource->cy-sCut.cy)>>1;
 					break;
 
 				case 1: // Top
-					lprSource->top=0;
+					prSource->top=0;
 					break;
 
 				case 2: // Bottom
-					lprSource->top=sSource.cy-sCut.cy+1;
+					prSource->top=psSource->cy-sCut.cy+1;
 					break;
 			}
-			lprSource->bottom=lprSource->top+sCut.cy-1;
+			prSource->bottom=prSource->top+sCut.cy-1;
 			break;
 
-			//
-			// Allineamento di default
-			//
+
+		//
+		// Allineamento di default
+		//
 		default: 
 
 			// Allinamento Orizzontale
@@ -4621,18 +4659,18 @@ void RectCalcSize(SIZE sSource,		// Dimensioni del sorgente
 			{
 				default:
 				case 0: // Centra (Default)
-					lprDest->left=(sAreaDest.cx-lpsDest->cx)/2;
-					lprDest->right=lprDest->left+lpsDest->cx-1;
+					prDest->left=(sFix.cx-psDest->cx)/2;
+					prDest->right=prDest->left+psDest->cx-1;
 					break;
 
 				case 1: // Left
-					lprDest->left=0;
-					lprDest->right=lpsDest->cx-1;
+					prDest->left=0;
+					prDest->right=psDest->cx-1;
 					break;
 
 				case 2: // Right
-					lprDest->left=sAreaDest.cx-lpsDest->cx+1;
-					lprDest->right=sAreaDest.cx-1;
+					prDest->left=sFix.cx-psDest->cx+1;
+					prDest->right=sFix.cx-1;
 					break;
 			}
 
@@ -4641,18 +4679,18 @@ void RectCalcSize(SIZE sSource,		// Dimensioni del sorgente
 			{
 				default:
 				case 0: // Centra (Default)
-					lprDest->top=(sAreaDest.cy-lpsDest->cy)/2;
-					lprDest->bottom=lprDest->top+lpsDest->cy-1;
+					prDest->top=(sFix.cy-psDest->cy)/2;
+					prDest->bottom=prDest->top+psDest->cy-1;
 					break;
 
 				case 1: // Top
-					lprDest->top=0;
-					lprDest->bottom=lpsDest->cy-1;
+					prDest->top=0;
+					prDest->bottom=psDest->cy-1;
 					break;
 
 				case 2: // Bottom
-					lprDest->top=sAreaDest.cy-lpsDest->cy+1;
-					lprDest->bottom=sAreaDest.cy-1;
+					prDest->top=sFix.cy-psDest->cy+1;
+					prDest->bottom=psDest->cy-1;
 					break;
 			}
 			break;

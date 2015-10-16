@@ -76,7 +76,8 @@ typedef struct {
 
 	EN_CHARTYPE	iCharType; // 0=Ascii, 1=Iso(ansi), 2=uf8
 	EN_CHARTYPE iCharDecoding; // 0=no, 1=Ansi
-	BOOL	bSilentError;
+	BOOL		bSilentError;
+	BOOL		bFieldUnknownError;	// T/F se va in errore con campi sconosciuti
 
 } S_TXB;
 
@@ -92,6 +93,7 @@ PS_TXB	txbOpenWeb(CHAR * pszUrl,CHAR * pszMethod,S_WEB_ERR * psWebError);
 
 BOOL	txbClose(PS_TXB htx);
 PS_TXB	CSVOpen(UTF8* utfFileName, BOOL bEncode); // new 2009 / 2010
+PS_TXB	txtOpen(UTF8 * utfFileName,CHAR * pszFileHeaderEncode, BOOL bUtf8ToAnsi); // new 2014
 
 TXBFLD * txbFldInfo(PS_TXB htx,CHAR * pszName);
 BOOL	txbFind(PS_TXB htx,EN_TXB_ARRAY enArray,INT iMode,void *lpb);
@@ -113,16 +115,39 @@ BOOL	txbFindRecord(PS_TXB htx,EN_TXB_ARRAY enArray,BOOL (* funcProc)(PS_TXB ,voi
 
 void	txbAdbExport(INT hdb,
 					INT iIndex,
-					CHAR *lpFileExport,
+					UTF8 * lpFileExport,
 					CHAR *lpCol,
 					CHAR *lpRow,
 					CHAR *lpFieldsInclude, // Includere questi campi separati da pipe = NULL TUTTI
 					CHAR *lpFieldsExclude, // Non includere questi campi separati da pipe = NULL non controllo
 					CHAR *lpAddFields,
-					BOOL (*ExternControl)(INT,LONG,void *));
-BOOL	txbFldImport(INT hdbDest,PS_TXB txbSource,BOOL fCutSpace);
+					BOOL (*funcNotify)(EH_SRVPARAMS));
 
-PS_TXB	txbCreate(CHAR * utfFileName,
+#if (defined(_ADB32)||defined(_ADB32P))
+
+	// Usato per funzione di notifica esterna
+	typedef struct {
+		
+		HDB		hdb;
+		PS_TXB	txb;
+		CHAR *	pszName;	// Nome del campo
+		
+		BOOL	bReady;
+		CHAR *	pszValue;	
+		BOOL	bExclude;
+	
+	} S_TXB_EXT;
+
+BOOL	txbFldImport(HDB hdbDest,
+					 PS_TXB txbSource,
+					 BOOL fCutSpace,
+					 BOOL bNotResetUnknow,
+					 CHAR * pszBlackList,
+					 CHAR * pszWhiteList,
+					 void *	(*funcNotify)(EH_SRVPARAMS));
+#endif
+
+PS_TXB	txbCreate(UTF8 * utfFileName,
 			      CHAR *lpCol, // Carattere separatore colonne
 			      CHAR *lpRow, // Carattere separatore righe
 				  CHAR *lpEnconding, // NULL= default (ASCII)

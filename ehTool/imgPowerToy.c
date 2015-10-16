@@ -17,12 +17,12 @@
 static void _LIMGCopyRGB(RECT *prClip,
 						 IMGHEADER *lpImghDst,
 						 IMGHEADER *lpImghSrc,
-						 SINT iAlpha8);
+						 INT iAlpha8);
 
 static void _LIMGCopyRGB_ALPHA(RECT *prClip,
 						       IMGHEADER *lpImghDst,
 						       IMGHEADER *lpImghSrc,
-						       SINT iAlpha8);
+						       INT iAlpha8);
 static BOOL _LPointerClip(RECT *prClip,
 				   IMGHEADER *lpImghDst,
 				   IMGHEADER *lpImghSrc,
@@ -36,8 +36,8 @@ static BOOL _LPointerClip(RECT *prClip,
 // 
 // Giorgio/Ettore		Ferrà srl 2010
 // --------------------------------------------------------
-BOOL IMGCopy(SINT hdlImageDst,	// La destinazione
-			 SINT hdlImageSrc,	// Il sorgente
+BOOL IMGCopy(INT hdlImageDst,	// La destinazione
+			 INT hdlImageSrc,	// Il sorgente
 			 POINT pArea,		    // La posizione e la dimensione
 			 double dAlphaMain)
 {
@@ -45,7 +45,7 @@ BOOL IMGCopy(SINT hdlImageDst,	// La destinazione
 	IMGHEADER *lpImghSrc;
 
 	RECT rClip;
-	SINT iAlpha8;
+	INT iAlpha8;
 
 	lpImghDst=(IMGHEADER *) memoLock(hdlImageDst);
 	lpImghSrc=(IMGHEADER *) memoLock(hdlImageSrc);
@@ -54,7 +54,7 @@ BOOL IMGCopy(SINT hdlImageDst,	// La destinazione
 	rClip.right=pArea.x+lpImghSrc->bmiHeader.biWidth-1;
 	rClip.top=pArea.y; 
 	rClip.bottom=pArea.y+lpImghSrc->bmiHeader.biHeight-1;
-	iAlpha8=(SINT) (dAlphaMain*255/100); // Trasformo double in char (0/255)
+	iAlpha8=(INT) (dAlphaMain*255/100); // Trasformo double in char (0/255)
 
 	switch (lpImghDst->enPixelType)
 	{
@@ -124,7 +124,7 @@ static BOOL _LPointerClip(RECT *prClip,
 static void _LIMGCopyRGB(RECT *prClip,
 						 IMGHEADER *lpImghDst,
 						 IMGHEADER *lpImghSrc,
-						 SINT iAlpha8)
+						 INT iAlpha8)
 {
 	int register x,y;
 	int unsigned register r32;
@@ -135,7 +135,7 @@ static void _LIMGCopyRGB(RECT *prClip,
 	BYTE *lpDst;
 	BYTE *lpd,*lps;
 	BOOL bInverted=FALSE;
-	SINT iAlpha;
+	INT iAlpha;
 
 	if (iAlpha8<1) return;
 	if (_LPointerClip(	prClip,
@@ -225,7 +225,7 @@ static void _LIMGCopyRGB(RECT *prClip,
 			{
 				if (iAlpha8>=255) // copia senza trasparenza
 				{
-					SINT xSize=(prClip->right-prClip->left+1)*lpImghSrc->iChannels;
+					INT xSize=(prClip->right-prClip->left+1)*lpImghSrc->iChannels;
 
 					for (y=prClip->top; y<=prClip->bottom; y++)
 					{
@@ -282,7 +282,7 @@ static void _LIMGCopyRGB(RECT *prClip,
 			{
 				if (iAlpha8>=255) // copia senza trasparenza
 				{
-					SINT xSize=(prClip->right-prClip->left+1)*lpImghSrc->iChannels;
+					INT xSize=(prClip->right-prClip->left+1)*lpImghSrc->iChannels;
 
 					for (y=prClip->top; y<=prClip->bottom; y++)
 					{
@@ -321,12 +321,12 @@ static void _LIMGCopyRGB(RECT *prClip,
 static void _LIMGCopyRGB_ALPHA(RECT *prClip,
 						       IMGHEADER *lpImghDst,
 						       IMGHEADER *lpImghSrc,
-						       SINT iAlpha8)
+						       INT iAlpha8)
 {
 	BYTE *lpSrc;
 	BYTE *lpDst;
 	BYTE *lpd,*lps;
-	SINT x,y;
+	INT x,y;
 	int register r32,*p32;
 	BYTE r,g,b,rs,gs,bs;
 	LONG *p32Source,*p32Dest;	
@@ -346,7 +346,7 @@ static void _LIMGCopyRGB_ALPHA(RECT *prClip,
 			// copia senza trasparenza
 				if (iAlpha8>=255) {
 
-					SINT xSize=(prClip->right-prClip->left+1)*lpImghSrc->iChannels;
+					INT xSize=(prClip->right-prClip->left+1)*lpImghSrc->iChannels;
 					for (y=prClip->top; y<=prClip->bottom; y++) {
 						 ehMemCpy(lpDst,lpSrc,xSize);
 						 lpSrc+=lpImghSrc->linesize; lpDst+=lpImghDst->linesize;
@@ -473,10 +473,10 @@ static void _LIMGCopyRGB_ALPHA(RECT *prClip,
 
 
 
-SINT ColorConvert(CHAR *lpColore)
+INT ColorConvert(CHAR *lpColore)
 {
 	CHAR szServ[200];
-	SINT iColor[3];
+	INT iColor[3];
 	if (*lpColore=='#')
 	{
 		strncpy(szServ,lpColore+1,2); szServ[2]=0; _strupr(szServ); iColor[0]=xtoi(szServ); 
@@ -501,7 +501,7 @@ SINT ColorConvert(CHAR *lpColore)
 	return 0;
 }
 /*
-SINT AlignConvert(CHAR *lpColore)
+INT AlignConvert(CHAR *lpColore)
 {
 	strlwr(lpColore);
 	if (!strcmp(lpColore,"left")||!strcmp(lpColore,"l")) return LR_LEFT;
@@ -514,9 +514,9 @@ SINT AlignConvert(CHAR *lpColore)
 */
 
 
-static void LAutoLevelMaker(SINT iLevel[],SINT *lpiLevelInMin,SINT *lpiLevelInMax)
+static void LAutoLevelMaker(INT iLevel[],INT *lpiLevelInMin,INT *lpiLevelInMax)
 {
-	SINT a,iTot;
+	INT a,iTot;
 	double dMax;
 	double dPerc,dCy;
 	double dBlackThresold=6; // Era 4
@@ -557,13 +557,13 @@ static void LAutoLevelMaker(SINT iLevel[],SINT *lpiLevelInMin,SINT *lpiLevelInMa
 	}
 }
 
-SINT IMGAutoLevel(SINT hdlImage)
+INT IMGAutoLevel(INT hdlImage)
 {
-	SINT ariLevels[256];
-	SINT iLevelInMin,iLevelInMax;
+	INT ariLevels[256];
+	INT iLevelInMin,iLevelInMax;
 	double dGamma=1;
-	SINT iLevelOutMin=0;
-	SINT iLevelOutMax=255;
+	INT iLevelOutMin=0;
+	INT iLevelOutMax=255;
 
 	IMGLevelMaker(hdlImage,ariLevels); // Cerco i livelli della foto
 	LAutoLevelMaker(ariLevels,&iLevelInMin,&iLevelInMax); // Cerco il minimo / massimo
@@ -580,7 +580,7 @@ SINT IMGAutoLevel(SINT hdlImage)
 // --------------------------------------------------------------
 
 
-SINT IMGFactCalcH(IMGHEADER *ImgHead,SIZE *lpsDest,SINT *lpiPerc)
+INT IMGFactCalcH(IMGHEADER *ImgHead,SIZE *lpsDest,INT *lpiPerc)
 {
 	SIZE sSource;
 	sSource.cx=ImgHead->bmiHeader.biWidth;
@@ -588,9 +588,9 @@ SINT IMGFactCalcH(IMGHEADER *ImgHead,SIZE *lpsDest,SINT *lpiPerc)
 	return IMGFactCalc(&sSource,lpsDest,lpiPerc);
 }
 
-SINT IMGFactCalc(SIZE *lpsSource,SIZE *lpsDest,SINT *lpiPerc)
+INT IMGFactCalc(SIZE *lpsSource,SIZE *lpsDest,INT *lpiPerc)
 {
-	SINT iScale,iPerc;
+	INT iScale,iPerc;
 	iScale=1;
 	//if (!lpsSource->cx||lpsSource->cy) ehExit("IMGFactCalc=0");
 	
@@ -636,15 +636,15 @@ SINT IMGFactCalc(SIZE *lpsSource,SIZE *lpsDest,SINT *lpiPerc)
 }
 
 
-BOOL JPGReadSize(TCHAR *imageFileName,SINT *HdlImage,BOOL *lpfStop,SINT *lpiErr,SINT iModeError,SIZE sDest)
+BOOL JPGReadSize(TCHAR *imageFileName,INT *HdlImage,BOOL *lpfStop,INT *lpiErr,INT iModeError,SIZE * psDest)
 {
 	IMGHEADER sImg;
 	SIZE sNewDest;
 	RECT rDest,rSource;
-	SINT iFact;
+	INT iFact;
 	SIZE sSource;
-	SINT hdlOriginal;
-	SINT hdlBuild;
+	INT hdlOriginal;
+	INT hdlBuild;
 	BOOL fError=TRUE;
 
 	if (!JPGReadHeader(imageFileName,&sImg,JME_NORMAL)) return fError;
@@ -654,7 +654,9 @@ BOOL JPGReadSize(TCHAR *imageFileName,SINT *HdlImage,BOOL *lpfStop,SINT *lpiErr,
 
 	// Calcolo le dimensione della nuova foto
 	IMGCalcSize(&sImg,      // Dimensioni del sorgente
-				sDest,		   // Area disponibile
+				psDest,		// Area disponibile
+				NULL,
+				NULL,
 				IMGPT_AL_FORMATO,  // Tipo di adattamento
 				0,	   // Allineamento orizzontale
 				0,	   // Allineamento verticale

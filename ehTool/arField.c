@@ -10,7 +10,7 @@
 #include "/easyhand/ehtool/arField.h"
  
 
-static _DMI dmiField=DMIRESET;
+static _DMI dmiField=DMIRESET; 
 
 void ar_recreset(SINT idb)
 {

@@ -2384,8 +2384,10 @@ void		pwdPdfFile(	UTF8 *		pszFileName,
 				sPe.dwSizeData=sizeof(PWD_POINT);
 				psPoint=sPe.psData=ehAlloc(sPe.dwSizeData);
 				
-				psParam=lstGet(psGo->lstParams,0); psPoint->x=UM_CONV_X(atof(psParam->pbValue));
-				psParam=lstGet(psGo->lstParams,1); psPoint->y=UM_CONV_Y(atof(psParam->pbValue));
+				psParam=lstGet(psGo->lstParams,0); 
+				psPoint->x=UM_CONV_X(atof(psParam->pbValue));
+				psParam=lstGet(psGo->lstParams,1); 
+				psPoint->y=UM_CONV_Y(atof(psParam->pbValue));
 				lstPush(lstPath,&sPe);
 			}
 			//
@@ -2400,8 +2402,10 @@ void		pwdPdfFile(	UTF8 *		pszFileName,
 				sPe.dwSizeData=sizeof(PWD_POINT);
 				psPoint=sPe.psData=ehAlloc(sPe.dwSizeData);
 
-				psParam=lstGet(psGo->lstParams,0); psPoint->x=UM_CONV_X(atof(psParam->pbValue));
-				psParam=lstGet(psGo->lstParams,1); psPoint->y=UM_CONV_Y(atof(psParam->pbValue));
+				psParam=lstGet(psGo->lstParams,0); 
+				psPoint->x=UM_CONV_X(atof(psParam->pbValue));
+				psParam=lstGet(psGo->lstParams,1); 
+				psPoint->y=UM_CONV_Y(atof(psParam->pbValue));
 				lstPush(lstPath,&sPe);
 			}
 

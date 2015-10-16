@@ -16,7 +16,7 @@
 	//
 	// EH_INTERNET
 	//
-	#ifdef EH_INTERNET
+	#if (defined(EH_MAIL)||defined(EH_INTERNET))
 		#include "/easyhand/inc/eh_internet.h"
 	#endif
 
@@ -62,7 +62,7 @@
 	// <== SQL SECTION (START) =======================================================
 	//
 
-void *	 sqlScroll(struct OBJ *objCalled,EN_MESSAGE cmd,LONG info,CHAR *str);
+void *	 sqlScroll(struct OBJ * objCalled,EN_MESSAGE cmd,LONG info,CHAR *str);
 #define _sqlScrollAdaptor_ EH_DISPEXT * psExt=(EH_DISPEXT *) pbReturn; SQL_RS rsSet=(SQL_RS ) lParam; EN_MESSAGE enMess=message;
 
 	#ifdef EH_SQL_ODBC

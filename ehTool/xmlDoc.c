@@ -1,7 +1,7 @@
 //   ---------------------------------------------
-//   | xmlDoc  
+//   | xmlDoc - Gestore di file XML 
 //   |         
-//   |
+//   |							Ferrà 2005-2014
 //   ---------------------------------------------
 //
 #include "/easyhand/inc/easyhand.h"
@@ -60,13 +60,15 @@ BOOL	xmlClose(XMLD * pxDoc,BOOL bSave) {
 		EH_FILE * psFile;
 
 		lst=xmlToLst(pxDoc->pxRoot,NULL);
-		psFile=fileOpen(pxDoc->szFile,FO_WRITE|FO_CREATE_ALWAYS);
-		filePrint(psFile,"<?xml version=\"1.0\" encoding=\"UTF-8\"?>" CRLF); // Header > da vedere
+		psFile=fileOpen(pxDoc->szFile,FO_WRITE|FO_CREATE_ALWAYS); 
+		if (!psFile) ehExit("file open error: %s",pxDoc->szFile);
+		if (!pxDoc->bNotHeaderXml) filePrint(psFile,"<?xml version=\"1.0\" encoding=\"UTF-8\"?>" CRLF); // Header > da vedere
 		for (lstLoop(lst,psz)) {
 			filePrint(psFile,"%s" CRLF,psz);
 		}
 		fileClose(psFile);
 		lstDestroy(lst);
+
 	}
 
 	if (pxDoc->pxRoot) xmlRemove(pxDoc,pxDoc->pxRoot,false);
@@ -174,30 +176,58 @@ XMLPTR xmlLast(XMLPTR px) {
 	return pxLast;
 }
 
+//
+// xmlAppendChild()
+//
+XMLPTR xmlAppendChild(XMLD * pxDoc, XMLPTR pxParent, CHAR * pszNew,...) {
+
+	CHAR * pszElement;
+	XMLPTR pxRet=NULL;
+	strFromArgs(pszNew,pszElement);
+	pxRet=xmlAdd(pxDoc, true, pxParent, ">%s",pszElement);
+
+	ehFree(pszElement);
+	return pxRet;
+
+}
 
 //
-// xmlAdd()
-// Ritorna TRUE se ci sono problemi
+// xmlAdd() - Aggiunge un nodo
+// Ritorna il puntatore al nodo aggiunto
 //
 XMLPTR xmlAdd(XMLD * pxDoc, BOOL bAddEver, XMLPTR pxParent, CHAR * pszNew,...) {
 
 	XMLPTR pxb,px,pxStart=NULL,pxPoint,pxLast=NULL;
+	XMLPTR pxRet=NULL;
 	INT a,iLevel=0;
 	CHAR * pszElement;
 	EH_AR ar;
+
+	strFromArgs(pszNew,pszElement);
 
 	if (!pxParent) {
 		pxStart=pxDoc->pxRoot; 
 		pxPoint=pxStart;
 	}
-		else {
+	else {
 		
-			pxStart=pxParent;
-			pxPoint=NULL;
+		pxStart=pxParent;
+		pxPoint=pxStart;
 	}
 
-	strFromArgs(pszNew,pszElement);
-	ar=_strParser(pszElement);
+	if (*pszElement=='>') {
+		
+		pxStart=pxStart->pxFirstChild;
+		pxPoint=pxStart;
+		ar=_strParser(pszElement+1);
+	}
+	else {
+		ar=_strParser(pszElement);
+	}
+
+	//
+	// Array dei nodi da aggiungere
+	//
 	
 	for (a=0;ar[a];a++) {
 
@@ -216,8 +246,26 @@ XMLPTR xmlAdd(XMLD * pxDoc, BOOL bAddEver, XMLPTR pxParent, CHAR * pszNew,...) {
 		
 
 		//
-		// Controllo Item stesso livello
+		// Controllo se item c'è già
 		//
+		pxLast=NULL; pxb=NULL;
+		if (!bAddEver) {
+
+			for (pxb=pxPoint;pxb;pxb=pxb->pxNext) {
+
+				pxLast=pxb;
+				if (!strcmp(pxb->pName,px->pName)) {
+				
+						pxParent=pxb;
+						pxPoint=pxb->pxFirstChild;
+						xmlElementFree(px);
+						pxRet=pxParent;
+						break;
+				}
+			}
+		}
+
+/*
 		pxLast=NULL;
 		for (pxb=pxPoint;pxb;pxb=pxb->pxNext) {
 
@@ -228,6 +276,7 @@ XMLPTR xmlAdd(XMLD * pxDoc, BOOL bAddEver, XMLPTR pxParent, CHAR * pszNew,...) {
 					pxParent=pxb;
 					pxPoint=pxb->pxFirstChild;
 					xmlElementFree(px);
+					pxRet=pxParent;
 					break;
 				}
 				else {
@@ -235,14 +284,15 @@ XMLPTR xmlAdd(XMLD * pxDoc, BOOL bAddEver, XMLPTR pxParent, CHAR * pszNew,...) {
 					pxPoint=xmlLast(pxb);
 					pxPoint->pxNext=px;
 					pxPoint=px;
+					pxRet=px;
 					break;
 
 				}
 			}
 		}
-
+*/
 		//
-		// Aggiungo un figlio
+		// AppendChild() -> Aggiungo un figlio
 		//
 		if (!pxb) {
 
@@ -258,21 +308,68 @@ XMLPTR xmlAdd(XMLD * pxDoc, BOOL bAddEver, XMLPTR pxParent, CHAR * pszNew,...) {
 			if (pxLast) {
 				
 				pxParent=pxLast->pxNext=px;
-				pxPoint=NULL;
 			}
 			// Non ho altri figli = Inserisco il primo
 			else {
 				pxParent->pxFirstChild=px;
-				pxParent=px;
-				pxPoint=NULL;
 			}
+			pxParent=px;
+			pxPoint=NULL;
+			pxRet=pxParent;
 		}
 	}
 	ARDestroy(ar);
 	ehFree(pszElement);
-	return pxParent;
+	return pxRet;
 }
 
+//
+// xmlSet()
+// Ritorna il puntatore al nodo aggiunto
+//
+XMLPTR xmlSet(XMLD * pxDoc, BOOL bAddEver, XMLPTR pxParent, CHAR * pszNew,...) {
+
+	CHAR * pszElement;
+	CHAR * psz;
+	XMLPTR pxmlEle;
+	CHAR * pszAttrib=NULL;
+	strFromArgs(pszNew,pszElement);
+
+	if (!pxParent) pxParent=pxDoc->pxRoot;
+
+	psz=strstr(pszElement,"="); 
+	if (psz) 
+	{
+		*psz=0;
+		pszAttrib=strstr(psz+1,"\1"); if (pszAttrib) *pszAttrib=0;
+	}
+	pxmlEle=xmlAdd(pxDoc,bAddEver,pxParent,pszElement);
+	if (pxmlEle&&psz) strAssign(&pxmlEle->pszValue,psz+1);
+
+	if (pszAttrib) {
+
+		EH_JSON * js;
+		EH_JSON * psJson;
+		INT a=0;
+
+		pszAttrib++;
+		psJson=js=jsonCreate(pszAttrib);
+		
+		do {
+
+			if (psJson->enType!=JSON_ARRAY) {
+				xmlSetAttrib(pxmlEle,psJson->pszName,"%s",psJson->utfValue);
+			} 
+			// Ho array e no child !!
+
+		} while ((psJson=psJson->psNext));
+		jsonDestroy(js);
+		
+	}
+	ehFree(pszElement);
+	return pxmlEle;
+
+}
 
 
 //
@@ -300,6 +397,8 @@ BOOL xmlRemove(XMLD * pxDoc, XMLPTR pxElement,BOOL bOnlyChildren) {
 				break;
 
 			}
+			if (pxLast==pxb) 
+				break;
 			pxLast=pxb;
 		}
 	}
@@ -686,20 +785,17 @@ static void _xmlScan(XMLD * psDoc,CHAR **lpSource,XMLPTR pxParent)
 	BYTE *	lpEntity,*pb;
 	CHAR *	lpName;
 	CHAR *	pszAtt=NULL;
-//	CHAR *lp;
 
-	INT iCount=0;
-	INT iSize;
-	BOOL fOpen,fClose;
-//	XMLE xmlElement;
-	XMLPTR px=NULL;
-	XMLPTR pxLast=NULL;
+	INT		iCount=0;
+	INT		iSize;
+	BOOL	fOpen,fClose;
+	XMLPTR	px=NULL;
+	XMLPTR	pxLast=NULL;
 	EN_XMLTAG_IS enType;
-//	INT idxLastElement;
-	static INT iLevel=0;
-	BYTE *lpSourcePoint;
+	static	INT iLevel=0;
+	BYTE *	lpSourcePoint;
 
-	while (TRUE)
+	while (true)
 	{
 		if (!**lpSource) break;
 		lpEntity=_getEntity(psDoc,lpSource,&iSize,&enType,&lpSourcePoint);
@@ -718,9 +814,9 @@ static void _xmlScan(XMLD * psDoc,CHAR **lpSource,XMLPTR pxParent)
 				lpName=lpEntity+1; lpEntity[iSize-1]=0;
 				if (*lpName=='/') {fClose=TRUE; fOpen=FALSE; lpName++;} else fClose=FALSE;
 				for (pb=lpName;*pb;pb++) {if (*pb<'!') break;}
-				//lp=strstr(lpName," ");
+				
 				if (pb) {*pb=0; pszAtt=pb+1;} else pszAtt=NULL;
-				//win_infoarg("iParent=%d Tag[%s] Att=[%s] fOpen=%d fClose=%d",iParent,lpName,lpAtt,fOpen,fClose);
+				
 
 				if (fClose)
 				{

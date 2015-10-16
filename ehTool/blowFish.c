@@ -473,6 +473,7 @@ CHAR * bfHexDecryptAlloc(CHAR * pszCryptHex,CHAR * pszKey) {
 	  printf("Test decryption failed.\n");
 */
 
+
 //
 // bfHexEncrypt()
 //
@@ -491,7 +492,6 @@ CHAR * bfHexEncrypt(CHAR * pszSource,
 	S_BLOWFISH sCtx;
 
 	bfInit(&sCtx, (unsigned char *) pszKey, strlen(pszKey));
-//	memset(pszHexDest,0,iHexDest);
 	*pszHexDest=0; c=0;
 
 	pMax=pszSource+strlen(pszSource);
@@ -521,4 +521,102 @@ CHAR * bfHexEncryptAlloc(CHAR * pszCryptHex,CHAR * pszKey) {
 	CHAR *	pszRet=ehAlloc(iSize+1);
 	if (!bfHexEncrypt(pszCryptHex,pszKey,pszRet,iSize)) ehFreePtr(&pszRet);
 	return pszRet;
+}
+
+
+//
+// bfBaseEncrypt()
+//
+CHAR * bfBaseEncrypt(	CHAR * pszSource,
+						CHAR * pszKey,
+						CHAR * pszBaseDest,
+						INT iBaseDest) {
+						
+	CHAR * pszRet=NULL;
+
+	BYTE *  p, * pMax;
+	DWORD	dwL,dwR;
+	INT		b,c;
+	BOOL	bError=false;
+	DWORD	* pdwStart,* pdw;
+	INT		iDw;
+	CHAR * psz;
+
+	S_BLOWFISH sCtx;
+
+	bfInit(&sCtx, (unsigned char *) pszKey, strlen(pszKey));
+	*pszBaseDest=0; c=0;
+
+	pMax=pszSource+strlen(pszSource);
+	pdwStart=pdw=ehAlloc(strlen(pszSource)*4);
+	iDw=0;
+	for (p=pszSource;;) {
+		
+		// Prendo le due DWORD
+		dwL=dwR=0;
+		for (b=0;b<4;b++,p++) {if (p<=pMax) dwL|=(*p<<((3-b)<<3)); else dwL|=(0<<((3-b)<<3));} // L
+		for (b=0;b<4;b++,p++) {if (p<=pMax) dwR|=(*p<<((3-b)<<3)); else dwR|=(0<<((3-b)<<3));} // L
+
+		c+=8;// if (c>=iHexDest) {bError=true; break;}
+		bfEncrypt(&sCtx, &dwL, &dwR);
+		*pdw=dwL; pdw++;
+		*pdw=dwR; pdw++; iDw+=8;
+
+//		ardw[0]=dwL; dwL[1]=dwR;
+//		strAppend(pszHexDest,"%08x%08x",dwL,dwR);
+		if (p>pMax) break;
+	}
+	psz=base64Encode(0,pdwStart,iDw);
+	if (strlen(psz)>=(UINT) iBaseDest) bError=true; else 
+	{
+		strCpy(pszBaseDest,psz,iBaseDest);
+		while(strReplace(pszBaseDest,"=",""));
+	}
+	ehFree(psz);
+	ehFree(pdwStart);
+
+	if (bError) {*pszBaseDest=0; return NULL;} else return pszBaseDest;
+
+}
+
+
+//
+// bfBaseDecrypt()
+// Ritorna NULL se si è verificato un errore 
+// 
+CHAR * bfBaseDecrypt(	CHAR *	pszCriptBase,
+						CHAR *	pszKey,
+						CHAR *	pszDest,
+						INT		iSizeDest) {
+
+//	CHAR *  p;
+	DWORD	dwL,dwR;
+	CHAR	*pd;
+	INT		a,b,c;
+	BOOL	bError=false;
+
+	S_BLOWFISH sCtx;
+	SIZE_T tiSize;
+	DWORD * pwd,* pwdStart;
+
+	pwdStart=pwd=base64Decode(pszCriptBase,&tiSize);
+	if (!pwd) return NULL;
+
+	bfInit(&sCtx, (unsigned char *) pszKey, strlen(pszKey));
+	pd=pszDest;
+	c=0; *pszDest=0;
+	for (a=0;a<(INT) tiSize;a++) {
+
+		dwL=*pwd; pwd++;
+		dwR=*pwd; pwd++;
+		a+=8;
+
+		bfDecrypt(&sCtx, &dwL, &dwR); 
+		c+=8; if (c>=iSizeDest) {bError=true; break;} // errore (Over Size)
+		for (b=0;b<4;b++) {*pd++=(dwL>>((3-b)<<3))&0xff;}
+		for (b=0;b<4;b++) {*pd++=(dwR>>((3-b)<<3))&0xff;}
+	}
+	*pd=0;
+	ehFree(pwdStart);
+	if (bError) {*pszDest=0; return NULL;} else return pszDest;
 }

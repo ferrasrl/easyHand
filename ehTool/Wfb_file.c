@@ -12,6 +12,87 @@
 
 #ifdef _WIN32
 
+//
+// fileChoose()
+//
+INT	fileChoose(	HWND	hwnd,
+				CHAR *	pszTitle,
+				CHAR	arFilter[],
+				CHAR *	pszPath,
+				EH_LST	lstFiles,
+				BOOL	bFileMultiple,
+				BOOL	bFileMustExist)
+{
+    OPENFILENAME ofn;
+	BOOL bRet=false;
+	INT iSizeBuf=16000;
+	CHAR * pszFileBuf=ehAllocZero(iSizeBuf);
+	
+
+	_(ofn);
+	ofn.lStructSize       = sizeof(OPENFILENAME);
+    ofn.hwndOwner         = hwnd;
+    ofn.hInstance         = sys.EhWinInstance;
+    ofn.lpstrFilter       = arFilter;
+	ofn.lpstrCustomFilter = NULL;
+    ofn.nMaxCustFilter    = 0;
+    ofn.nFilterIndex      = 0;
+    ofn.lpstrFile         = pszFileBuf; // File che si vogliono indicare
+    ofn.nMaxFile          = iSizeBuf; // Grandezza del Buffer
+    ofn.lpstrFileTitle    = NULL;
+    ofn.nMaxFileTitle     = 0;
+    ofn.lpstrInitialDir   = NULL;//Appoggio.Path;
+    ofn.lpstrInitialDir   = pszPath;//Appoggio.Path;
+    ofn.lpstrTitle        = pszTitle;
+    ofn.nFileOffset       = 0;//strlen(szFile)+1; // Offset dei file
+    ofn.nFileExtension    = 0;//"\"*.*\"";
+    ofn.lpstrDefExt       = NULL;
+    ofn.lCustData         = 0;//(LPARAM)&sMyData; // Passo un Puntatore ai Miei dati
+/*
+	if (fPreviewProc)
+	{
+		ofn.lpfnHook 		  = ComDlg32DlgProc; // Procedura agganciata
+	}
+	*/
+	ofn.lpTemplateName    = NULL;//MAKEINTRESOURCE(IDD_COMDLG32); // Dialogo agganciato
+    ofn.Flags             = OFN_EXPLORER |    // Abilito il tipo Explorer
+							OFN_ENABLEHOOK|
+							OFN_ENABLESIZING|
+							OFN_HIDEREADONLY;// |    // Nascondo Read only
+	if (bFileMultiple)		ofn.Flags|=OFN_ALLOWMULTISELECT;
+	if (bFileMustExist)		ofn.Flags|=OFN_FILEMUSTEXIST;
+	
+    if (GetOpenFileName(&ofn)) 
+	{
+		bRet=true;
+		if (bFileMultiple) {
+			
+			CHAR * p=pszFileBuf;
+			CHAR * pszFolder=NULL;
+//			CHAR * psz;
+			while (*p) {
+				if (!pszFolder) pszFolder=p;
+				lstPush(lstFiles,p);
+				p+=strlen(p)+1;
+			}
+
+			if (lstFiles->iLength>1) {
+				lstClean(lstFiles);
+				p=pszFolder+strlen(pszFolder)+1;
+				while (*p) {
+					
+					lstPushf(lstFiles,"%s\\%s",pszFolder,p);
+					p+=strlen(p)+1;
+				}
+			}
+			
+		}
+	}
+	ehFree(pszFileBuf);
+	return bRet;
+}
+
+
 SINT FileAskOpenWin(CHAR *Titolo,CHAR szFilter[],CHAR *NomeFile,SINT FlagExist)
 {
     OPENFILENAME ofn;

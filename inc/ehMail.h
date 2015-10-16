@@ -101,6 +101,7 @@ typedef struct {
 	FMAIL_ADDR	sBcc;
 	FMAIL_ADDR	sReplyTo;
 	FMAIL_ADDR	sNotifyTo;
+//	FMAIL_ADDR	sDispositionTo;
 
 	CHAR *		putfSubject;     // Soggetto
 	CHAR *		pSubjectEncoded; // New 2009 (Se non espressamente indicato fatto in automatico dal sistema)
@@ -197,9 +198,12 @@ typedef struct {
 	INT		iPortSend;	// Se indicato porta di invio alternativa (default 25 per SMTP)
 	CHAR 	szSMTPUser[300];	// Solo con autentica
 	CHAR 	szSMTPPassword[300];   // Solo con autentica
+
 	CHAR 	szPOP3Server[300];   // Nome del server POP3 (Ricezione)
 	CHAR 	szPOP3User[300];         // Nome dell'user
 	CHAR 	szPOP3Password[300];         // Password
+	INT		iPortReceive;	// Se indicato porta di invio alternativa (default 25 per SMTP)
+
 	CHAR 	szMyServer[300];   // Chi sono Es www.ferra.com
     INT		(*SubControl)(INT,LONG,void *); // Sotto procedura dedicata al Paint
 

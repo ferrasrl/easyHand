@@ -57,19 +57,26 @@ typedef struct {
 	BOOL			bHtmlReady;
 	_IEI			sIe;
 
-	DWORD			msTimeReady;	// Tempo in cui è stata aletta la pagina
+	DWORD			msTimeReady;	// Tempo in cui è stata letta la pagina
+	SIZE			sizWin;
+
+	DWORD			msTimeoutField;
 
 } EH_WEBPAGE;//EH_WPLIST;
 
 //BOOL	bwsCallJScript(CHAR *lpObjName,CHAR *lpFunction,CHAR *lpResult,INT iBufferSize,INT iArgs,...);
 //BOOL	bwsObjectReady(CHAR *lpObjName,CHAR *lpFunction,INT iTimeOutSec); // new 2009
-BOOL	bwsSetUrl(CHAR * pszObj,CHAR * pszUrl,DWORD dwTimeout);
+BOOL	bwsSetTimeout(CHAR * pszObj,DWORD dwTimeoutField);
+BOOL	bwsSetUrl(CHAR * pszObj,CHAR * pszUrl,BOOL bSilent,DWORD dwTimeout);
+BOOL	bwsSetText(CHAR * pszObj,BYTE * pszText,BOOL bUtf8,DWORD dwTimeout);
+BOOL	bwsVisible(CHAR * pszObj,BOOL bShow);
 BOOL	bwsWaitUrl(CHAR * pszObj,CHAR * pszWildCharUrl,CHAR * pszUrl,INT iSizeUrl,DWORD msWaiting);
 BOOL	bwsElementReady(CHAR * pszObj,CHAR * pszSearch, BOOL bQuery,DWORD msReply, IHTMLElement **  ppiElement);
-BOOL	bwsSetValue(CHAR * pszObj,CHAR * pszIdName,CHAR * pszFormat,...);
+BOOL	bwsSetValue(CHAR * pszObj,CHAR * pszIdName,BOOL bIsUtf8,CHAR * pszFormat,...);
 CHAR *	bwsGetValue(CHAR * pszObj,CHAR * pszFormat, ...);
 BOOL	bwsJavascript(CHAR * pszObj,CHAR * pszFormat,...);
 BOOL	bwsJavascriptEx(CHAR * pszObj,DWORD dwWait,CHAR * pszFormat,...);
+BOOL	bwsSetScroll(CHAR * pszObj,INT iValue);
 //CHAR *	bwsEventFunction(void);
 
 void	bwsEvent(CHAR * pszObj,IHTMLElement * piElement,CHAR * pszEvent);
@@ -82,6 +89,8 @@ BOOL	bwsSetInputFile(CHAR * pszObj,CHAR * pszFld,CHAR * pszPhoto);
 CHAR  * bwsGetCookie(CHAR * pszObj);
 EH_LST  bwsGetListFields(CHAR * pszObj,CHAR * pszNameForm);
 DWORD	bwsSetEmulation(DWORD dwEmulation);
+BOOL	bwsSetLoading(CHAR * pszObj, DWORD dwStatus);
+BOOL	bwsLoadingWaiting(CHAR * pszObj, DWORD dwStatus, DWORD dwTimeout);
 
 // Opzioni possibili su update
 #define WP_URL 0

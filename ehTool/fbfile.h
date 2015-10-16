@@ -27,4 +27,12 @@ SINT FileAskOpenWin(CHAR *Titolo,CHAR szFilter[],CHAR *NomeFile,SINT FlagExist);
 SINT FileAskSaveWin(CHAR *Titolo,CHAR szFilter[],CHAR *NomeFile,SINT FlagExist);
 SINT PathAskWin(CHAR *Titolo,CHAR *NomePath);
 BOOL PathAskWinEx(HWND hWnd,CHAR *Titolo,CHAR *NomePath);
+
+INT	fileChoose(	HWND	hwnd,
+				CHAR *	pszTitle,
+				CHAR	arFilter[],
+				CHAR *	pszPath,
+				EH_LST	lstFiles,
+				BOOL	bFileMultiple,
+				BOOL	bFileMustExist);
 #endif

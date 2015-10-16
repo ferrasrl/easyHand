@@ -7,9 +7,11 @@
 #include <psapi.h>
 
 typedef struct {
-   SC_HANDLE hSCM;
-   SC_HANDLE hService;
-   SERVICE_STATUS sServiceStatus;
+   
+	SC_HANDLE hSCM;
+	SC_HANDLE hService;
+	SERVICE_STATUS sServiceStatus;
+
 } S_NT_SERVICE;
 
 BOOL	FNTServiceGet(CHAR * pszServiceName,DWORD dwMode,S_NT_SERVICE * psNtService);

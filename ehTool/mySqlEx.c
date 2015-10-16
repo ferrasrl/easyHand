@@ -116,6 +116,7 @@ S_FLD_INFO * mysGetTableInfo(DYN_SECTION_FUNC CHAR * pszTable,_DMI * pdmiField,_
 			} else sField.enEncoding=ULT_CS_LATIN1;
 			
 			pszTypeComplex=sql_ptr(rsSet,"Type");
+			strCpy(sField.szTypeText,pszTypeComplex,sizeof(sField.szTypeText));
 			pszType=strExtract(pszTypeComplex,NULL,"(",0,0);
 			if (!pszType) pszType=strExtract(pszTypeComplex,NULL," ",0,0);
 			if (!pszType) pszType=strDup(pszTypeComplex);
@@ -137,7 +138,7 @@ S_FLD_INFO * mysGetTableInfo(DYN_SECTION_FUNC CHAR * pszTable,_DMI * pdmiField,_
 
 			// Tipo
 			if (!strcmp(pszType,"int")) {
-				sField.enFldType=ADB_INT32;
+				sField.enFldType=ADB_UINT32;
 				if (!strCmp(sql_ptr(rsSet,"Extra"),"auto_increment")) sField.enFldType=ADB_AINC;
 
 			}
@@ -181,13 +182,38 @@ S_FLD_INFO * mysGetTableInfo(DYN_SECTION_FUNC CHAR * pszTable,_DMI * pdmiField,_
 			pszNullMode=sql_ptr(rsSet,"Null"); if (!pszNullMode) ehError();
 			if (strstr(pszNullMode,"YES")) sField.bIsNullable=1;
 			if (strstr(pszNullMode,"NO")) sField.bIsNullable=0;
+
+			if (sField.enFldType==ADB_AINC) strcat(sField.szTypeText," AUTO_INCREMENT");
 			ehFreePtrs(1,&pszType);
+
+
+			pszCollation=sql_ptr(rsSet,"Collation");
+			if (pszCollation) {
+				if (!strBegin(pszCollation,"utf8_general_ci")) {
+					strAppend(sField.szTypeText," CHARACTER SET utf8 COLLATE %s",pszCollation);
+				}
+				else if (!strBegin(pszCollation,"utf8_bin")) {
+					strAppend(sField.szTypeText," CHARACTER SET utf8 COLLATE %s",pszCollation);
+				}
+					
+			} 
 			
+			if (!sField.bIsNullable) strcat(sField.szTypeText," NOT NULL");
+
 			p=sql_ptr(rsSet,"Default");
-			if (!p) strcpy(sField.szDefault,"?nil?"); 
+			if (!p) {
+				strcpy(sField.szDefault,"?nil?"); 
+
+				if (sField.bIsNullable) strcat(sField.szTypeText," DEFAULT NULL");
+			}
 			else 
 			{
 				strcpy(sField.szDefault,p);
+				if (sField.enFldType==ADB_ALFA||
+					sField.enFldType==ADB_BLOB)
+					strAppend(sField.szTypeText," DEFAULT '%s'",sField.szDefault);
+					else
+					strAppend(sField.szTypeText," DEFAULT %s",sField.szDefault);
 			}
 
 
@@ -271,7 +297,7 @@ EH_DATATYPE adb_TypeToDataType(EN_FLDTYPE enType) {
 		case ADB_COBN:	enRet=_NUMBER; break;
 		case ADB_AINC:	enRet=_ID; break;
 		case ADB_BLOB:	enRet=_TEXT; break;
-		case ADB_INT32: enRet=_INTEGER; break;
+		case ADB_UINT32: enRet=_INTEGER; break;
 		case ADB_BINARY: enRet=_BINARY; break;
 		case ADB_POINT: enRet=_POINT; break;
 		case ADB_GEOMETRY: enRet=_GEOMETRY; break;
@@ -443,7 +469,7 @@ BOOL mysTableExport(DYN_SECTION_FUNC
 		else {
 			sql_query(DYN_SECTIONC "SELECT %s FROM %s %s LIMIT %d,%d",pszQueryFields,pszTable,pszOrder,iOffset,iBlock);
 		}
-		printf("\rrichiedo a mySql da %d (%d records) [%d%%] ...     ",iOffset,iBlock,iOffset*100/iMaxRecords);
+		// printf("\rrichiedo a mySql da %d (%d records) [%d%%] ...     ",iOffset,iBlock,iOffset*100/iMaxRecords);
 		rsSet=sql_stored(DYN_SECTION);
 		while (sql_fetch(rsSet)) {
 			if (bShowProgress) {
@@ -518,7 +544,7 @@ static CHAR * _getPrimaryKey(_DMI * pdmiField,_DMI * pdmiIndex,SQL_RS rsSet,EH_L
 
 				case ADB_BOOL :
 				case ADB_INT  : 
-				case ADB_INT32: 
+				case ADB_UINT32: 
 				case ADB_AINC:
 					if (!pszValue) pszValue="NULL";
 					pszString=strDup(pszValue);
@@ -554,13 +580,11 @@ static CHAR * _getPrimaryKey(_DMI * pdmiField,_DMI * pdmiIndex,SQL_RS rsSet,EH_L
 
 }
 
-
-
 //
 // mysTableUtf8Repair()
 // Ritorna True se non riesce
 //
-BOOL mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWORD * pdwUpdate) {
+BOOL mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWORD * pdwUpdate,DWORD * pdwError) {
 
 	DYN_SECTION_GLOBALPTR
 	_DMI dmiField=DMIRESET;
@@ -575,6 +599,7 @@ BOOL mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWOR
 	EH_LST lstCols,lstField,lstUtf;
 	INT iUpdate=0;
 	INT iBack;
+	INT	iError=0;
 
 	if (pdwUpdate) *pdwUpdate=0;
 	if (!mysGetTableInfo(DYN_SECTIONC pszTable,&dmiField,&dmiIndex)) { return true;}	
@@ -629,14 +654,18 @@ BOOL mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWOR
 			bNotUpdate=false;
 			lstClean(lstField);
 			for (lstLoop(lstUtf,pszFld)) {
-			
+			/*
 				CHAR *	pszBug;
 				CHAR *	pszGood=NULL;
 				CHAR *	pUtfSql=NULL;
-				BOOL	bStrError=false;
 				pszBug=sql_ptr(rsSet,pszFld);
-				if (strEmpty(pszBug)) continue;
+*/
+				CHAR *	pszNewValue;
+				BOOL	bStrChanged=false;
+				if (strEmpty(sql_ptr(rsSet,pszFld))) continue;
+				pszNewValue=strUtf8Repair(sql_ptr(rsSet,pszFld),&bStrChanged,&bNotUpdate);
 
+/*
 				for (pszBug=sql_ptr(rsSet,pszFld);;pszBug=pUtfSql) {
 					CHAR * pszBefore=strDup(pszBug);
 					ehFreeNN(pUtfSql);
@@ -651,13 +680,16 @@ BOOL mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWOR
 					bStrError=true;
 				}
 				if (!pszGood) {bStrError=false; bNotUpdate=true; pszGood=strDup("?");}
+				
 				ehFree(pUtfSql);
-				if (bStrError) {
-					pUtfSql=strEncode(pszGood,SE_SQL,NULL); 
-					lstPushf(lstField,"%s%s='%s'",lstField->iLength?",":"",pszFld,pUtfSql);
-					ehFree(pUtfSql);				
+				*/
+
+				if (bStrChanged) {
+					CHAR * pszSql=strEncode(pszNewValue,SE_SQL,NULL); 
+					lstPushf(lstField,"%s%s='%s'",lstField->iLength?",":"",pszFld,pszSql);
+					ehFree(pszSql);				
 				}
-				ehFree(pszGood);
+				ehFreeNN(pszNewValue);
 				
 			}
 
@@ -668,14 +700,14 @@ BOOL mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWOR
 			
 				CHAR * pszQuery;
 				CHAR * pszPrimaryKey;
-				lstInsf(lstField,0,"UPDATE %s SET ",pszTable);
+				lstInsf(lstField,0,"?UPDATE %s SET ",pszTable);
 				pszPrimaryKey=_getPrimaryKey(&dmiField,&dmiIndex,rsSet,NULL);
 				lstPushf(lstField," WHERE %s",pszPrimaryKey);
 				pszQuery=lstToString(lstField,"","","");
 				ehFree(pszPrimaryKey);
- 				sql_query(DYN_SECTIONC "%s",pszQuery);
+ 				if (!sql_query(DYN_SECTIONC "%s",pszQuery)) iUpdate++; else iError++;
 				ehFree(pszQuery);
-				iUpdate++;
+				
 
 			}
 			
@@ -686,6 +718,7 @@ BOOL mysTableUtf8Repair(DYN_SECTION_FUNC CHAR * pszTable,BOOL bShowProgress,DWOR
 		printf("\r%s > %d (completed)." CRLF,pszTable,iMaxRecords);
 	}
 	if (pdwUpdate) *pdwUpdate=iUpdate;
+	if (pdwError) *pdwError=iError;
 	DMIClose(&dmiField,"Field");
 	DMIClose(&dmiIndex,"Field");
 	ehFree(pszQueryCols);
@@ -732,7 +765,7 @@ static void _txbRowExport(INT iFields,S_FLD_INFO *arsFld,EH_AR arExclude,S_TXB *
 
 			case ADB_BOOL :
 			case ADB_INT  : 
-			case ADB_INT32: 
+			case ADB_UINT32: 
 			case ADB_AINC:
 				fprintf(psTxb->ch,"%d",(INT) dValue);//atoi(arsFld[a].pBindBuffer));
 				break;
@@ -750,9 +783,9 @@ static void _txbRowExport(INT iFields,S_FLD_INFO *arsFld,EH_AR arExclude,S_TXB *
 				//
 				// Tolgo i due separatori dalla stringa a livello precauzionale
 				//
-				if (strstr(pszValue,TXB_SEP_COL)||strstr(pszValue,TXB_SEP_COL)) 
+				if (strstr(pszValue,TXB_SEP_COL)||strstr(pszValue,TXB_SEP_ROW)) 
 				{
-					bError=TRUE;
+					bError=true;
 					while (strReplace(pszValue,TXB_SEP_COL,""));
 					while (strReplace(pszValue,TXB_SEP_ROW,""));
 				}
@@ -767,7 +800,18 @@ static void _txbRowExport(INT iFields,S_FLD_INFO *arsFld,EH_AR arExclude,S_TXB *
 						break;
 
 					case ULT_CS_UTF8:
-						fprintf(psTxb->ch,"%s",pszValue);
+						if (!isAscii(pszValue,false)&&!isUtf8(pszValue,false)) {
+							
+							CHAR * psz;
+
+							psz=strEncode(pszValue,SE_UTF8,NULL);
+							fprintf(psTxb->ch,"%s",psz);
+							printf("utf encoding error [%s]>[%s]" CRLF,pszValue,psz);
+							ehFree(psz);
+
+						} else {
+							fprintf(psTxb->ch,"%s",pszValue);
+						}
 						break;
 				}
 				break;
@@ -827,6 +871,7 @@ static S_FLD_INFO * _fldInfo(INT iFields,S_FLD_INFO * arsFld,CHAR * pszField) {
 }
 
 
+
 static BOOL _addTxbFields(	BOOL bInsert,
 							EH_LST lstQuery,
 
@@ -881,9 +926,11 @@ static BOOL _addTxbFields(	BOOL bInsert,
 				sExt.bNotExist=true;
 				sExt.bInsert=bInsert;
 				sExt.pszSep=pE;
-				funcExt(WS_REALSET,0,&sExt);
+				bNotAssign=funcExt(WS_REALSET,0,&sExt);
 				if (sExt.bError) {bError=true; break;}
+				if (!bNotAssign) pE=","; //  Tapullino
 			}
+
 			continue;
 		}
 
@@ -920,9 +967,12 @@ static BOOL _addTxbFields(	BOOL bInsert,
 
 				case ADB_BOOL :
 				case ADB_INT  : 
-				case ADB_INT32: 
 				case ADB_AINC:
 					lstPushf(lstQuery,"%d",txbFldInt(psTxb,psTxb->lpFieldInfo[k].lpName));
+					break;
+
+				case ADB_UINT32: 
+					lstPushf(lstQuery,"%u",txbFldInt(psTxb,psTxb->lpFieldInfo[k].lpName));
 					break;
 
 				case ADB_ALFA:
@@ -1058,12 +1108,12 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 	//
 	// Apro il txb
 	//
-	printf("\ropen %s .. ",fileName(pszFileSource));
+	if (bShowProgress) printf("\ropen %s .. ",fileName(pszFileSource));
 	psTxb=txbOpen(pszFileSource); 
 	if (!psTxb) 
 	{	
 		lstDestroy(lstQuery); 
-		printf("Errore in apertura file %s",pszFileSource); 
+		if (bShowProgress) printf("Errore in apertura file %s",pszFileSource); 
 		return true;
 	}
 
@@ -1181,7 +1231,7 @@ BOOL mysTableImport(DYN_SECTION_FUNC
 //	ehFree(pszBuffer);
 	ehFree(pszFieldList);
 	lstDestroy(lstQuery);
-	printf("\r%s completed (100%%).",pszTableDest);
+	if (bShowProgress) printf("\r%s completed (100%%).",pszTableDest);
 	txbClose(psTxb);
 	DMIClose(&dmiFieldDest,"field");
 	if (arExclude) ehFree(arExclude);
@@ -1249,8 +1299,8 @@ CHAR * _getType(S_FLD_INFO * psFld)
 			break;
 
 
-		case ADB_INT32: 
-			strcpy(szServ,"INT"); 
+		case ADB_UINT32: 
+			strcpy(szServ,"INT UNSIGNED"); 
 			break;
 
 		case ADB_BOOL:  
@@ -1340,7 +1390,7 @@ CHAR * mysFieldModify(EN_MESSAGE enMess,CHAR * pszTable,S_FLD_INFO * psFld) {
 
 }
 
-// ALTER TABLE Asl MODIFY NOME VARCHAR(101) CHARACTER SET utf8 NOT NULL AFTER IDCODE
+// ALTER TABLE Asl MODIFY NOME VARCHAR(101) CHARACTER SET utf8 NOT NULL AFTER uid
 
 
 //
@@ -1401,14 +1451,13 @@ static void _addFields(BOOL bInsert,
 			case ADB_COBD : 
 			case ADB_COBN : 
 			case ADB_FLOAT:
-				
 				if (!pszValue) pszValue="NULL";
 				strcat(pszBuffer,pszValue);
 				break;
 
 			case ADB_BOOL :
 			case ADB_INT  : 
-			case ADB_INT32: 
+			case ADB_UINT32: 
 			case ADB_AINC:
 				if (!pszValue) pszValue="NULL";
 				strcat(pszBuffer,pszValue);
@@ -1417,7 +1466,6 @@ static void _addFields(BOOL bInsert,
 			case ADB_ALFA:
 			case ADB_DATA:
 			case ADB_BLOB:
-
 				pString=strEncode(pszValue,SE_SQLSTR,NULL);
 				strcat(pszBuffer,pString);
 				ehFree(pString);
@@ -1592,6 +1640,9 @@ BOOL mysTableSync(S_MYSQL_SECTION * psecSource,CHAR * pszTableSource,
 		if (mysFieldSearch(&dmiField,"IDCODE")>-1) pszCode="IDCODE";
 	}
 	if (strEmpty(pszCode)) {
+		if (mysFieldSearch(&dmiField,"uid")>-1) pszCode="uid";
+	}
+	if (strEmpty(pszCode)) {
 		if (mysFieldSearch(&dmiField,"CODICE")>-1) pszCode="CODICE";
 	}
 	if (strEmpty(pszCode)&&(bOnlyIncrement||bAutoRemove)) ehError();
@@ -1660,6 +1711,7 @@ BOOL mysTableSync(S_MYSQL_SECTION * psecSource,CHAR * pszTableSource,
 
 		CHAR szLastCode[30]="0";
 		bAutoRemove=false; // non si può fare
+
 		//
 		// A) determino ultimo codice sulla destinazione
 		//
@@ -1795,7 +1847,7 @@ BOOL mysTableSync(S_MYSQL_SECTION * psecSource,CHAR * pszTableSource,
 						if (*szServ) strcat(szServ," AND ");
 						strAppend(szServ,"%s='%s'",arFld[a],arValue[a]);
 					}	
-					//printf("%s",szServ); _getch();
+					//printf("%s",szServ); ehGetch();
 //					printf("DELETE FROM %s WHERE (%s)",pszTableDest,szServ);
 					sql_query(_SectionDest "DELETE FROM %s WHERE (%s)",pszTableDest,szServ);
 					ehFree(arValue);
@@ -1846,12 +1898,15 @@ void mysSchemaSync(CHAR *	pszSchemaSource,
 	CHAR	szTableSource[500];
 	CHAR	szTableDest[500];
 	BOOL	bError;
-	CHAR *	putfFileTemp="c:\\mvk\\fileTempDb.txb";
+	// CHAR *	putfFileTemp="c:\\temp\\fileTempDb.txb";
+	CHAR	szFileTemp[500];
 	S_TBL_INFO * arsRef,* arsTarget;
 	
 	_DMI	dmiRef=DMIRESET;
 	_DMI	dmiTarget=DMIRESET;
 	INT		a,idx=0;
+
+	fileTempName(szFileTemp,"txb",szFileTemp,true);
 
 	if (!strCaseCmp(pszSchemaSource,pszSchemaTarget)) ehError(); // Se sono uguale errore !!
 	arsRef=mysGetSchema(pszSchemaSource,&dmiRef); // Schema di riferimento
@@ -1902,8 +1957,8 @@ void mysSchemaSync(CHAR *	pszSchemaSource,
 
 					// sprintf(szTableSource,"%s.%s",pszSchemaImport,pszTable);
 					if (strCaseCmp(szTableSource,szTableDest)) {
-						if (!mysTableExport(szTableSource,putfFileTemp,NULL,true,NULL,NULL,NULL)) {
-							mysTableImport(putfFileTemp,szTableDest,false,true,NULL,NULL,NULL);
+						if (!mysTableExport(szTableSource,szFileTemp,NULL,true,NULL,NULL,NULL)) {
+							mysTableImport(szFileTemp,szTableDest,false,true,NULL,NULL,NULL);
 						} else {
 							//ehExit("mysSchemaSync:mysTableExport: %s:%s",szTableSource,putfFileTemp);
 							printf("\7:Attenzione %s non esiste nel dbase di importazione",szTableSource);
@@ -1955,7 +2010,7 @@ void mysSchemaSync(CHAR *	pszSchemaSource,
 		}
 
 	}
-	fileRemove(putfFileTemp);
+	fileRemove(szFileTemp);
 
 	//
 	// Controllo tabella cambiate
@@ -1976,7 +2031,7 @@ void mysSchemaSync(CHAR *	pszSchemaSource,
 			sprintf(szTableSource,"%s.%s",pszSchemaTarget,pszTable);
 			sprintf(szTableDest,"%s._%s_%s",pszSchemaTarget,dtNow(),pszTable);
 			printf("rename %s > %s" CRLF,szTableSource,szTableDest);
-			_getch();
+			ehGetch();
 			sql_query("ALTER TABLE %s RENAME TO %s",szTableSource,szTableDest);
 
 		}
@@ -2109,7 +2164,7 @@ static void _dbTableStructSync(CHAR * pszTableRef,CHAR * pszTableTarget,BOOL bOp
 
 			CHAR * pszQuery=mysFieldModify(WS_DEL,pszTableTarget,psFld);
 			printf("Rimuovo %s.%d " CRLF " -> %s" CRLF,pszTableTarget,psFld->szName,pszQuery); 
-			if (bOperatorAsk) _getch();
+			if (bOperatorAsk) ehGetch();
 			sql_query("%s",pszQuery);
 			ehFree(pszQuery);
 		
@@ -2120,13 +2175,17 @@ static void _dbTableStructSync(CHAR * pszTableRef,CHAR * pszTableTarget,BOOL bOp
 		//
 
 			psFldRef=arsRef+idx;
-			memcpy(&sFldRef,psFldRef,sizeof(S_FLD_INFO));  _(sFldRef.szFieldBefore);
+			memcpy(&sFldRef,psFldRef,sizeof(S_FLD_INFO));  
+
+			_(sFldRef.szFieldBefore);
+			_(sFld.szTypeText);
+			_(sFldRef.szTypeText);
 			
 			if (memcmp(&sFldRef,&sFld,sizeof(S_FLD_INFO))) {
 			
 				CHAR * pszQuery=mysFieldModify(WS_UPDATE,pszTableTarget,psFldRef);
 				printf("-> %s" CRLF,pszQuery); 
-				if (bOperatorAsk) _getch();
+				if (bOperatorAsk) ehGetch();
 				sql_query("%s",pszQuery);
 				ehFree(pszQuery);
 
@@ -2149,7 +2208,7 @@ static void _dbTableStructSync(CHAR * pszTableRef,CHAR * pszTableTarget,BOOL bOp
 
 			CHAR * pszQuery=mysFieldModify(WS_INSERT,pszTableTarget,psFldRef);
 			printf("-> %s" CRLF,pszQuery); 
-			if (bOperatorAsk) _getch();
+			if (bOperatorAsk) ehGetch();
 			sql_query("%s",pszQuery);
 			ehFree(pszQuery);		
 		}
@@ -2184,7 +2243,7 @@ static void _dbTableStructSync(CHAR * pszTableRef,CHAR * pszTableTarget,BOOL bOp
 				ehFree(pszCreateRef);
 				pszCreateRef=_idxToStr(&dmiIdxRef,sIndex.szName,pszTableTarget);
 				printf("-> ReplaceIndex: %s" CRLF,pszCreateRef); 
-				if (bOperatorAsk) _getch();
+				if (bOperatorAsk) ehGetch();
 				sql_query("%s",pszCreateRef);
 			}
 		}
@@ -2210,7 +2269,7 @@ static void _dbTableStructSync(CHAR * pszTableRef,CHAR * pszTableTarget,BOOL bOp
 			ehFree(pszCreateRef);
 			pszCreateRef=_idxToStr(&dmiIdxRef,sIndex.szName,pszTableTarget);
 			printf("-> New Index: %s" CRLF,pszCreateRef); 
-			if (bOperatorAsk) _getch();
+			if (bOperatorAsk) ehGetch();
 			sql_query("%s",pszCreateRef);
 		}
 		ehFreePtrs(2,&pszCreateTarget,&pszCreateRef);

@@ -1436,7 +1436,7 @@ void ShowConciseImageInfo(void)
 
 void ErrFatal(char * msg)
 {
-    win_infoarg("Error : %s\n", msg);
+    win_infoarg("ErrFatal : %s\n", msg);
     if (CurrentFile) win_infoarg("in file '%s'\n",CurrentFile);
     exit(EXIT_FAILURE);
 } 

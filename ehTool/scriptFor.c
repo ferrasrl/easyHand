@@ -39,8 +39,21 @@ static S_SCRIPT_TAG _arsBasic[]={
 	{TG_GLOBAL|TE_STANTMENT, 1005,"PRINT"},
 	{TG_GLOBAL|TE_STANTMENT, 1006,"ERROR.STOP"},
 
+	// ELaborazione di stringhe
+	{TG_GLOBAL|TE_FUNCTION, 1101,"LEFT"},
+	{TG_GLOBAL|TE_FUNCTION, 1102,"RIGHT"},
+	{TG_GLOBAL|TE_FUNCTION, 1103,"SUBSTRING"},
+	{TG_GLOBAL|TE_FUNCTION, 1104,"TRIM"},
+	{TG_GLOBAL|TE_FUNCTION, 1105,"OMIT"},
+	{TG_GLOBAL|TE_FUNCTION, 1106,"KEEP"},
+
+	{TG_GLOBAL|TE_FUNCTION, 1107,"ATOI"},
+	{TG_GLOBAL|TE_FUNCTION, 1108,"ATOF"},
+
+	{TG_GLOBAL|TE_FUNCTION, 1110,"JSON.GET"},
 	{0,0,NULL},
 };
+
 
 
 //
@@ -51,25 +64,33 @@ static void (*extErrorNotify)(INT iMode,CHAR *pMess,...)=NULL;
 static CHAR *szFormError[]={"pszFormula interpretata correttamente.",
 							"Variabile sconosciuta",
 							"Errore in formula"};
+
 //static INT	iFormLastError=0;
 // static CHAR szAddInfo[80];
-static INT	_SimpleFORMtoNumber(S_SCRIPT * psScript,CHAR * pszFormula);
-static INT	_firstOperatorConverter(S_SCRIPT * psScript,CHAR * pszString); // Primi operatori da convertire : /*<<>>
-static INT	_secondOperatorConverter(S_SCRIPT * psScript,CHAR * pszString); // Secondi operatori +-&^
-static INT	_BooleanOperatorConverter(S_SCRIPT * psScript,CHAR * pszString);
-static S_UNIVAL * _formulaProcess(S_SCRIPT * psScript,CHAR * pszFormula);
+static INT			_SimpleFORMtoNumber(S_SCRIPT * psScript,CHAR * pszFormula);
+static INT			_firstOperatorConverter(S_SCRIPT * psScript,CHAR * pszString); // Primi operatori da convertire : /*<<>>
+static INT			_secondOperatorConverter(S_SCRIPT * psScript,CHAR * pszString); // Secondi operatori +-&^
+static INT			_BooleanOperatorConverter(S_SCRIPT * psScript,CHAR * pszString);
+static S_UNIVAL *	_formulaProcess(S_SCRIPT * psScript,CHAR * pszFormula);
 static BOOL IsMathOperator(CHAR Byte);
-static CHAR * ParChiudi(CHAR *p);
+static CHAR *		_ParChiudi(CHAR *p);
 static S_UNIVAL *	_WhatIsThis(S_SCRIPT * psScript,CHAR * pszElement,EN_TAG_TYPE * penType,BOOL bGetValue);//FORMULA_FUNC_EXT,void*Valore);
-static CHAR *	_parClose(CHAR *p);
-static BOOL _tagEngine(S_SCRIPT * psScript,
+static CHAR *		_parClose(CHAR *p);
+static BOOL			_tagEngine(S_SCRIPT * psScript,
 					  // S_SCRIPT_TAG * psTag,
 					   INT iCode,
 					   CHAR * pszToken,
 					   CHAR * pszChar,
 					   CHAR * pszBuffer);
-static CHAR * _getScript(S_SCRIPT * psScript);
+static CHAR *		_getScript(S_SCRIPT * psScript);
 //static BOOL _private.bFormulaDebug=FALSE;
+
+//
+// String Function 
+//
+static S_UNIVAL * _leftString(S_SCRIPT * psScript,CHAR * pszToken,CHAR * pszParams);
+static S_UNIVAL * _rightString(S_SCRIPT * psScript,CHAR * pszToken,CHAR * pszParams);
+static S_UNIVAL * _stringToNum(S_SCRIPT * psScript,CHAR * pszToken,BOOL bInteger);
 
 //
 // Script
@@ -86,6 +107,36 @@ static void	*	_varManager(S_SCRIPT * psScript,EN_MESSAGE enMess,CHAR * pszName,S
 static CHAR *	_token(S_SCRIPT * psScript,CHAR * lpChars,CHAR * lpLastSep,EN_TOKEN_MODE iMode);
 static BOOL		_varNameCheck(CHAR *lpNome);
 static BOOL		_scPrint(CHAR *lpFormulaSource,S_SCRIPT * psScript);
+
+
+//
+// scriptError()
+//
+void * scriptError(S_SCRIPT * psScript,EN_SER enErr,CHAR * pszFormat,...) {
+
+	CHAR * psz;
+	strFromArgs(pszFormat,psz);
+	psScript->enError=enErr;
+	lstPush(psScript->lstError,psz);
+	ehFree(psz);
+	return NULL;
+
+}
+
+//
+// scriptShowErrors()
+//
+void scriptShowErrors(S_SCRIPT * psScript) {
+	
+	CHAR * psz;	
+	printf(CRLF);
+	for (lstLoop(psScript->lstError,psz)) {
+		printf("- %s " CRLF,psz);
+	}
+
+}
+
+
 
 static struct {
 
@@ -111,16 +162,18 @@ void FormulaDebug(INT flag)
 static INT IsDecNumero(CHAR *);
 static INT IsHexNumero(CHAR *);
 static INT IsBinNumero(CHAR *);
-static INT IsStringFix(CHAR *);
+static INT _isStringFix(CHAR *);
 static INT IsStringVar(CHAR *);
-static BOOL IsString(CHAR *);
+static BOOL _isString(CHAR *);
+//static BOOL _isStringSum(S_SCRIPT * psScript,CHAR *);
+static S_UNIVAL * _stringSum(S_SCRIPT * psScript,CHAR * pszSum,BOOL bOnlyVerify);
 
 
 //
 // scriptGetValue()
 //
 
-S_UNIVAL * scriptGetValue(S_SCRIPT * psScript,CHAR * pszFormula)
+S_UNIVAL * scriptGetValue(S_SCRIPT * psScript,CHAR * pszToken)
 {
 
 	BOOL bRet=false;
@@ -131,21 +184,21 @@ S_UNIVAL * scriptGetValue(S_SCRIPT * psScript,CHAR * pszFormula)
 
 	//psFor->dValue=0;
 	// Tolgo i caratteri di controllo (CR-LF ecc)
-	for (ps=pszFormula;*ps;ps++)
+	for (ps=pszToken;*ps;ps++)
 	{
 		 if (*ps<33) continue;
 		 *pd=*ps; pd++;
 	}
     *pd=0;
 
-	//printf(CRLF ">|%s|<" CRLF,lpNewFormula); //getch();
-//	iFormLastError=EE_OK;
-	
 // Se è una singola variabile la elaboro subito
-	psRet=_WhatIsThis(psScript,pszFormula,&enType,true);//funcExt,NULL);
+	psRet=_WhatIsThis(psScript,pszToken,&enType,true);//funcExt,NULL);
 //	printf("> [%s]=%d" CRLF,pszFormula,enType);
 	if (enType==E_FORMULANUM||enType==E_VARUNKNOW) {
-		psRet=_formulaProcess(psScript,pszFormula);
+		psRet=_formulaProcess(psScript,pszToken);
+	}
+	else if (enType==E_TEXT_SUM) {
+		psRet=_stringSum(psScript,pszToken,false);
 	}
 
 	ehFree(lpNewFormula);
@@ -158,17 +211,14 @@ S_UNIVAL * scriptGetValue(S_SCRIPT * psScript,CHAR * pszFormula)
 static S_UNIVAL * _formulaProcess(S_SCRIPT * psScript,CHAR * pszFormula)//double *Valore,FORMULA_FUNC_EXT)
 {
 	// Lunghezza massima della formula
-	const INT MaxFormula=512;
+	const INT MaxFormula=2048;
 
-	INT  hdlFormula,hdlCodaOriginale;
+//	INT  hdlFormula,hdlCodaOriginale;
 	CHAR *	pszTotale;
 	CHAR *	CodaOriginale;
 	BOOL fRet=FALSE;
-	S_UNIVAL * psRet;
+	S_UNIVAL * psRet=NULL;
 
-//	*pdRet=0;
-//	*Valore=0;
-	//_private.bFormulaDebug=ON;
 	if (_private.bFormulaDebug) {win_infoarg("FORMULA |%s|\n",pszFormula); }
 
 	// ------------------------------------------------------------|
@@ -182,64 +232,16 @@ static S_UNIVAL * _formulaProcess(S_SCRIPT * psScript,CHAR * pszFormula)//double
 		return NULL;
 	}
 
-	hdlFormula=memoAlloc(M_HEAP,MaxFormula,"FORM");
-	pszTotale=memoPtr(hdlFormula,NULL);
+//	hdlFormula=memoAlloc(M_HEAP,MaxFormula,"FORM");
+	//pszTotale=memoPtr(hdlFormula,NULL);
+	pszTotale=ehAlloc(MaxFormula);
 
-	hdlCodaOriginale=memoAlloc(M_HEAP,MaxFormula,"FCODA");
-	CodaOriginale=memoPtr(hdlCodaOriginale,NULL);
+	//hdlCodaOriginale=memoAlloc(M_HEAP,MaxFormula,"FCODA");
+	//CodaOriginale=memoPtr(hdlCodaOriginale,NULL);
+	CodaOriginale=ehAlloc(MaxFormula);
 
 	strcpy(pszTotale,pszFormula);
-
- // ------------------------------------------------------------|
- // FASE 1                                                      |
- // Estre le formule semplici (quelle senza parentesi)          |
- // ricerca le pi— profonde sostituendole con autovariabili     |
- // fino a risalire alle meno profonde                          |
- // ------------------------------------------------------------|
-
-/*
- for(;strstr(pszTotale,"(")!=NULL;)
- {
-	CHAR *p,*pstart,*pend;
-
-	// -----------------------------------
-	// Trovo la Parentesi + profonda     |
-	// -----------------------------------
-	pstart=NULL;
-	for (p=pszTotale;*p;p++)
-	 {
-		if (*p=='(')
-			 {if (p>pszTotale) {if (!IsMathOperator(*(p-1))) continue;}
-				pstart=p;
-			 }
-	 }
-	
-	if (pstart==NULL) break; // non ci sono + parentesi
-
-	// -----------------------------------
-	// Trovo la Parentesi che chiude     |
-	// -----------------------------------
-	if (_private.bFormulaDebug) {win_infoarg("PARENTESI:\n");}
-	pend=ParChiudi(pstart);
-	if (pend==NULL) ehExit("() e che cavolo!");
-
-	if (_private.bFormulaDebug) win_infoarg(pszTotale);
-	*pend=0;
-	if (_private.bFormulaDebug) {win_infoarg(" extract [%s]\n",pstart+1); }
-
-
-	// -------------------------------------------------
-	// Converto la formula senza parantesi in un valore|
-	// -------------------------------------------------
-
-	strcpy(CodaOriginale,pend+1);
-	if (_SimpleFORMtoNumber(pstart+1,funcExt)) return ON;
-	strcpy(pstart,pstart+1);
-	strcat(pszTotale,CodaOriginale);
-	if (_private.bFormulaDebug) {win_infoarg("Calc1 [%s] \n",pszTotale); }
- }
-*/
-	while (TRUE)
+	while (true)
 	{
 		// -------------------------------------------
 		// Trovo la Parentesi + profonda che apre    |
@@ -264,7 +266,7 @@ static S_UNIVAL * _formulaProcess(S_SCRIPT * psScript,CHAR * pszFormula)//double
 		// Trovo la Parentesi che chiude     |
 		// -----------------------------------
 		if (_private.bFormulaDebug) {win_infoarg("PARENTESI:\n");}
-		pend=ParChiudi(pstart);
+		pend=_ParChiudi(pstart);
 		if (pend==NULL) //ehExit("() e che cavolo! |%s|",pstart);
 		{
 			 if (extErrorNotify) (*extErrorNotify)(2,"() Parentesi errate: %s",pstart);
@@ -312,8 +314,10 @@ static S_UNIVAL * _formulaProcess(S_SCRIPT * psScript,CHAR * pszFormula)//double
  // ------------------------------------------------------------|
 FINE:
 	// DELVARautopush(); Non posso usarlo perchŠ addesso Š diventata ricorsiva
-	memoFree(hdlFormula,"Form");
-	memoFree(hdlCodaOriginale,"FCODA");
+	//memoFree(hdlFormula,"Form");
+	//memoFree(hdlCodaOriginale,"FCODA");
+	ehFree(pszTotale);
+	ehFree(CodaOriginale);
 
 	//_private.bFormulaDebug=OFF;
 	if (_private.bFormulaDebug) {win_infoarg("ESC FORMULA\n"); }
@@ -333,7 +337,7 @@ static BOOL IsMathOperator(CHAR Byte)
 
 
 // Ritorna Null se c'è un errore
-static CHAR *ParChiudi(CHAR *p)
+static CHAR * _ParChiudi(CHAR *p)
 {
  INT num=0;
  BOOL String=0;
@@ -468,12 +472,12 @@ static S_UNIVAL * _ElementAllocStringConverter(S_SCRIPT * psScript,CHAR * pszEle
 	S_UNIVAL * psRet;
 
 	psRet=_WhatIsThis(psScript,pszElement,&enType,true);//funcExt,Valore);
-
+	/*
 	if (enType==E_TEXT&&!psRet) 
 	{
 		psRet=valCreate(_TEXT,0,pszElement);
 	}
-
+*/
 	return psRet; // Non trovato
 }
 
@@ -584,7 +588,7 @@ static INT _secondOperatorConverter(S_SCRIPT * psScript, CHAR *pszString)
 			lpE2=p2; // Ultimo Puntatore a E2
 
 			// Controllo stringhe
-			if (IsString(E1)&&IsString(E2))
+			if (_isString(E1)&&_isString(E2))
 			{
 			if (
 				(!strcmp(szOperator,"="))||
@@ -660,9 +664,15 @@ static INT _secondOperatorConverter(S_SCRIPT * psScript, CHAR *pszString)
 				)
 				{
 
-				 psRet=_ElementNumConverter(psScript,E1); if (!psRet) return true;
+				 psRet=_ElementNumConverter(psScript,E1); 
+				 if (!psRet) {
+					 scriptError(psScript,SER_OBJ_UNKNOW,"'%s' unknown",E1);
+					 return true;
+				 }
 				 Numero1=psRet->dValue; valDestroy(psRet);
-				 psRet=_ElementNumConverter(psScript,E2); if (!psRet) return true;
+				 psRet=_ElementNumConverter(psScript,E2); 
+				 if (!psRet) 
+					 return true;
 				 Numero2=psRet->dValue; valDestroy(psRet);
 				 
 				 PTstart=(LONG) (lpE1)-(LONG) (pszString);
@@ -899,13 +909,16 @@ static INT _SimpleFORMtoNumber(S_SCRIPT * psScript,CHAR *pszFormula)
  // in AutoVariabili                          !
  // -------------------------------------------
 
-	if (_firstOperatorConverter(psScript,pszFormula)) return TRUE;
+	if (_firstOperatorConverter(psScript,pszFormula)) 
+		return true;
 	//Tipo=_WhatIsThis(pszFormula,psFor);//funcExt,NULL);
 	psRet=_WhatIsThis(psScript,pszFormula,&enType,false);//funcExt,Valore);
 	if ((enType==E_NUMDEC)||(enType==E_NUMHEX)||(enType==E_NUMBIN)) goto FINE;
 
-	if (_secondOperatorConverter(psScript,pszFormula)) return ON;
-	if (_BooleanOperatorConverter(psScript,pszFormula)) return ON;
+	if (_secondOperatorConverter(psScript,pszFormula)) 
+		return true;
+	if (_BooleanOperatorConverter(psScript,pszFormula)) 
+		return true;
 
  // Mi ritorna una stringa
  //if (strstr(pszFormula,"ACHR")) goto FINE;
@@ -925,6 +938,96 @@ static INT _SimpleFORMtoNumber(S_SCRIPT * psScript,CHAR *pszFormula)
  return OFF;
 }
 
+//
+// _funcExecute()
+//
+static S_UNIVAL * _funcExecute(S_SCRIPT *psScript,CHAR * pszObject) {
+
+	S_SCRIPT_TAG * psTag;
+	S_UNIVAL * psVar=NULL;
+	psTag=scriptTag(_arsBasic,TG_GLOBAL,pszObject);	
+	if (psTag&&psTag->enTypes&TE_FUNCTION) {
+		switch (psTag->iCode) {
+			case 1101: // LEFT
+				psVar=_leftString(psScript,pszObject,NULL);
+				break;
+
+			case 1102: // LEFT
+				psVar=_rightString(psScript,pszObject,NULL);
+				break;
+
+
+			case 1107: // ATOI
+				psVar=_stringToNum(psScript,pszObject,true);
+				break;
+
+			case 1108: // ATOF
+				psVar=_stringToNum(psScript,pszObject,true);
+				break;
+
+			default:
+				ehExit("%s non implementato" CRLF,pszObject);
+		}
+	}
+	
+	return psVar;
+
+}
+
+//
+// Estrae il valore di una variabile o altro
+//
+static S_UNIVAL * _varGet(S_SCRIPT * psScript,CHAR * pszName,EN_TAG_TYPE * penType,BOOL bAlloc) {
+
+	S_UNIVAL * psVar;
+	EN_TAG_TYPE enType=E_VARNUM;
+
+	//
+	// Prima controllo se è una variabile
+	//
+	psVar=_varManager(psScript,WS_REALGET,pszName,NULL);
+	if (psVar&&bAlloc) psVar=valDup(psVar);
+		
+	//
+	// Poi controllo se è una funziona esterna
+	//
+
+	if (!psVar) {
+
+		//
+		// Domando alla funzione esterna
+		//
+		if (psScript->funcExt) 
+		{
+			psVar=psScript->funcExt(psScript,WS_REALGET,pszName,NULL);
+			if (psVar) {
+				enType=E_VARNUM; 
+				if (psVar->enDaTy==_TEXT) 
+					enType=E_VARTEXT; 
+			}
+			else enType=E_VARUNKNOW;
+			if (!bAlloc) valDestroy(psVar);
+		}
+	}
+
+	//
+	// Poi controllo se è il risultato di una funzione
+	//
+	if (!psVar) {
+
+		psVar=_funcExecute(psScript,pszName);
+		if (psVar) {
+			enType=E_VARNUM; 
+			if (psVar->enDaTy==_TEXT) 
+				enType=E_VARTEXT; 
+		}
+		else enType=E_VARUNKNOW;
+		if (!bAlloc&&psVar) valDestroy(psVar);
+	}
+
+	*penType=enType; // Mha ... non saprei !!
+	return psVar;
+}
 
 //
 // _WhatIsThis()
@@ -954,7 +1057,8 @@ static S_UNIVAL *	_WhatIsThis(S_SCRIPT * psScript,
 			 if (IsDecNumero(pszElement)) enType=E_NUMDEC;
 			 else if (IsHexNumero(pszElement)) enType=E_NUMHEX; 
 			 else if (IsBinNumero(pszElement)) enType=E_NUMBIN;  //return E_NUMBIN;
-			 else if (IsStringFix(pszElement)) {enType=E_TEXT; } //return E_TEXT; // ... per intenderci "cazzo" ;-)
+			 else if (_isStringFix(pszElement)) enType=E_TEXT; //return E_TEXT; // ... per intenderci "cazzo" ;-)
+			 else if (_stringSum(psScript,pszElement,true)) enType=E_TEXT_SUM; 
 
 			 // Potrebbe essere una formula
 			 else if ((*pszElement>='0')&&(*pszElement<='9')) enType=E_FORMULANUM; 
@@ -969,7 +1073,17 @@ static S_UNIVAL *	_WhatIsThis(S_SCRIPT * psScript,
 						case E_NUMDEC: psRet=valCreateNumber(atof(pszElement)); break;
 						case E_NUMHEX: psRet=valCreateNumber(xtoi(pszElement)); break;
 						case E_NUMBIN: ehError();//  non implementato
-						case E_TEXT: psRet=valCreate(_TEXT,0,pszElement); break;
+						case E_TEXT: 
+							// E' un testo delimitato da quote quindi tolgo il carattere di testa e di coda
+							if (strlen(pszElement)<3)
+								psRet=valCreate(_TEXT,0,""); 
+							else {
+								CHAR * psz=strTake(pszElement+1,pszElement+strlen(pszElement)-2);
+								psRet=valCreate(_TEXT,0,psz); 
+								ehFree(psz);
+							}
+							break;
+
 						default: break;
 				 }
 			 }
@@ -981,10 +1095,17 @@ static S_UNIVAL *	_WhatIsThis(S_SCRIPT * psScript,
 		//
 		if (IsStringVar(pszElement)) {
 			enType=E_VARTEXT; 
+			*penType=enType;
+			//if (enType==E_TEXT&&!psRet) 
+			//{
+			// psRet=valCreate(_TEXT,0,pszElement);
+			psVar=_varGet(psScript,pszElement,&enType,true);
+
 			// Se voglio il valore devo cercarlo 
-			//return NULL;
-			ehError();
-			break;
+			return psVar;
+
+			//ehError();
+			//break;
 
 		}// ... per intenderci VALORE$
 		else {
@@ -1019,7 +1140,7 @@ static S_UNIVAL *	_WhatIsThis(S_SCRIPT * psScript,
 			 !memcmp(pszElement,"FIX(",4))
 		 {
 			// Post Controllo Funzione
-			 lpClose=ParChiudi(pszElement+3);
+			 lpClose=_ParChiudi(pszElement+3);
 			 if (lpClose)
 			 {if (!*(lpClose+1))
 				{
@@ -1051,42 +1172,16 @@ static S_UNIVAL *	_WhatIsThis(S_SCRIPT * psScript,
 			 }
 		 }
 
+
 	 //
 	 // Variabili Script
 	 //
-		
-		psVar=_varManager(psScript,WS_REALGET,pszElement,NULL);
-		if (psVar) {
-			
-			enType=E_VARNUM;
-			if (bGetValue) psRet=valDup(psVar);
-			break;
-		}
-
-
-		//
-		// Domando alla funzione esterna
-		//
-		if (psScript->funcExt) 
-		{
-			psRet=psScript->funcExt(psScript,WS_REALGET,pszElement,NULL);
-			if (psRet) enType=E_VARNUM; else enType=E_VARUNKNOW;
-			if (!bGetValue) valDestroy(psRet);
-			break;
-		}
-
-	//	fCheck=_formulaExtCall(WS_FIND,pszElement,psFor);
-
-		/*
-		if (funcExt) // Funsione di traslazione Variabile
-		{
-		 if (lpRetValore) fCheck=funcExt(WS_FIND,0,okl,&Valore);
-						  else
-						  fCheck=funcExt(WS_FIND,0,okl,NULL);
-		}
-		*/
+	
+		psRet=_varGet(psScript,pszElement,&enType,bGetValue);
+//		if (bGetValue&&psVar) psRet=valDup(psVar);
 		break;
 	}
+
 	if (enType==E_VARUNKNOW) {
 	
 		fString=FALSE;
@@ -1103,10 +1198,14 @@ static S_UNIVAL *	_WhatIsThis(S_SCRIPT * psScript,
 					enType=E_FORMULANUM; // E' una formula
 					break;	
 				}
-			}
+		}
+
 	}
 
 	if (enType) *penType=enType;
+	if (psScript->bTrace&&enType==E_VARUNKNOW) {
+		printf("varUnknow: [%s]\7" CRLF,pszElement);
+	}
 	return psRet;
 }
 
@@ -1163,38 +1262,229 @@ static INT IsBinNumero(CHAR *pszString)
  return ON;
 }
 
-static INT IsStringFix(CHAR *dato)
+static INT _isStringFix(CHAR *dato)
 {
- CHAR *p;
- CHAR szSearch[2];
+	CHAR *p;
+	CHAR szSearch[2];
 
- p=dato;
- if (*p!='\"'&&*p!='\'') return OFF;
- *szSearch=*p; szSearch[1]=0;
- p++;
- p=strstr(p,szSearch); 
- if (p==NULL) return OFF;
- p++;
- if (*p!=0) return OFF;
- return ON;
+	p=dato;
+	if (*p!='\"'&&*p!='\'') return OFF;
+	*szSearch=*p; szSearch[1]=0;
+	p++;
+	p=strstr(p,szSearch); 
+	if (p==NULL) return OFF;
+	p++;
+	if (*p!=0) return OFF;
+	return ON;
 }
+
+//
+// _isStringSum()  - E' una sommatoria di stringhe
+//
+// - Operatore solo somma
+// - Oggetti ammessi
+// - Stringhe statiche
+// - Variabili Stringa
+// - Funzioni che ritorna no una stringa
+// 
+static S_UNIVAL * _stringSum(S_SCRIPT * psScript,CHAR * pszSum,BOOL bOnlyVerify)
+{
+	EH_LST lst=lstNew();
+	CHAR * p, * psz;
+	CHAR c, * pszStart=NULL,cQuote=0;
+	EN_TAG_TYPE enType;
+	BOOL bSum=false;
+	S_UNIVAL * psRet=NULL;
+	for (p=pszSum;*p;p++) {
+		
+		c=*p;
+		
+		if (!lst) break;
+
+		//
+		// Fuori da una stringa
+		//
+		if (!cQuote) {
+		
+			pszStart=p;
+			if (c=='\"'||c=='\'') {cQuote=c; continue;} // Inizio costante stringa
+			if (c<33) continue;
+			if (c=='+') {
+
+				if (bSum) 
+				{
+					if (!bOnlyVerify) scriptError(psScript,SER_SINTAX,"(++) string sum error [%s]",pszSum); // Trovato doppio +
+					lst=lstDestroyPtr(lst);
+					break;
+				}
+				if (!lst->iLength) 
+				{
+					if (!bOnlyVerify) scriptError(psScript,SER_SINTAX,"+ string start [%s]",pszSum); // Errore non può iniziare cosi
+					lst=lstDestroyPtr(lst);
+					break;
+				}
+				bSum=true;
+				continue; // Somma ok
+			}
+
+			//
+			// Determino la fine dell'oggetto (deve iniziare per una lettera)
+			//
+			if (c<'A'||c>'Z') {
+				if (c<'a'||c>'z') {
+					if (!bOnlyVerify) scriptError(psScript,SER_SINTAX,"String sum number [%s]",pszSum);
+					lst=lstDestroyPtr(lst);
+					break;
+				}
+			}
+	
+			for (;*p;p++) {
+				c=*p;
+				if (c==' ') return false; // Sintax error: Trovato spazio inaspettato
+				
+				//
+				// + Funzione (Non verifcata)
+				//
+				else if (c=='(') 
+				{
+					CHAR * pszEnd=NULL;
+					pszEnd=_ParChiudi(p);
+					psz=strTake(pszStart,pszEnd); enType=E_VARUNKNOW;
+					psRet=_WhatIsThis(psScript,psz,&enType,false);
+					if (enType!=E_VARTEXT&&enType!=E_TEXT) 
+					{
+						if (!bOnlyVerify) scriptError(psScript,SER_SINTAX,"+ %s var unknow [%s]",pszStart,pszSum);
+						lst=lstDestroyPtr(lst);
+						if (psRet) valDestroy(psRet);
+						ehFree(psz);
+						break;
+					}
+					if (psRet) valDestroy(psRet);
+ 					lstPushPtr(lst,psz); // Costante psz
+					p=pszEnd;
+					break;
+
+				}
+				//
+				// + Variabile (Non verificata)
+				//
+				else if (c=='+') {
+
+					psz=strTake(pszStart,p-1); enType=E_VARUNKNOW;
+					psRet=_WhatIsThis(psScript,psz,&enType,false);
+ 					lstPushPtr(lst,psz); // Costante Stringa
+					if (enType!=E_VARTEXT&&enType!=E_TEXT) 
+					{
+						if (!bOnlyVerify) scriptError(psScript,SER_SINTAX,"+ %s var unknow [%s]",pszStart,pszSum);
+						lst=lstDestroyPtr(lst);
+						if (psRet) valDestroy(psRet);
+					}
+					if (psRet) valDestroy(psRet);
+					break;
+				}
+			}
+			
+			bSum=false;
+
+
+
+//			psRet=_WhatIsThis(psScript,p,&enType,true);//funcExt,NULL);
+//			printf("%s",p);
+
+		
+		} else { // Prelevo stringa quotata
+		
+			if (c=='\\') {p++; continue;}
+			if (c==cQuote) {
+				psz=strTake(pszStart,p);
+				lstPushPtr(lst,psz); // Costante Stringa
+				cQuote=0;
+			}
+		}
+	}
+	//
+	// Se richiesto costruisco la stringa di ritorno
+	//
+	if (bSum) {
+		if (!bOnlyVerify) scriptError(psScript,SER_SINTAX,"+ open [%s]",pszSum);
+	}
+
+	if (!bOnlyVerify) {
+		
+		CHAR * pszAdd=strDup("");
+		CHAR * pszStr=NULL;
+		S_UNIVAL * psVal;
+		
+		for (lstLoop(lst,psz)) {
+			
+			psVal=scriptGetValue(psScript,psz);
+			if (!psVal) {
+				scriptError(psScript,SER_SINTAX,"sintax error [%s]",pszSum);
+				lst=lstDestroyPtr(lst);
+				break;
+			}
+
+			if (psVal->enDaTy!=_TEXT) {
+				scriptError(psScript,SER_SINTAX,"not string value [%s]",pszSum);
+				lst=lstDestroyPtr(lst);
+				break;
+			}
+			strCat(&pszAdd,psVal->pszString);
+			valDestroy(psVal);
+
+		}
+
+		//
+		// build string's sum
+		// 
+		if (!lst) ehFree(pszAdd); 
+		else 
+		{
+			psRet=valCreateText(pszAdd);
+			ehFree(pszAdd);
+		}
+
+
+	} else {
+		if (lst) {
+			if (lst->iLength) psRet=(void * ) 1;
+		}
+		
+	}
+	if (lst) lstDestroyPtr(lst);
+
+	return psRet;
+	/*
+	CHAR *p;
+	CHAR szSearch[2];
+
+	p=dato;
+	if (*p!='\"'&&*p!='\'') return OFF;
+	*szSearch=*p; szSearch[1]=0;
+	p++;
+	p=strstr(p,szSearch); 
+	if (p==NULL) return OFF;
+	p++;
+	if (*p!=0) return OFF;
+	return ON;
+	*/
+}
+
 
 static INT IsStringVar(CHAR *dato)
 {
-// CHAR *p;
- // DA CAMBIARE VEDERE SE DOLLARO E' L'uLTIMO E CE NE é UNOSOLO
- if (strstr(dato,"[")) return FALSE;
- if (strstr(dato,"(")) return FALSE;
- if (strstr(dato,"\'")) return FALSE;
- if (strstr(dato,"\"")) return FALSE;
- if (dato[strlen(dato)-1]=='$') return TRUE;
-// p=strstr(dato,"$"); if (p) return TRUE; 
- return FALSE;
+	if (strstr(dato,"[")) return FALSE;
+	if (strstr(dato,"(")) return FALSE;
+	if (strstr(dato,"\'")) return FALSE;
+	if (strstr(dato,"\"")) return FALSE;
+	if (dato[strlen(dato)-1]=='$') return TRUE;
+	// p=strstr(dato,"$"); if (p) return TRUE; 
+	return FALSE;
 }
 
-static BOOL IsString(CHAR *lpCosa)
+static BOOL _isString(CHAR *lpCosa)
 {
- if (IsStringFix(lpCosa)||IsStringVar(lpCosa)) return TRUE; else return FALSE;
+ if (_isStringFix(lpCosa)||IsStringVar(lpCosa)) return true; else return false;
 }
 
 //
@@ -1202,7 +1492,7 @@ static BOOL IsString(CHAR *lpCosa)
 // Estrae in un array gli argomenti di una funzione
 // pCharStart/Stop sono i delimitatori (eventuali parentesi)
 //
-EH_LST scriptFuncArg(BYTE *pString,BYTE *pCharStart,BYTE *pCharStop,INT *piError)
+EH_LST scriptFuncArg(BYTE * pString,BYTE * pCharStart,BYTE * pCharStop,INT * piError,CHAR ** ppEndString)
 {
 	BYTE *p;
 	BYTE bCharStart,bCharEnd;
@@ -1223,17 +1513,14 @@ EH_LST scriptFuncArg(BYTE *pString,BYTE *pCharStart,BYTE *pCharStop,INT *piError
 	} EN_MODE;
 
 	EN_MODE iMode=0;
-//	EH_AR arArg;
 	BOOL bBreak=FALSE;
 	BYTE *pError="!\1[ERROR]";
 	BYTE bCharArgSep=',';
 	INT iError=0;
-//	INT iLen;
 
 	if (piError) *piError=0;
 	bCharStart=(pCharStart)?*pCharStart:'(';
 	bCharEnd=(pCharStop)?*pCharStop:')';
-//	arArg=ARNew();
 	
 	lst=lstCreate(sizeof(S_ARG_INFO));
 
@@ -1298,27 +1585,45 @@ EH_LST scriptFuncArg(BYTE *pString,BYTE *pCharStart,BYTE *pCharStop,INT *piError
 			case ARG_GET_STRING_SQ: 
 				if (*p!='\'') continue;
 				pArg=strTake(pArgStart+1,p-1); 
-//				ARAddarg(&arArg,"S\1%s",pArg);  // 1 = Numero o variabile
-				_(sAi); 
-				sAi.enType=E_TEXT;
-				sAi.pszValue=strDup(pArg);
-				lstPush(lst,&sAi);
+				if (pArg) {
+					_(sAi); 
+					sAi.enType=E_TEXT;
+					sAi.pszValue=strDup(pArg);
+					lstPush(lst,&sAi);
 
-				ehFree(pArg);
+					ehFree(pArg);
+				} else { // Stringa VUota
+					
+					_(sAi); 
+					sAi.enType=E_TEXT;
+					sAi.pszValue=strDup("");
+					lstPush(lst,&sAi);
+				
+				}
 				iMode=ARG_SEP_SEARCH;
 				break;
 
 			case ARG_GET_STRING_DQ: 
 				if (*p!='\"') continue;
 				pArg=strTake(pArgStart+1,p-1); 
+				if (pArg) {
 //				ARAddarg(&arArg,"S\1%s",pArg?pArg:"");  // 1 = Numero o variabile
-				_(sAi); 
-				sAi.enType=E_TEXT;
-				sAi.pszValue=strDup(pArg);
-				lstPush(lst,&sAi);
+					_(sAi); 
+					sAi.enType=E_TEXT;
+					sAi.pszValue=strDup(pArg);
+					lstPush(lst,&sAi);
 
-				ehFree(pArg);
+					ehFree(pArg);
+				} else { // Stringa VUota
+					
+					_(sAi); 
+					sAi.enType=E_TEXT;
+					sAi.pszValue=strDup("");
+					lstPush(lst,&sAi);
+				
+				}
 				iMode=ARG_SEP_SEARCH;
+				
 				break;
 
 			case ARG_SEP_SEARCH:
@@ -1331,8 +1636,6 @@ EH_LST scriptFuncArg(BYTE *pString,BYTE *pCharStart,BYTE *pCharStop,INT *piError
 				if (strchr(" \t\n\r",*p)) continue; // Caratteri neutri
 
 				// Converto l'ultimo campo in errore
-//				iLen=ARLen(arArg);
-//				strAssign(&arArg[iLen-1],pError);
 				_(sAi); sAi.enType=E_ERROR; lstPush(lst,&sAi);
 				iMode=ARG_ERROR; iError++; 
 
@@ -1354,14 +1657,15 @@ EH_LST scriptFuncArg(BYTE *pString,BYTE *pCharStart,BYTE *pCharStop,INT *piError
 	}
 
 	if (iMode==ARG_GET_STRING_SQ||iMode==ARG_GET_STRING_DQ) {
-//		ARAdd(&arArg,pError); iError++;
 		_(sAi); 
 		sAi.enType=E_ERROR; 
 		sAi.pszValue=strDup("quote open");
 		lstPush(lst,&sAi);
+		iError++; 
 
 	}
 	if (piError) *piError=iError;
+	if (ppEndString) *ppEndString=p;
 //	if (piArgNum) *piArgNum=ARLen(arArg);
 	return lst;
 
@@ -1380,6 +1684,35 @@ EH_LST scriptFuncDestroy(EH_LST lst) {
 	return NULL;
 }
 
+//
+// scriptFuncGet()
+//
+S_UNIVAL * scriptFuncGet(S_SCRIPT * psScript,EH_LST lstParams,INT idx,EH_DATATYPE enDaTy) {
+
+	S_ARG_INFO * psId;
+	S_UNIVAL * psVal=NULL;
+	psId=lstGet(lstParams,idx);	
+	if (!psId) 
+		return NULL;
+	if (psId->enType==E_TEXT) {
+		psVal=valCreateText(psId->pszValue);
+	}
+	else if (psId->enType==E_VARNUM) {
+		psVal=valCreateNumber(atof(psId->pszValue));
+	} else {
+	
+		psVal=scriptGetValue(psScript,psId->pszValue);
+		//if (!psVal) psVal=psScript->funcExt(psScript,WS_REALGET,psId->pszValue,NULL); // FOrse non serve
+
+	}
+	if (!psVal) return psVal;
+	if (enDaTy!=_UNKNOW&&psVal->enDaTy!=enDaTy) {
+		valDestroy(psVal); 
+		scriptFuncDestroy(lstParams);
+		return NULL;
+	}
+	return psVal;
+}
 
 
 //
@@ -1586,7 +1919,13 @@ S_UNIVAL *  scriptExecute(S_SCRIPT * psScript,CHAR * pszTextScript)
 	if (psScript->bTrace) printf(CRLF);
 
 	psScript->enError=0;
-
+	if (psScript->lstError) lstClean(psScript->lstError); else psScript->lstError=lstNew();
+/*
+#ifdef _DEBUG
+	_isStringSum(psScript,"ORD$+LEFT(\"2000\",30)");
+	_isStringSum(psScript,"\"(JM_DATEINS=\"+MOVI.DATE$+\" AND IDCATEGO=2 AND MCODEST LIKE '\"+ORD$+\"%')\"");
+#endif
+*/
 //	iSize=strlen(pszTextScript)+10;
 	lpClone=strDup(pszTextScript);
 	_strupr(lpClone);
@@ -1619,7 +1958,11 @@ S_UNIVAL *  scriptExecute(S_SCRIPT * psScript,CHAR * pszTextScript)
 			//
 			if (psScript->enError)
 			{
-				printf(CRLF CRLF "Linea %d) %s" CRLF,psScript->iRow,psScript->szError);
+				if (psScript->bVerbose) 
+				{
+					printf(CRLF CRLF "Linea %d)" CRLF,psScript->iRow);
+					scriptShowErrors(psScript);
+				}
 				break;
 			}
 			if (!*pszToken) continue;
@@ -1632,7 +1975,7 @@ S_UNIVAL *  scriptExecute(S_SCRIPT * psScript,CHAR * pszTextScript)
 			// a) Controllo se è uno STANTMENT standard
 			//
 			psTag=scriptTag(_arsBasic,TG_GLOBAL,pszToken);
-			if (psScript->bTrace) 
+			if (psScript->bTrace&&psScript->bVerbose) 
 				printf("%d: %s (id:%d)" CRLF,psScript->iRow,pszToken,psTag?psTag->iCode:0);
 			
 			if (psTag) {
@@ -1651,19 +1994,23 @@ S_UNIVAL *  scriptExecute(S_SCRIPT * psScript,CHAR * pszTextScript)
 				if (*szChar=='=') {
 					
 					S_UNIVAL * psRet;
+					CHAR * pszExt;
 					strCpy(szVarName,pszToken,sizeof(szVarName));
-					strcpy(pszBuffer,_token(psScript,";", szChar,MODE_ENDASSIGN)); // Cerco cosa assegnare
+					pszExt=_token(psScript,";", szChar,MODE_ENDASSIGN);
+					if (!pszExt) 
+							ehError();
+					strcpy(pszBuffer,pszExt); // Cerco cosa assegnare
 					_charStop(pszBuffer,';'); // Metto una fine a ciò
 					// Questa è la formula
-					if (_private.bVerbose)  printf(": varAssign : %s={%s}",szVarName,pszBuffer); //getch();
-					_booleanSwapping(pszBuffer); // Cambio AND in && e OR in ||
+					if (_private.bVerbose&&psScript->bVerbose)  printf(": varAssign : %s={%s}",szVarName,pszBuffer); //getch();
+					// Se non è una stringa
+					if (!_stringSum(psScript,pszBuffer,true)) _booleanSwapping(pszBuffer); // Cambio AND in && e OR in ||
 
 					psRet=scriptGetValue(psScript,pszBuffer);
 					if (!psRet) 
 					{
-						//psScript->enError=SER_SINTAX;
-						psScript->enError=SER_SINTAX;
-						sprintf(psScript->szError,"Formula errata [%s]",pszBuffer);
+						psRet=scriptGetValue(psScript,pszBuffer); // Da togliere
+						scriptError(psScript,SER_SINTAX,"Formula errata [%s]",pszBuffer);
 						continue;
 					}
 
@@ -1672,7 +2019,7 @@ S_UNIVAL *  scriptExecute(S_SCRIPT * psScript,CHAR * pszTextScript)
 					if (idx!=-1) {
 
 						_varManager(psScript,WS_REALSET,szVarName,psRet);
-						if (_private.bVerbose) {printf("="); valPrint(psRet); printf(CRLF);}//sFormula.dValue);
+						if (_private.bVerbose&&psScript->bVerbose) {printf("="); valPrint(psRet); printf(CRLF);}//sFormula.dValue);
 						valDestroy(psRet);
 					}
 					else {
@@ -1685,8 +2032,7 @@ S_UNIVAL *  scriptExecute(S_SCRIPT * psScript,CHAR * pszTextScript)
 							if (!pRet) 
 							{
 								if (!psScript->enError) {
-									psScript->enError=SER_SINTAX;
-									sprintf(psScript->szError,"Assegnazione Variabile esterna errata");
+									scriptError(psScript,SER_SINTAX,"Assegnazione Variabile esterna errata");
 								}
 							
 							}
@@ -1710,19 +2056,17 @@ S_UNIVAL *  scriptExecute(S_SCRIPT * psScript,CHAR * pszTextScript)
 
 						//strcpy(pszBuffer,pszToken);
 						sprintf(pszBuffer,"(%s",_token(psScript,";", szChar,MODE_ENDASSIGN)); // Cerco cosa assegnare
-						psRet=psScript->funcExt(psScript,WS_PROCESS,pszCmd,pszBuffer);
-						ehFree(pszCmd);
-						/*
-						if (!pRet) 
+//						psRet=psScript->funcExt(psScript,WS_PROCESS,pszCmd,pszBuffer);
+						psRet=psScript->funcExt(psScript,WS_REALGET,pszCmd,pszBuffer);
+						if (!psRet) 
 						{
 							if (!psScript->enError) {
-								psScript->enError=SER_SINTAX;
-								sprintf(psScript->szError,"Funzione esterna erratao sconosciut");
+								scriptError(psScript,SER_SINTAX,"Funzione errata o sconosciuta [%s]",pszCmd);
 							}
 						
 						}
-						*/
-						valDestroy(psRet);
+						ehFree(pszCmd);
+						if (psRet) valDestroy(psRet);
 					}
 
 				}
@@ -1735,7 +2079,7 @@ S_UNIVAL *  scriptExecute(S_SCRIPT * psScript,CHAR * pszTextScript)
 	}
 
 	// Visualizzo le variabili
-	if (psScript->bTrace) 
+	if (psScript->bTrace&&psScript->bVerbose) 
 	{
 		printf(CRLF "------------------" CRLF);
 		if (!psScript->psRet) 
@@ -1761,6 +2105,7 @@ S_SCRIPT * scriptDestroy(S_SCRIPT * psScript) {
 	_varManager(psScript,WS_CLOSE,NULL,NULL);
 	lstDestroy(psScript->lstPos);
 	lstDestroy(psScript->lstNote);
+	lstDestroy(psScript->lstError);
 	valDestroy(psScript->psRet);
 	ehFree(psScript);
 	return NULL;
@@ -1810,23 +2155,25 @@ static BOOL _tagEngine(S_SCRIPT * psScript,
 		// VAR - Dichiarazione delle variabili
 		//
 		case 1000: 
-			if (psScript->bTrace) {
+			if (psScript->bTrace&&psScript->bVerbose) {
 				printf("Dichiarazioni variabili:" CRLF);
 			}
-			//pszVar=_token(psScript, ",;", pszChar,MODE_STD);
+			
 			while (pszVar=_token(psScript, ",;", pszChar,MODE_STD))
 			{
-				if (_private.bVerbose) printf( "{%s:%d}", pszVar,*pszChar);
+				if (_private.bVerbose&&psScript->bVerbose) printf( "{%s:%d}", pszVar,*pszChar);
 				
 				// Controllo validità del nome della variabile
 				if (_varNameCheck(pszVar))
 				{
-					psScript->enError=SER_SINTAX;
-					strcpy(psScript->szError,"Nome variabile non valido");
+//					psScript->enError=SER_SINTAX;
+//					strcpy(psScript->szError,"Nome variabile non valido");
+					scriptError(psScript,SER_SINTAX,"Nome variabile non valido");
+
 					return true;
 				}
 
-				if (psScript->bTrace) printf(" : create var '%s'" CRLF,pszVar);
+				if (psScript->bTrace&&psScript->bVerbose) printf(" : create var '%s'" CRLF,pszVar);
 				// Aggiungo la variabile all'ambiente
 				_varManager(psScript,WS_ADD,pszVar,NULL);
 
@@ -1843,8 +2190,7 @@ static BOOL _tagEngine(S_SCRIPT * psScript,
 				strcpy(pszBuffer,_token(psScript,"", pszChar,MODE_FORMULA)); // Cerco cosa assegnare
 				if (!pszBuffer) 
 				{
-					psScript->enError=SER_SINTAX;
-					strcpy(psScript->szError,"Probabili parentesi errate");
+					scriptError(psScript,SER_SINTAX,"Probabili parentesi errate");
 					break;
 				}
 
@@ -1855,14 +2201,15 @@ static BOOL _tagEngine(S_SCRIPT * psScript,
 				psRet=scriptGetValue(psScript,pszBuffer);
 				if (!psRet) 
 				{
-					psScript->enError=SER_SINTAX;
-					sprintf(psScript->szError,"if error [%s]",pszBuffer);
-					printf("%s" CRLF,psScript->szError);
+//					psScript->enError=SER_SINTAX;
+//					sprintf(psScript->szError,"if error [%s]",pszBuffer);
+					scriptError(psScript,SER_SINTAX,"if ? %s",pszBuffer);
+				//	if (psScript->bVerbose) scriptShowErrors(psScript);//printf("%s" CRLF,psScript->szError);
 					return true;
 				}
 				
 				bCond=(BOOL) psRet->dValue;//sFormula.dValue;
-				if (psScript->bTrace) printf(" %s ? %d" CRLF,pszBuffer,bCond);
+				if (psScript->bTrace&&psScript->bVerbose) printf(" %s ? %d" CRLF,pszBuffer,bCond);
 				valDestroy(psRet);
 
 
@@ -1876,8 +2223,9 @@ static BOOL _tagEngine(S_SCRIPT * psScript,
 //				if (_ifSearch(_token(psScript,NULL,NULL,MODE_STD),&sPos)) 
 				if (_ifSearch(psScript,bCond))
 				{
-					psScript->enError=SER_SINTAX;
-					strcpy(psScript->szError,"Probabili parentesi { errate");
+					//psScript->enError=SER_SINTAX;
+					//strcpy(psScript->szError,"Probabili parentesi { errate");
+					scriptError(psScript,SER_SINTAX,"Probabili parentesi { errate");
 					return true;
 				}
 
@@ -1894,8 +2242,9 @@ static BOOL _tagEngine(S_SCRIPT * psScript,
 				pszVar=_token(psScript,";", pszChar,MODE_ENDASSIGN); // Cerco cosa assegnare
 				if (!pszVar) 
 				{
-					psScript->enError=SER_SINTAX;
-					strcpy(psScript->szError,"Return errato");
+//					psScript->enError=SER_SINTAX;
+//					strcpy(psScript->szError,"Return errato");
+					scriptError(psScript,SER_SINTAX,"Return errato");
 //					printf("Errore\n");
 					return true;
 				}
@@ -1913,14 +2262,15 @@ static BOOL _tagEngine(S_SCRIPT * psScript,
 				*/
 				if (!psRet) {
 
-					psScript->enError=SER_SINTAX;
-					strcpy(psScript->szError,"Formula errata IN RETURN");
+					//psScript->enError=SER_SINTAX;
+					//strcpy(psScript->szError,"Formula errata IN RETURN");
+					scriptError(psScript,SER_SINTAX,"Formula errata IN RETURN");
 				}
 				else
 				{
 
 
-					if (_private.bVerbose) {printf("%s=",pszBuffer); valPrint(psRet); printf(CRLF);}//sFormula.dValue);
+					if (_private.bVerbose&&psScript->bVerbose) {printf("%s=",pszBuffer); valPrint(psRet); printf(CRLF);}//sFormula.dValue);
 					//
 					// Nota: al momento l'unico return è quello principale e quindi Carico il valore di ritorno nello script
 					//       In futuro potrei dover verificare se è un returno di una funzione o quello principale
@@ -1939,15 +2289,13 @@ static BOOL _tagEngine(S_SCRIPT * psScript,
 			pszVar=_token(psScript, ";", pszChar,MODE_ENDASSIGN); // Cerco cosa assegnare
 			if (!pszVar) 
 				{
-					psScript->enError=SER_SINTAX;
-					strcpy(psScript->szError,"PRINT() errato");
+					scriptError(psScript,SER_SINTAX,"PRINT() errato");
 					return true;
 				}
 			strcat(pszBuffer,pszVar);
 			if (_scPrint(pszBuffer,psScript)) 
 			{
-				psScript->enError=SER_SINTAX;
-				strcpy(psScript->szError,"Sintax error in DEBUG");
+				scriptError(psScript,SER_SINTAX,"Sintax error in DEBUG");
 				break;
 			}
 			break;
@@ -1977,8 +2325,7 @@ static BOOL _tagEngine(S_SCRIPT * psScript,
 				pszVar=_token(psScript, ";", pszChar,MODE_ENDASSIGN); // Cerco cosa assegnare
 				if (!pszVar) 
 				{
-					psScript->enError=SER_SINTAX;
-					strcpy(psScript->szError,"comando sconosciuto errato");
+					scriptError(psScript,SER_SINTAX,"comando sconosciuto errato");
 					return true;
 				}
 				strcat(pszBuffer,pszVar);
@@ -1987,9 +2334,8 @@ static BOOL _tagEngine(S_SCRIPT * psScript,
 					if (psTag->enTypes!=TE_FUNCTION)
 					{
 	//					_ERROR_SIGN_
-						psScript->enError=SER_SINTAX;
-						sprintf(psScript->szError,"Comando/Funzione sconosciuta [ ? %s ? ]",pszToken);
-						printf("%s",psScript->szError);
+						scriptError(psScript,SER_SINTAX,"Comando/Funzione sconosciuta [ ? %s ? ]",pszToken);
+						if (psScript->bVerbose) scriptShowErrors(psScript);//printf("%s",psScript->szError);
 						return true;
 						//lpLastError=szError;
 					}
@@ -2035,19 +2381,21 @@ static BOOL _tagEngine(S_SCRIPT * psScript,
 					psRet=scriptGetValue(psScript,pszBuffer);
 					if (!psRet) 
 					{
-						psScript->enError=SER_SINTAX;
-						sprintf(psScript->szError,"** Errore in formula [%s]",pszBuffer);
+//						psScript->enError=SER_SINTAX;
+//						sprintf(psScript->szError,"** Errore in formula [%s]",pszBuffer);
+						scriptError(psScript,SER_SINTAX,"** Errore in formula [%s]",pszBuffer);
 						return true;
 					}
-					if (_private.bVerbose) {printf("="); valPrint(psRet); printf(CRLF);} //%.2f",sFormula.dValue);
+					if (_private.bVerbose&&psScript->bVerbose) {printf("="); valPrint(psRet); printf(CRLF);} //%.2f",sFormula.dValue);
 					_varManager(psScript,WS_REALSET,pszToken,psRet);
 				}
 				break;
 			}
 
 			// Errore ?????????
-			psScript->enError=SER_SINTAX;
-			sprintf(psScript->szError,"Comando sconosciuto [:%s:]",pszToken);
+//			psScript->enError=SER_SINTAX;
+//			sprintf(psScript->szError,"Comando sconosciuto [:%s:]",pszToken);
+			scriptError(psScript,SER_SINTAX,"Comando sconosciuto [:%s:]",pszToken);
 			return true;
 	  }		  
 	return false;
@@ -2127,9 +2475,11 @@ static void * _varManager(S_SCRIPT * psScript,EN_MESSAGE enMess,CHAR * pszName,S
 			for (a=0;a<psScript->dmiVar.Num;a++)
 			{
 				DMIReadEx(&psScript->dmiVar,a,&sVar,"ID32");
-				printf("%d) %s=" CRLF,a,sVar.szNome);
-				valPrint(sVar.psRet);
-				printf(CRLF);
+				if (psScript->bVerbose) 
+				{	printf("%d) %s=" CRLF,a,sVar.szNome);
+					valPrint(sVar.psRet);
+					printf(CRLF);
+				}
 			}
 			//getch();
 			break;
@@ -2159,12 +2509,13 @@ static void _booleanSwapping(CHAR *lpFormula)
 
 static BOOL _varNameCheck(CHAR *lpNome)
 {
-	CHAR *lpc="0123456789ABCDEFGHIJKLMNOPQRSTUVXYZ_";
+	CHAR *lpc="0123456789ABCDEFGHIJKLMNOPQRSTUVXYZ_$";
 	CHAR *lp;
 	for (lp=lpNome;*lp;lp++)
 	{
 		if (!strchr(lpc,*lp)) return TRUE;
 	}
+	if (strEnd(lpNome,"$")&&strstr(lpNome,"$")) return true; // Non va bene
 
 	return FALSE;
 }
@@ -2194,8 +2545,8 @@ static CHAR * _tokenTake(S_SCRIPT * psScript,CHAR * pszStart,CHAR * pszEnd) {
 // RITORNA il token o NULL quando è finito
 //
 static CHAR * _token(S_SCRIPT * psScript, 
-					 CHAR * lpChars,
-					 CHAR * lpLastSep,
+					 CHAR *		lpChars,
+					 CHAR *		lpLastSep,
 					 EN_TOKEN_MODE enMode)
 {
 	//static CHAR *lpLastStr=NULL;
@@ -2217,17 +2568,12 @@ static CHAR * _token(S_SCRIPT * psScript,
 	pbStart=psPos->pszStart;
 	psScript->iRow=psScript->iRowNext;
 	for (;*pbStart;pbStart++) {if (!strchr(" \t\n\r",*pbStart)) break;}
+	if (strEmpty(pbStart)) return NULL;
+
 	while (true) {
 
 		iPar=0;
-
-//		if (!lpChars) // se NULL ritorno tutto lo script
-//		{
-			//pszToken=pbStart;
-			//break;
-//		}
 		lp=lpStart=pbStart;//arPos[iPos].pStart;
-		
 		switch (enMode)
 		{
 			case MODE_STD: // Ricerca in modo standard ################################à
@@ -2324,6 +2670,7 @@ static CHAR * _token(S_SCRIPT * psScript,
 				continue;
 			
 		}
+
 		if (!pszToken) break; // Finito
 		if (*pszToken) break;
 
@@ -2346,7 +2693,7 @@ static CHAR * _token(S_SCRIPT * psScript,
 		*/
 //		break;
 	}
-	if (psScript->bTrace) {
+	if (psScript->bTrace&&psScript->bVerbose) {
 	
 		printf("Token:[%s]",pszToken);
 		printf(CRLF);
@@ -2364,7 +2711,8 @@ static void _charStop(CHAR *pszBuffer,CHAR ch)
 	lpt=strchr(pszBuffer,ch); // Cerco il carattere nella lpChars
 	if (lpt) *lpt=0;
 }
-static CHAR*FormulaExtract(CHAR *lpDest,CHAR *lpSource)
+
+static CHAR * FormulaExtract(CHAR *lpDest,CHAR *lpSource)
 {
 	INT iPar=0;
 	if (*lpSource!='(') return NULL; // Deve iniziare con una parentesi
@@ -2396,6 +2744,7 @@ S_SCRIPT_TAG * scriptTag(	S_SCRIPT_TAG * psArrayTag,EN_TAGTYPE enGroup,CHAR * ps
   BOOL fRet=TRUE;
   INT iIdx,iLen;
   S_SCRIPT_TAG * psTag;
+  CHAR szServ[800];
 
   _strupr(pszToken);
   
@@ -2413,21 +2762,26 @@ S_SCRIPT_TAG * scriptTag(	S_SCRIPT_TAG * psArrayTag,EN_TAGTYPE enGroup,CHAR * ps
 		{
 		  case TE_FUNCTION: // Funzione
 			iLen=strlen(psTag->pszName);
-//			if (!memcmp(psTag->pszName,pszToken,iLen)&&pszToken[iLen]=='(') iCode=psTag->iCode; 
-			if (!memcmp(psTag->pszName,pszToken,iLen)) iCode=psTag->iCode; 
+			strcpy(szServ,psTag->pszName); strcat(szServ,"(");
+			if (!strCmp(psTag->pszName,pszToken)||
+				!memcmp(szServ,pszToken,iLen+1)) 
+				iCode=psTag->iCode; 
 			break;
 
 		  case TE_STANTMENT: // Stantment
 			iLen=strlen(psTag->pszName);
-			if (!memcmp(psTag->pszName,pszToken,iLen)) iCode=psTag->iCode; 
+			if (!memcmp(psTag->pszName,pszToken,iLen)) 
+				iCode=psTag->iCode; 
 			break;
 			
 		  case TE_VARIABLE: // Variabile
 		  case TE_CONST: // Variabile
-			if (!strcmp(psTag->pszName,pszToken)) iCode=psTag->iCode; 
+			if (!strcmp(psTag->pszName,pszToken)) 
+				iCode=psTag->iCode; 
 			break;
 		}
-		if (iCode) break;
+		if (iCode) 
+			break;
   }
 
 /*
@@ -2474,7 +2828,7 @@ static BOOL _extVarAssign(INT iCode,S_UNIVAL * psRet,S_SCRIPT * psScript)
 			return 1; // Errore la variabile non esiste
 	}
 	*/
-	printf("da Vedere");
+	if (psScript->bVerbose) printf("da Vedere");
 	return 0;
 }
 
@@ -2484,7 +2838,7 @@ static BOOL _extVarAssign(INT iCode,S_UNIVAL * psRet,S_SCRIPT * psScript)
 // Serve per vedere un dato durante la formula
 //
 
-static BOOL _scPrint(CHAR *lpFormulaSource,S_SCRIPT * psScript)
+static BOOL _scPrint(CHAR * lpFormulaSource,S_SCRIPT * psScript)
 {
 	CHAR *lpMemory;
 	CHAR *lpStart;
@@ -2501,7 +2855,7 @@ static BOOL _scPrint(CHAR *lpFormulaSource,S_SCRIPT * psScript)
 	lpStart=scriptParExtract(lpMemory);
 	if (!lpStart)
 	{
-		printf(CRLF "Promo:Promo_Inserisci[]: Errore di sintassi A (%s)" CRLF,lpFormulaSource);
+		if (psScript->bVerbose) printf(CRLF "Promo:Promo_Inserisci[]: Errore di sintassi A (%s)" CRLF,lpFormulaSource);
 		ehFree(lpMemory); 
 		return TRUE;
 	} 
@@ -2513,7 +2867,7 @@ static BOOL _scPrint(CHAR *lpFormulaSource,S_SCRIPT * psScript)
 	lp=scriptNext(lpStart,',');
 	if (lp==NULL) 
 	{
-		printf(CRLF "Promo:Promo_Inserisci[]: prezzo mancante (%s)" CRLF,lpFormulaSource);
+		if (psScript->bVerbose) printf(CRLF "Promo:Promo_Inserisci[]: prezzo mancante (%s)" CRLF,lpFormulaSource);
 		ehFree(lpMemory); return TRUE;
 	} 
 	*lp=0;
@@ -2527,15 +2881,17 @@ static BOOL _scPrint(CHAR *lpFormulaSource,S_SCRIPT * psScript)
 	lpStart=lp+1;
 	lp=scriptNext(lpStart,',');
 	psRet=scriptGetValue(psScript,lpStart);
-	if (!psRet)
-	{
-		printf("Errore in formula %s",lpStart);
-	} 
-	else
-	{
-		printf("> %s " ,lpPrefix);
-		valPrint(psRet);	
-		printf(CRLF);
+	if (psScript->bVerbose)  {
+		if (!psRet)
+		{
+			printf("Errore in formula %s",lpStart);
+		} 
+		else
+		{
+			printf("> %s " ,lpPrefix);
+			valPrint(psRet);	
+			printf(CRLF);
+		}
 	}
 	valDestroy(psRet);
 
@@ -2620,3 +2976,186 @@ static CHAR * _parClose(CHAR *p)
 	 //if (num) return NULL;
 	 return p;
 }
+
+//
+// Function DANGER Area
+//
+
+
+// ------------------------------------------------------------------------------------------
+// LEFT(STRING,VAL) = Calcola Somma periodo
+//
+
+static S_UNIVAL * _leftString(S_SCRIPT * psScript,CHAR * pszToken,CHAR * pszParams)
+{
+	CHAR * pszPrototype="LEFT(STRING$,LEN)";
+	S_UNIVAL * psRet=NULL;
+	S_UNIVAL * psVal=NULL;
+	S_UNIVAL * psStr=NULL;
+	INT iErrors=0;
+	EH_LST lst=NULL;
+	INT iLen;
+	
+	//
+	// Cerco parametri funzione
+	//
+	lst=scriptFuncArg(pszParams?pszParams:pszToken,"(",")",&iErrors,NULL);
+
+	if (iErrors||lst->iLength!=2) {
+	
+		scriptFuncDestroy(lst);
+//		psScript->enError=SER_SINTAX;
+//		sprintf(psScript->szError,"%s: errors | %s",pszToken,pszPrototype); 
+		scriptError(psScript,SER_SINTAX,"'%s' unknown","%s: errors | %s",pszToken,pszPrototype); 
+	    return NULL;
+	
+	}
+	
+	//
+	// Leggo stringa
+	//
+	psStr=scriptFuncGet(psScript,lst,0,_TEXT);
+	if (!psStr) {
+//		psScript->enError=SER_SINTAX;
+//		sprintf(psScript->szError,"%s: first param error | %s",pszToken,pszPrototype); 
+		scriptError(psScript,SER_SINTAX,"%s: first param error | %s",pszToken,pszPrototype); 
+	    return NULL;
+	}
+
+	//
+	// Leggo Lunghezza
+	//
+	psVal=scriptFuncGet(psScript,lst,1,_NUMBER);
+	if (!psVal) {
+//		psScript->enError=SER_SINTAX;
+//		sprintf(psScript->szError,"%s: second param error | %s",pszToken,pszPrototype); 
+		scriptError(psScript,SER_SINTAX,"%s: second param error | %s",pszToken,pszPrototype); 
+	    return NULL;
+	}
+	iLen=(INT) psVal->dValue;
+	if (iLen>(INT) strlen(psStr->pszString)) iLen=strlen(psStr->pszString);
+	psStr->pszString[iLen]=0;
+
+	psRet=valCreateText(psStr->pszString);
+
+	valDestroy(psVal);
+	valDestroy(psStr);
+
+	if (lst) scriptFuncDestroy(lst);
+	return psRet; 
+
+}
+
+
+// ------------------------------------------------------------------------------------------
+// RIGHT(STRING,VAL) = Calcola Somma periodo
+//
+
+static S_UNIVAL * _rightString(S_SCRIPT * psScript,CHAR * pszToken,CHAR * pszParams)
+{
+	CHAR * pszPrototype="LEFT(STRING$,LEN)";
+	S_UNIVAL * psRet=NULL;
+	S_UNIVAL * psVal=NULL;
+	S_UNIVAL * psStr=NULL;
+	INT iErrors=0;
+	EH_LST lst=NULL;
+	INT iLen;
+	
+	//
+	// Cerco parametri funzione
+	//
+	lst=scriptFuncArg(pszParams?pszParams:pszToken,"(",")",&iErrors,NULL);
+
+	if (iErrors||lst->iLength!=2) {
+	
+		scriptFuncDestroy(lst);
+//		psScript->enError=SER_SINTAX;
+//		sprintf(psScript->szError,"%s: errors | %s",pszToken,pszPrototype); 
+		scriptError(psScript,SER_SINTAX,"%s: errors | %s",pszToken,pszPrototype); 
+	    return NULL;
+	
+	}
+	
+	//
+	// Leggo stringa
+	//
+	psStr=scriptFuncGet(psScript,lst,0,_TEXT);
+	if (!psStr) {
+//		psScript->enError=SER_SINTAX;
+//		sprintf(psScript->szError,"%s: first param error | %s",pszToken,pszPrototype); 
+		scriptError(psScript,SER_SINTAX,"%s: first param error | %s",pszToken,pszPrototype); 
+	    return NULL;
+	}
+
+	//
+	// Leggo Lunghezza
+	//
+	psVal=scriptFuncGet(psScript,lst,1,_NUMBER);
+	if (!psVal) {
+//		psScript->enError=SER_SINTAX;
+//		sprintf(psScript->szError,"%s: second param error | %s",pszToken,pszPrototype); 
+		scriptError(psScript,SER_SINTAX,"%s: second param error | %s",pszToken,pszPrototype); 
+	    return NULL;
+	}
+	iLen=(INT) psVal->dValue;
+	if (iLen>(INT) strlen(psStr->pszString)) iLen=strlen(psStr->pszString);
+	iLen=strlen(psStr->pszString)-iLen;
+
+	psRet=valCreateText(psStr->pszString+iLen);
+
+	valDestroy(psVal);
+	valDestroy(psStr);
+
+	if (lst) scriptFuncDestroy(lst);
+	return psRet; 
+
+}
+
+
+
+//
+// ATOI(STRING) = Calcola Somma periodo
+//
+
+static S_UNIVAL * _stringToNum(S_SCRIPT * psScript,CHAR * pszToken,BOOL bInteger)
+{
+	CHAR * pszPrototype="ATOI(STRING)";
+	S_UNIVAL * psRet=NULL;
+	S_UNIVAL * psVal=NULL;
+	S_UNIVAL * psStr=NULL;
+	INT iErrors=0;
+	EH_LST lst=NULL;
+	
+	//
+	// Cerco parametri funzione
+	//
+	lst=scriptFuncArg(pszToken,"(",")",&iErrors,NULL);
+
+	if (iErrors||lst->iLength!=1) {
+	
+		scriptFuncDestroy(lst);
+		scriptError(psScript,SER_SINTAX,"%s: errors | %s",pszToken,pszPrototype); 
+	    return NULL;
+	
+	}
+	
+	//
+	// Leggo stringa
+	//
+	psStr=scriptFuncGet(psScript,lst,0,_TEXT);
+	if (!psStr) {
+		scriptError(psScript,SER_SINTAX,"%s: first param error | %s",pszToken,pszPrototype); 
+	    return NULL;
+	}
+	if (bInteger) 
+		psRet=valCreateNumber(atoi(psStr->pszString));
+		else
+		psRet=valCreateNumber(atof(psStr->pszString));
+
+	valDestroy(psStr);
+
+	if (lst) scriptFuncDestroy(lst);
+	return psRet; 
+
+}
+

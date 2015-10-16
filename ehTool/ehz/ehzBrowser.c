@@ -10,9 +10,15 @@
 //   ---------------------------------------------------------------------------------
 
 /*
-[(HKEY_CURRENT_USER or HKEY_LOCAL_MACHINE)\Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION]
-"MyApplication.exe" = dword 8000 (Hex: 0x1F40)
-http://www.codeproject.com/Articles/793687/Configuring-the-emulation-mode-of-an-Internet-Expl
+	Documentazione
+	IWebBrowser2		https://msdn.microsoft.com/en-us/library/aa752127(v=vs.85).aspx
+	IHTMLDocument2		https://msdn.microsoft.com/en-us/library/aa752574(v=vs.85).aspx
+
+
+	[(HKEY_CURRENT_USER or HKEY_LOCAL_MACHINE)\Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION]
+	"MyApplication.exe" = dword 8000 (Hex: 0x1F40)
+	http://www.codeproject.com/Articles/793687/Configuring-the-emulation-mode-of-an-Internet-Expl
+
 */
 
 #define CINTERFACE
@@ -37,9 +43,9 @@ http://www.codeproject.com/Articles/793687/Configuring-the-emulation-mode-of-an-
 
 static EH_WEBPAGE *	_WebPageSearch(HWND hwnd);
 static BYTE *		_HtmlBuilderAlloc(BYTE *lpSource);
-static void			_oldFormSetField(EH_WEBPAGE *psWebPage,INT iMode,CHAR *lpFormName);
+static void			_oldFormSetField(EH_WEBPAGE * psWebPage,INT iMode,CHAR *lpFormName);
 LRESULT CALLBACK	_browserWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-static long			_ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,INT iParam);
+//static long			_ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,INT iParam);
 static long			_ieNavigatePage(EH_WEBPAGE *psWebPage, CHAR * pszWebPage,INT iParam);
 
 //static CHAR *		_JavaLikeGetValue(EH_WEBPAGE *psWebPage,INT iMode,CHAR *lpFormName);
@@ -70,7 +76,7 @@ static IDispatch *	_getElementInterface(EH_WEBPAGE * psWebPage,CHAR *pszInputNam
 // more meaningful code to.
 
 DWORD dwGlobalCookieWB = 0;				// Per registrare e rilasciare un gestore di eventi per il WebBrowser
-static const TCHAR	*BrowserClassName = "ehzBrowser";	// The class name of our Window to host the browser. It can be anything of your choosing.
+static const CHAR	* _pszBrowserClassName = "ehzBrowser";	// The class name of our Window to host the browser. It can be anything of your choosing.
 // This is used by _ieWritePage(). It can be global because we never change it.
 static const SAFEARRAYBOUND ArrayBound = {1, 0};
 
@@ -128,7 +134,7 @@ void * ehzBrowser(EH_OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 				wc.cbSize = sizeof(WNDCLASSEX);
 				wc.hInstance = sys.EhWinInstance;
 				wc.lpfnWndProc = _browserWindowProc;
-				wc.lpszClassName = BrowserClassName;
+				wc.lpszClassName = _pszBrowserClassName;
 				wc.style = CS_HREDRAW|CS_VREDRAW;
 				wc.hbrBackground = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
 
@@ -141,11 +147,11 @@ void * ehzBrowser(EH_OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 			psWebPage=objCalled->pOther;
 			psWebPage->lpObj=objCalled;
 			psWebPage->enEncoding=SE_ANSI;
+			psWebPage->msTimeoutField=5000; // Default aspetto 5 secondi per vedere se trovo un campo
 			psWebPage->hWnd=CreateWindowEx(	0, 
-											BrowserClassName, 
+											_pszBrowserClassName, 
 											0, 
 											WS_CHILD|WS_VISIBLE,
-											//"Test", WS_OVERLAPPEDWINDOW,
 											0, 0, 0, 0,
 											WindowNow(), 
 											(HMENU) 2000+iProgress, 
@@ -188,12 +194,14 @@ void * ehzBrowser(EH_OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 			{
 				case WP_PTR: // Trova e sostituisce i tag predefiniti
 						lpAlloc=_HtmlBuilderAlloc(ptr);
-						_ieWritePage(psWebPage, lpAlloc,info);
+						//_ieWritePage(psWebPage, lpAlloc,info);
+						bwsSetText(psWebPage->lpObj->nome,lpAlloc,false,0);
 						ehFree(lpAlloc);
 						break;
 
 				default:
-						_ieWritePage(psWebPage, ptr,info);
+						//_ieWritePage(psWebPage, ptr,info);
+						bwsSetText(psWebPage->lpObj->nome,ptr,false,0);
 						break;
 			}
 			break;
@@ -203,7 +211,7 @@ void * ehzBrowser(EH_OBJ *objCalled,EN_MESSAGE cmd,LONG info,void *ptr)
 			break;
 
 		case WS_DO: // Spostamento / Ridimensionamento
-			MoveWindow(objCalled->hWnd,DExt->px,DExt->py,DExt->lx,DExt->ly,TRUE);
+			MoveWindow(objCalled->hWnd,DExt->px,DExt->py,DExt->lx,DExt->ly,true);
 			break;
 
 		case WS_PRINT: 
@@ -511,12 +519,11 @@ HRESULT STDMETHODCALLTYPE WebEvents_Invoke(DWebBrowserEvents2 FAR* This,
   }
   //return S_OK;
 
-
+  printf("invoke: %d " ,dispIdMember);
   // Here is our message map, where we map dispids to function calls.
   switch (dispIdMember) 
   {
 	case DISPID_BEFORENAVIGATE2:
-
 		
 		// (parameters are on stack, thus in reverse order)
 		_BeforeNavigate2(	psWebPage,
@@ -536,11 +543,15 @@ HRESULT STDMETHODCALLTYPE WebEvents_Invoke(DWebBrowserEvents2 FAR* This,
 		psWebPage->iStatusLoading=1;
 		break;
 
+	case DISPID_DOWNLOADCOMPLETE:
+		printf("Download complete");
+		break;
+
 	case DISPID_DOCUMENTCOMPLETE: // <--- Fires when a document is completely loaded and initialized.
 		//iWPIndex=WPFind(WP_FINDHWND,lpD->hWnd);
 		
 		psWebPage->iStatusLoading|=2; // Completato
-		psWebPage->fPageReady=TRUE;
+		psWebPage->fPageReady=true;
 		if (pDispParams->rgvarg) {
 			if (pDispParams->rgvarg[0].pvarVal) {
 				if (pDispParams->rgvarg[0].pvarVal->bstrVal) {
@@ -553,10 +564,41 @@ HRESULT STDMETHODCALLTYPE WebEvents_Invoke(DWebBrowserEvents2 FAR* This,
 		}
 		break; 
 
+	case DISPID_COMMANDSTATECHANGE:
+		{
+			long cmd = pDispParams-> rgvarg [0].lVal; 
+			printf("Command State Change %d" CRLF,cmd);
+		}
+		return DISP_E_MEMBERNOTFOUND;
+/*
+	case DISPID_COMMANDSTATECHANGE:
+         { 
+            long cmd = pDispParams-> rgvarg [0].lVal; 
+//            TOLEBOOL enabled = pDispParams-> rgvarg [1].boolVal; 
+            //event happens 
+            switch (cmd) 
+            { 
+            case CSC_NAVIGATEBACK: 
+               ;//here anything 
+            break; 
+            case CSC_NAVIGATEFORWARD: 
+               ;//here anything 
+            break; 
+            case CSC_UPDATECOMMANDS: 
+				printf("qui");
+               ;//here anything 
+            break; 
+            }
+         }
+	//	psWebPage->fPageReady=true;
+		break;
+*/
+
 		// Fires after a navigation to a link is completed on a window element or a frameSet element.
 		// Inviato quando la navigazione è completa
 	case DISPID_NAVIGATECOMPLETE2:
 		psWebPage->iStatusLoading|=4; // Completato
+//		psWebPage->fPageReady=true;
 		psz=_BstrToStr(psWebPage, pDispParams->rgvarg[0].pvarVal->bstrVal);
 		sprintf(szServ,"navCompleted|%s",psz);
 		ehFree(psz);
@@ -678,9 +720,11 @@ HRESULT STDMETHODCALLTYPE WebEvents_Invoke(DWebBrowserEvents2 FAR* This,
 		*/
 
 	default:
+	    printf(CRLF);
 		return DISP_E_MEMBERNOTFOUND;
   } //end switch
 
+  printf(CRLF);
   return S_OK;
 }
 
@@ -1819,10 +1863,10 @@ void UnEmbedBrowserObject(HWND hwnd)
  * the browser can call our functions in our struct's VTables.
  */
 
-long EmbedBrowserObjectBuilder(HWND hwnd,EH_WEBPAGE	*psWebPage)
+long EmbedBrowserObjectBuilder(HWND hwnd,EH_WEBPAGE	* psWebPage)
 {
-	IOleObject			*browserObject;
-	IWebBrowser2		*webBrowser2;
+	IOleObject *		browserObject;
+	IWebBrowser2 *		webBrowser2;
 	RECT				rect;
 	BYTE				*ptr;
 	_IOleClientSiteEx	*_iOleClientSiteEx;
@@ -1970,6 +2014,7 @@ long EmbedBrowserObjectBuilder(HWND hwnd,EH_WEBPAGE	*psWebPage)
 			// in our window. The functions we call are put_Left(), put_Top(), put_Width(), and put_Height().
 			// Note that we reference the IWebBrowser2 object's VTable to get pointers to those functions. And
 			// also note that the first arg we pass to each is the pointer to the IWebBrowser2 object.
+			psWebPage->sIe.piWebBrowser2=webBrowser2;
 			webBrowser2->lpVtbl->put_Left(webBrowser2, 0);
 			webBrowser2->lpVtbl->put_Top(webBrowser2, 0);
 			webBrowser2->lpVtbl->put_Width(webBrowser2, rect.right);
@@ -1978,7 +2023,7 @@ long EmbedBrowserObjectBuilder(HWND hwnd,EH_WEBPAGE	*psWebPage)
 			// We no longer need the IWebBrowser2 object (ie, we don't plan to call any more functions in it
 			// right now, so we can release our hold on it). Note that we'll still maintain our hold on the
 			// browser object until we're done with that object.
-			webBrowser2->lpVtbl->Release(webBrowser2);
+			//webBrowser2->lpVtbl->Release(webBrowser2);
 
 			// Success
 			return(0);
@@ -1994,7 +2039,7 @@ long EmbedBrowserObjectBuilder(HWND hwnd,EH_WEBPAGE	*psWebPage)
 }
 
 
-/******************************* ResizeBrowser() ****************************
+/******************************* _browserResize() ****************************
  * Resizes the browser object for the specified window to the specified
  * width and height.
  *
@@ -2008,41 +2053,61 @@ long EmbedBrowserObjectBuilder(HWND hwnd,EH_WEBPAGE	*psWebPage)
  * this function to resize the browser object.
  */
 
-void ResizeBrowser(HWND hwnd, DWORD width, DWORD height)
+static void _browserResize(HWND hwnd, DWORD width, DWORD height)
 {
-	IWebBrowser2	*webBrowser2;
+	// EH_OBJ *	psObj;
+	IWebBrowser2	*	webBrowser2;
 //	IOleObject		*browserObject;
-	EH_WEBPAGE		*psWebPage=_WebPageSearch(hwnd);
+	EH_WEBPAGE		*	psWebPage=_WebPageSearch(hwnd);
 	
 //	browserObject=psWebPage->browserObject;
 	// Retrieve the browser object's pointer we stored in our window's GWL_USERDATA when
 	// we initially attached the browser object to this window.
 	//browserObject = *((IOleObject **)GetWindowLong(hwnd, GWL_USERDATA));
 
-
 	// We want to get the base address (ie, a pointer) to the IWebBrowser2 object embedded within the browser
 	// object, so we can call some of the functions in the former's table.
-	if (!psWebPage->browserObject->lpVtbl->QueryInterface(psWebPage->browserObject, &IID_IWebBrowser2, (void**)&webBrowser2))
+	//if (!psWebPage->browserObject->lpVtbl->QueryInterface(psWebPage->browserObject, &IID_IWebBrowser2, (void**)&webBrowser2))
+	if (webBrowser2=psWebPage->sIe.piWebBrowser2) 
 	{
 		// Ok, now the pointer to our IWebBrowser2 object is in 'webBrowser2', and so its VTable is
 		// webBrowser2->lpVtbl.
 
 		// Call are put_Width() and put_Height() to set the new width/height.
+		psWebPage->sizWin.cx=width;
+		psWebPage->sizWin.cy=height;
 		webBrowser2->lpVtbl->put_Width(webBrowser2, width);
 		webBrowser2->lpVtbl->put_Height(webBrowser2, height);
 
 		// We no longer need the IWebBrowser2 object (ie, we don't plan to call any more functions in it,
 		// so we can release our hold on it). Note that we'll still maintain our hold on the browser
 		// object.
-		webBrowser2->lpVtbl->Release(webBrowser2);
+//		webBrowser2->lpVtbl->Release(webBrowser2);
 	}
 }
+/*
+static void _browserShow(HWND hwnd)
+{
+	IWebBrowser2	*	webBrowser2;
+	EH_WEBPAGE		*	psWebPage=_WebPageSearch(hwnd);
+	
+	printf("%s=%x" CRLF,psWebPage->lpObj->nome,hwnd);
+	if (webBrowser2=psWebPage->sIe.piWebBrowser2) 
+	{
 
+		// Call are put_Width() and put_Height() to set the new width/height.
+		//webBrowser2->lpVtbl->put_Left(webBrowser2, 0);
+		//webBrowser2->lpVtbl->put_Top(webBrowser2, 0);
+		webBrowser2->lpVtbl->put_Visible(webBrowser2,VARIANT_TRUE);
+//		webBrowser2->lpVtbl->Release(webBrowser2);
+	}
+}
+*/
 
 void PrintDocument(HWND hwnd,INT iMode)
 {
 	//IOleObject		*browserObject;
-	IWebBrowser2	*webBrowser2;
+	IWebBrowser2 *	webBrowser2;
 	LPDISPATCH		lpDispatch;
 	EH_WEBPAGE		*psWebPage=_WebPageSearch(hwnd);
 	//browserObject=psWebPage->browserHandle;
@@ -2055,7 +2120,8 @@ void PrintDocument(HWND hwnd,INT iMode)
 	//win_infoarg("2");
 	// We want to get the base address (ie, a pointer) to the IWebBrowser2 object embedded 
 	// within the browser object, so we can call some of the functions in the former's table.
-	if (!psWebPage->browserObject->lpVtbl->QueryInterface(psWebPage->browserObject, &IID_IWebBrowser2, (void**)&webBrowser2))
+//	if (!psWebPage->browserObject->lpVtbl->QueryInterface(psWebPage->browserObject, &IID_IWebBrowser2, (void**)&webBrowser2))
+	if (webBrowser2=psWebPage->sIe.piWebBrowser2)
 	{
 		// Now the pointer to our IWebBrowser2 object is in 'webBrowser2', and so its VTable is:
 		//  webBrowser2->lpVtbl.
@@ -2226,7 +2292,7 @@ void PrintDocument(HWND hwnd,INT iMode)
 
 void DoPageAction(HWND hwnd, DWORD action)
 {	
-	IWebBrowser2	*webBrowser2;
+	IWebBrowser2 *	webBrowser2;
 	EH_WEBPAGE *psWebPage=_WebPageSearch(hwnd);
 	//IOleObject		*browserObject;
 
@@ -2236,7 +2302,8 @@ void DoPageAction(HWND hwnd, DWORD action)
 
 	// We want to get the base address (ie, a pointer) to the IWebBrowser2 object embedded within the browser
 	// object, so we can call some of the functions in the former's table.
-	if (!psWebPage->browserObject->lpVtbl->QueryInterface(psWebPage->browserObject, &IID_IWebBrowser2, (void**)&webBrowser2))
+	//if (!psWebPage->browserObject->lpVtbl->QueryInterface(psWebPage->browserObject, &IID_IWebBrowser2, (void**)&webBrowser2))
+	if (webBrowser2=psWebPage->sIe.piWebBrowser2)
 	{
 		// Ok, now the pointer to our IWebBrowser2 object is in 'webBrowser2', and so its VTable is
 		// webBrowser2->lpVtbl.
@@ -2297,7 +2364,8 @@ void DoPageAction(HWND hwnd, DWORD action)
 //
 // _ieWritePage()
 //
-long _ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,INT iParam)
+
+long _ieWritePage(EH_WEBPAGE * psWebPage, LPCTSTR string,INT iParam)
 {	
 	SAFEARRAY		*sfArray;
 	
@@ -2310,6 +2378,7 @@ long _ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,INT iParam)
 
 	bstr = 0;
 	iLevelError=1;
+	/*
 	if (!psWebPage->bHtmlReady) {
 
 		VARIANT	myURL;
@@ -2321,7 +2390,7 @@ long _ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,INT iParam)
 		// Free any resources (including the BSTR).
 		VariantClear(&myURL);
 	}
-
+*/
 	iLevelError=2;
 	_ieCreate(psWebPage,FALSE);
 	if ((sfArray = SafeArrayCreate(VT_VARIANT, 1, (SAFEARRAYBOUND *)&ArrayBound))) // Creo l'array di strutture VARIANT
@@ -2346,7 +2415,7 @@ long _ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,INT iParam)
 #endif
 			iLevelError=7;
 			//
-			// memorizzo il no stro BSTR pointer nel VARIANT.
+			// memorizzo il nostro BSTR pointer nel VARIANT.
 			if (pVar->bstrVal = bstr)
 			{
 				IDispatch* pElemDisp = NULL;
@@ -2357,9 +2426,11 @@ long _ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,INT iParam)
 
 				// Passo il VARIENT con il suot BSTR a write() in ordine per mostrare
 				// l'HTML string nel corpo della pagina vuota da noi creata sopra
-				psIe->piHtmlDoc2->lpVtbl->open(psIe->piHtmlDoc2, L"html/txt", vnull, vnull, vnull, &pElemDisp); // new 2009
-				psIe->piHtmlDoc2->lpVtbl->write(psIe->piHtmlDoc2, sfArray);
-				psIe->piHtmlDoc2->lpVtbl->close(psIe->piHtmlDoc2); // new 2009
+				if (psIe->piHtmlDoc2) {
+					psIe->piHtmlDoc2->lpVtbl->open(psIe->piHtmlDoc2, L"html/txt", vnull, vnull, vnull, &pElemDisp); // new 2009
+					psIe->piHtmlDoc2->lpVtbl->write(psIe->piHtmlDoc2, sfArray);
+					psIe->piHtmlDoc2->lpVtbl->close(psIe->piHtmlDoc2); // new 2009
+				}
 				// Normally, we'd need to free our BSTR, but SafeArrayDestroy() does // <--------------- GUARDA!
 				// it for us:
 				// SysFreeString(bstr);
@@ -2373,7 +2444,7 @@ long _ieWritePage(EH_WEBPAGE *psWebPage, LPCTSTR string,INT iParam)
 	if (iLevelError==8) 
 	{
 		if (iParam) _LWaiting(psWebPage,iParam);
-		psWebPage->bHtmlReady=TRUE;
+		psWebPage->bHtmlReady=true;
 		return(0);
 	}
 
@@ -2504,14 +2575,14 @@ IOleObject **pbrowserObject
 //
 // _ieCreate() - Crea un struttura con i puntatori alle interfacce
 //
-static BOOL _ieCreate(EH_WEBPAGE *psWebPage,BOOL bGetTag) //_IEI * psIe, HWND hwnd, BOOL bGetTag) {	
+static BOOL _ieCreate(EH_WEBPAGE * psWebPage,BOOL bGetTag) //_IEI * psIe, HWND hwnd, BOOL bGetTag) {	
 {
 	BOOL	bError=TRUE;
 	_IEI *	psIe=&psWebPage->sIe;
 
 	// We want to get the base address (ie, a pointer) to the IWebBrowser2 object embedded 
 	// within the browser object, so we can call some of the functions in the former's table.
-	if (!psIe->piWebBrowser2) psWebPage->browserObject->lpVtbl->QueryInterface(psWebPage->browserObject, &IID_IWebBrowser2, (void**)&psIe->piWebBrowser2);
+	if (!psIe->piWebBrowser2) psWebPage->browserObject->lpVtbl->QueryInterface(psWebPage->browserObject, &IID_IWebBrowser2, (void**) &psIe->piWebBrowser2);
 	if (psIe->piWebBrowser2) {
 		// Now the pointer to our IWebBrowser2 object is in 'webBrowser2', and so its VTable is:
 		//  webBrowser2->lpVtbl.
@@ -2519,12 +2590,39 @@ static BOOL _ieCreate(EH_WEBPAGE *psWebPage,BOOL bGetTag) //_IEI * psIe, HWND hw
 		// Call the IWebBrowser2 object's get_Document so we can get its DISPATCH object. 
 		// I don't know why you don't get the DISPATCH object via the browser object's 
 		// QueryInterface(), but you don't.
-		if (!psIe->lpDispatch) psIe->piWebBrowser2->lpVtbl->get_Document(psIe->piWebBrowser2, &psIe->lpDispatch);
+		if (!psIe->lpDispatch) {
+			psIe->piWebBrowser2->lpVtbl->get_Document(psIe->piWebBrowser2, &psIe->lpDispatch);
+			if (!psIe->lpDispatch) {
+
+				VARIANT vEmpty;
+				BSTR bstrURL = SysAllocString(L"about:blank");
+				HRESULT hr;
+				VariantInit(&vEmpty);
+				
+				hr = psIe->piWebBrowser2->lpVtbl->Navigate(psIe->piWebBrowser2,bstrURL, &vEmpty, &vEmpty, &vEmpty, &vEmpty);
+				if (SUCCEEDED(hr))
+				{
+				   psIe->piWebBrowser2->lpVtbl->put_Visible(psIe->piWebBrowser2,VARIANT_TRUE);
+				   psIe->piWebBrowser2->lpVtbl->get_Document(psIe->piWebBrowser2, &psIe->lpDispatch);
+				}
+				   /*
+				   else
+				   {
+					   pBrowser2->Quit();
+				   }
+				   */
+				SysFreeString(bstrURL);
+//				   pBrowser2->Release();
+//			   }
+				// psIe->piWebBrowser2->put_lpVtbl->get_Document(psIe->piWebBrowser2, &psIe->lpDispatch);
+			
+			}
+		}
 		if (psIe->lpDispatch) {
 
 			if (!psIe->piHtmlDoc3) psIe->lpDispatch->lpVtbl->QueryInterface(psIe->lpDispatch, &IID_IHTMLDocument3, (void**)&psIe->piHtmlDoc3);
 			if (!psIe->piHtmlDoc2) psIe->lpDispatch->lpVtbl->QueryInterface(psIe->lpDispatch, &IID_IHTMLDocument2, (void**)&psIe->piHtmlDoc2);
-			if (!psIe->piHtmlDoc2) psIe->lpDispatch->lpVtbl->QueryInterface(psIe->lpDispatch, &IID_IHTMLDocument2, (void**)&psIe->piHtmlDoc2);
+			//if (!psIe->piHtmlDoc2) psIe->lpDispatch->lpVtbl->QueryInterface(psIe->lpDispatch, &IID_IHTMLDocument2, (void**)&psIe->piHtmlDoc2);
 
 //			if (!psIe->piHtmlWin2) psIe->piHtmlDoc2->lpVtbl->get_parentWindow(psIe->piHtmlDoc2,&psIe->piHtmlWin2);
 			
@@ -2695,6 +2793,7 @@ void EventBuildConnector(HWND hwnd)
 LRESULT CALLBACK _browserWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	LPCREATESTRUCT pCreate;
+//	printf("%d|",uMsg);
 	switch (uMsg)
 	{
 		case WM_CREATE:
@@ -2732,8 +2831,17 @@ LRESULT CALLBACK _browserWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
 
 		case WM_SIZE:
 			// Resize the browser object to fit the window
-			ResizeBrowser(hwnd, LOWORD(lParam), HIWORD(lParam));
+	//		printf("resize" CRLF);
+			_browserResize(hwnd, LOWORD(lParam), HIWORD(lParam));
 			return(0);
+/*
+		case WM_SHOWWINDOW:
+		case WM_PAINT:
+			_browserShow(hwnd);
+//			printf("show" CRLF);
+//		 	return(0);
+		
+*/
 
 
 	}
@@ -2764,6 +2872,7 @@ static IDispatch * _getElementInterface(EH_WEBPAGE * psWebPage,CHAR *pszInputNam
 		if ((SUCCEEDED(hr)) && (piTag!=NULL) ) {
 			piTag->lpVtbl->get_tagName(piTag,pbStrIdName); 
 			_$Release(piTag);
+
 		}
 		*/
 		
@@ -2942,7 +3051,7 @@ static LRESULT _bwsSetUrlControl(S_BWS_NOTIFY * psBws) {
 						CHAR * psz;
 						psz=_BstrToStr(psWebPage, psBws->pDispParams->rgvarg[0].pvarVal->bstrVal);
 						printf("docCompleted:%s" CRLF,psz);
-						strToClipboard("%s",psz);
+					//	strToClipboard("%s",psz);
 						ehFree(psz);
 
 						psWebPage->fPageReady=true;
@@ -3050,8 +3159,145 @@ case DISPID_DOCUMENTCOMPLETE: // <--- Fires when a document is completely loaded
 
 }
 
+//
+// bwsSetText()
+//
+/*
+BOOL _bwsSetText(CHAR * pszObj,BYTE * pszText,BOOL bUtf8,DWORD dwTimeout) {
 
-BOOL bwsSetUrl(CHAR * pszObj,CHAR * pszUrl,DWORD dwTimeout) {
+	CHAR szFile[500];
+	INT ret;
+	BOOL			bDone=false;
+	//ret=fileTempName(NULL, "html-",szFile,true);
+	//if (ret) {
+	
+		strcpy(szFile,progenesiTemp("htmlPreview.htm"));
+		fileStrWrite(szFile,pszText);
+
+		bwsSetUrl(pszObj,szFile,false,2000);
+		fileRemove(szFile);
+
+	//}
+	// printf("qui");
+	return bDone;
+
+}
+*/
+
+BOOL bwsSetText(CHAR * pszObj,BYTE * pszText,BOOL bUtf8,DWORD dwTimeout) { // pause
+
+	EH_OBJ *		psObj;
+	EH_WEBPAGE *	psWebPage=NULL;
+	BOOL			bDone=false;
+
+	SAFEARRAY	*	sfArray;
+	VARIANT		*	pVar;
+	
+ 	psObj=obj_GetInfo(pszObj);  if (psObj) 	psWebPage=psObj->pOther; if (!psWebPage) ehError();
+	if (dwTimeout) psWebPage->funcNotify=_bwsSetUrlControl;
+
+	psWebPage->iStatusLoading=0; // Resetto lo status della pagina da caricare
+	psWebPage->fPageReady=false;
+
+	if (psWebPage->sIe.piWebBrowser2) {
+
+		if ((sfArray = SafeArrayCreate(VT_VARIANT, 1, (SAFEARRAYBOUND *) &ArrayBound))) // Creo l'array di strutture VARIANT
+		{
+			if (!SafeArrayAccessData(sfArray, (void**) &pVar)) // Chiedo l'accesso all'array e gli passo pVar
+			{
+				WCHAR *pw;
+				pVar->vt = VT_BSTR;
+
+				if (bUtf8)  pw=utfToWcs((CHAR *) pszText);  else pw=strToWcs((CHAR *) pszText); 
+				pVar->bstrVal=SysAllocString(pw);//buffer);
+				ehFree(pw);
+
+				if (pVar->bstrVal)
+				{
+					IDispatch* pElemDisp = NULL;
+					VARIANT vnull;
+					_IEI *			psIe=&psWebPage->sIe;
+					vnull.vt=VT_ERROR;
+					vnull.scode=DISP_E_PARAMNOTFOUND; 
+
+					// Passo il VARIENT con il suot BSTR a write() in ordine per mostrare
+					// l'HTML string nel corpo della pagina vuota da noi creata sopra
+					if (psIe->piHtmlDoc2) {
+						psIe->piHtmlDoc2->lpVtbl->open(psIe->piHtmlDoc2, L"html/txt", vnull, vnull, vnull, &pElemDisp); // new 2009
+						psIe->piHtmlDoc2->lpVtbl->write(psIe->piHtmlDoc2, sfArray);
+						psIe->piHtmlDoc2->lpVtbl->close(psIe->piHtmlDoc2); // new 2009
+				//		bDone=true;
+					}
+				}
+			}
+			SafeArrayDestroy(sfArray);
+			SysFreeString(pVar->bstrVal);
+
+			//
+			// Controllo che il documento sia pronto
+			//
+			if (dwTimeout) {
+				DWORD dwRif,msElapsed;
+				_IEI *	psIe=&psWebPage->sIe;
+				chronoStart(&dwRif);
+				while (true) {
+
+					BSTR bsState;
+					msElapsed=(DWORD) ((double) chronoGet(&dwRif)/CLOCKS_PER_SEC*1000);
+
+					psIe->piHtmlDoc2->lpVtbl->get_readyState(psIe->piHtmlDoc2, &bsState);
+					printf("> %d : %S" CRLF,msElapsed,bsState);
+					if (!wcsCmp(bsState,L"complete")) {
+						bDone=true;
+						break;
+					}
+
+					if (msElapsed>dwTimeout) break;
+					PauseActive(300);
+				}
+			}
+
+/*
+			if (dwTimeout) {
+				chronoStart(&dwRif);
+				while (true) {
+
+					msElapsed=(DWORD) ((double) chronoGet(&dwRif)/CLOCKS_PER_SEC*1000);
+					printf("> %d" CRLF,msElapsed);
+					if (psWebPage->fPageReady) {
+						
+						psWebPage->msTimeReady=msElapsed;
+						bDone=true;
+						break;
+					}
+
+					if (msElapsed>dwTimeout) break;
+					PauseActive(100);
+				}
+			}
+*/
+
+		}
+	}
+	return bDone;
+}
+
+
+//
+// bwsSetTimeout()
+//
+BOOL	bwsSetTimeout(CHAR * pszObj,DWORD dwTimeoutField) {
+
+	EH_WEBPAGE * psWebPage;
+	psWebPage=_getWebPage(pszObj); if (!psWebPage) return true;
+	psWebPage->msTimeoutField=dwTimeoutField;
+	return false;
+}
+
+//
+// bwsSetUrl()
+//
+BOOL bwsSetUrl(CHAR * pszObj,CHAR * pszUrl,BOOL bSilent,DWORD dwTimeout) {
 	
 	EH_OBJ *	psObj;
 	EH_WEBPAGE *psWebPage=NULL;
@@ -3059,7 +3305,6 @@ BOOL bwsSetUrl(CHAR * pszObj,CHAR * pszUrl,DWORD dwTimeout) {
 	VARIANT		vUrl;
 	WCHAR *		pwcUrl;
 	
-
  	psObj=obj_GetInfo(pszObj);  if (psObj) 	psWebPage=psObj->pOther; if (!psWebPage) ehError();
 	if (dwTimeout) psWebPage->funcNotify=_bwsSetUrlControl;
 
@@ -3071,9 +3316,9 @@ BOOL bwsSetUrl(CHAR * pszObj,CHAR * pszUrl,DWORD dwTimeout) {
 		DWORD dwRif;
 		DWORD msElapsed;
 
-
 		chronoStart(&dwRif);
-		psWebPage->sIe.piWebBrowser2->lpVtbl->put_Silent(psWebPage->sIe.piWebBrowser2, (VARIANT_BOOL) true);
+//		psWebPage->sIe.piWebBrowser2->lpVtbl->put_Silent(psWebPage->sIe.piWebBrowser2, (VARIANT_BOOL) true); // MOdalità silenziona
+		psWebPage->sIe.piWebBrowser2->lpVtbl->put_Silent(psWebPage->sIe.piWebBrowser2, bSilent?VARIANT_TRUE:VARIANT_FALSE); // MOdalità silenziona
 	
 		VariantInit(&vUrl);
 		vUrl.vt = VT_BSTR;
@@ -3081,12 +3326,11 @@ BOOL bwsSetUrl(CHAR * pszObj,CHAR * pszUrl,DWORD dwTimeout) {
 		vUrl.bstrVal = SysAllocString(pwcUrl);
 		ehFree(pwcUrl);
 		psWebPage->sIe.piWebBrowser2->lpVtbl->Navigate2(psWebPage->sIe.piWebBrowser2, &vUrl, 0, 0, 0, 0);
-		VariantClear(&vUrl);
+	//	VariantClear(&vUrl);
 
 		if (dwTimeout) {
 			while (true) {
 
-			
 				msElapsed=(DWORD) ((double) chronoGet(&dwRif)/CLOCKS_PER_SEC*1000);
 				if (psWebPage->fPageReady) {
 					
@@ -3096,19 +3340,50 @@ BOOL bwsSetUrl(CHAR * pszObj,CHAR * pszUrl,DWORD dwTimeout) {
 				}
 
 				if (msElapsed>dwTimeout) break;
-				PauseActive(100);
+				PauseActive(500);
 			}
-		
-		
 		}
+
+		VariantClear(&vUrl);
+
+
 	}
 
-
-
 	return bDone;
-
 }
 
+//
+// bwsVisible()
+//
+BOOL	bwsVisible(CHAR * pszObj,BOOL bShow) {
+
+	_IEI * psIe;
+	EH_OBJ *	psObj;
+	EH_WEBPAGE *psWebPage=NULL;
+	BOOL		bDone=false;
+//	VARIANT		vUrl;
+//	WCHAR *		pwcUrl;
+	
+ 	psObj=obj_GetInfo(pszObj); if (psObj) 	psWebPage=psObj->pOther; 
+	psIe=&psWebPage->sIe;
+
+	if (bShow) {
+		//psIe->piWebBrowser2->lpVtbl->put_Visible(psIe->piWebBrowser2,VARIANT_TRUE);		
+			psIe->piWebBrowser2->lpVtbl->put_Width(psIe->piWebBrowser2, psWebPage->sizWin.cx);
+			psIe->piWebBrowser2->lpVtbl->put_Height(psIe->piWebBrowser2, psWebPage->sizWin.cy);
+
+	}
+		else	
+		//psIe->piWebBrowser2->lpVtbl->put_Visible(psIe->piWebBrowser2,VARIANT_FALSE);		
+		{
+	
+			psIe->piWebBrowser2->lpVtbl->put_Width(psIe->piWebBrowser2, 0);
+			psIe->piWebBrowser2->lpVtbl->put_Height(psIe->piWebBrowser2, 0);
+
+		}	
+
+	return false;
+}
 
 //
 // bwsWaitUrl()
@@ -3163,7 +3438,7 @@ BOOL	bwsWaitUrl(CHAR * pszObj,CHAR * pszWildCharUrl,CHAR * pszUrl,INT iUrlSize,D
 				if (!msWaiting||bReady) break;
 				msElapsed=(DWORD) ((double) chronoGet(&dwRif)/CLOCKS_PER_SEC*1000);
 				if (msElapsed>msWaiting) break;
-				PauseActive(200);
+				PauseActive(300);
 
 			}
 
@@ -3315,7 +3590,7 @@ BOOL bwsJavascriptEx(CHAR * pszObj,DWORD msReply,CHAR * pszFormat,...) {
 		if (!msReply||bDone) break;
 		msElapsed=(DWORD) ((double) chronoGet(&dwRif)/CLOCKS_PER_SEC*1000);
 		if (msElapsed>msReply) break;
-		PauseActive(100);
+		PauseActive(300);
 
 	}
 	return bDone;
@@ -3325,7 +3600,7 @@ BOOL bwsJavascriptEx(CHAR * pszObj,DWORD msReply,CHAR * pszFormat,...) {
 //
 // bwsSetValue()
 //
-BOOL bwsSetValue(CHAR * pszObj,CHAR * pszNameId,CHAR * pszFormat,...) {
+BOOL bwsSetValue(CHAR * pszObj,CHAR * pszNameId,BOOL bUtf8,CHAR * pszFormat,...) {
 	
 	BOOL bDone=false;
 	IHTMLElement *  piElement;
@@ -3334,13 +3609,25 @@ BOOL bwsSetValue(CHAR * pszObj,CHAR * pszNameId,CHAR * pszFormat,...) {
 	CHAR * pszValue;
 	strFromArgs(pszFormat,pszValue);
 
-	if (bwsElementReady(pszObj,pszNameId, false,5000, &piElement)) {
+	if (bwsElementReady(pszObj,pszNameId, false,psWebPage->msTimeoutField, &piElement)) {
 
 			VARIANT		 var;
 			BSTR		bsValue;
 			VariantInit(&var);
 			var.vt = VT_BSTR;
-			if (pszValue) _StrToBstr(psWebPage, pszValue, &var.bstrVal);
+			if (pszValue) 
+			{
+				if (bUtf8) 
+				{
+					WCHAR * pwc=strDecode(pszValue,SD_UTF8,NULL);
+					var.bstrVal= SysAllocString(pwc); 
+					ehFreeNN(pwc);
+
+				} else {
+					_StrToBstr(psWebPage, pszValue, &var.bstrVal);
+				}
+			}
+			
 			_StrToBstr(psWebPage, "value", &bsValue);
 			hr=piElement->lpVtbl->setAttribute(piElement,bsValue,var,false);
 			if ( !SUCCEEDED(hr) ) {
@@ -3353,10 +3640,31 @@ BOOL bwsSetValue(CHAR * pszObj,CHAR * pszNameId,CHAR * pszFormat,...) {
 			bDone=true;
 	
 	} else {
-		printf("bwsSetValue(%s) error",pszNameId);
+
+		printf("bwsSetValue(%s) error" CRLF,pszNameId);
+
 	}
 	ehFree(pszValue);
 	return bDone;
+}
+
+//
+// bwsSetScroll()
+//
+BOOL bwsSetScroll(CHAR * pszObj,INT iValue) {
+
+	EH_WEBPAGE * psWebPage=_getWebPage(pszObj);
+	_IEI *	psIe=&psWebPage->sIe;
+	IHTMLWindow2   *	piHtmlWin2;
+
+	if (!psWebPage) return true;
+
+	psIe->piHtmlDoc2->lpVtbl->get_parentWindow(psIe->piHtmlDoc2,&piHtmlWin2);
+	piHtmlWin2->lpVtbl->scroll(piHtmlWin2,iValue,0);
+
+	return false;
+
+
 }
 
 
@@ -3462,7 +3770,7 @@ CHAR * bwsGetValue(CHAR * pszObj,CHAR * pszFormat, ...) {
 	CHAR * pszValue=NULL;
 	CHAR * pszNameId;
 	strFromArgs(pszFormat,pszNameId);
-	if (bwsElementReady(pszObj,pszNameId, false,5000, &piElement)) {
+	if (bwsElementReady(pszObj,pszNameId, false,psWebPage->msTimeoutField, &piElement)) {
 
 			BSTR	bsName,bstrReturn=NULL;
 			IDispatch * piItemDispatch;
@@ -4060,8 +4368,64 @@ DWORD	bwsSetEmulation(DWORD dwEmulation) {
 	//
 	// Setto al versione
 	//
+	// Fino a /main, speriamo che esista
+
+	sprintf(szServ,"HKEY_CURRENT_USER/Software/Microsoft/Internet Explorer/Main/FeatureControl");
+	if (msSetRegisterKey(szServ,&dwVersionSet,sizeof(dwVersionSet),REG_NONE)) {
+		alert("Non posso creare %s",szServ);
+	}
+
+	sprintf(szServ,"HKEY_CURRENT_USER/Software/Microsoft/Internet Explorer/Main/FeatureControl/FEATURE_BROWSER_EMULATION");
+	if (msSetRegisterKey(szServ,&dwVersionSet,sizeof(dwVersionSet),REG_NONE)) {
+		alert("Non posso creare %s",szServ);
+	}
+
 	sprintf(szServ,"HKEY_CURRENT_USER/Software/Microsoft/Internet Explorer/Main/FeatureControl/FEATURE_BROWSER_EMULATION/%s",fileName(sys.szAppNameFull));
 	if (msSetRegisterKey(szServ,&dwVersionSet,sizeof(dwVersionSet),REG_DWORD)) dwVersionSet=0;
 
 	return dwVersionSet;
+}
+
+//
+// bwsSetLoading()
+//
+BOOL bwsSetLoading(CHAR * pszObj, DWORD dwStatus) {
+
+   	EH_WEBPAGE * psWebPage;
+	psWebPage=_getWebPage(pszObj); if (!psWebPage) return true;
+	psWebPage->iStatusLoading=dwStatus;
+
+	return false;
+
+}
+
+//
+// bwsLoadingWaiting()
+//
+BOOL	bwsLoadingWaiting(CHAR * pszObj, DWORD dwStatus, DWORD dwTimeout) {
+
+   	EH_WEBPAGE * psWebPage;
+	BOOL bDone=false;
+	psWebPage=_getWebPage(pszObj); if (!psWebPage) return false;
+
+	if (dwTimeout) {
+
+		DWORD dwRif,msElapsed;
+		_IEI *	psIe=&psWebPage->sIe;
+		chronoStart(&dwRif);
+		while (true) {
+
+			msElapsed=(DWORD) ((double) chronoGet(&dwRif)/CLOCKS_PER_SEC*1000);
+
+			if ((psWebPage->iStatusLoading&dwStatus)==dwStatus) {
+				bDone=true;
+				break;
+			}
+
+			if (msElapsed>dwTimeout) break;
+			PauseActive(300);
+		}
+	}
+	return bDone;
+
 }

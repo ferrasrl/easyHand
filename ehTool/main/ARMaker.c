@@ -215,6 +215,7 @@ EH_ARF ARFHdlToPtr(SINT hdl) // Uso interno
 	lpOldPtr=memoPtr(hdl,NULL);
 	dwSize=sys.arMemoElement[hdl].dwSize;
 	lpRet=ehAlloc(dwSize); 
+	printf("dwSize:%d:%d",hdl,dwSize);
 	memcpy(lpRet,lpOldPtr,dwSize);
 	memoFree(hdl,"Temp");
 	

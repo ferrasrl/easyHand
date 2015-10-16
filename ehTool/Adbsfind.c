@@ -139,7 +139,7 @@ static SINT Ladb_Sfind(SINT Hdb,SINT Idx,SINT modo,SINT NumPt,va_list Ah)
 			case ADB_NUME:
 			case ADB_BOOL:
 			case ADB_INT :
-			case ADB_INT32:
+			case ADB_UINT32:
 			case ADB_COBN:
 			case ADB_COBD:
 			case ADB_AINC:

@@ -1,6 +1,6 @@
 //   ---------------------------------------------
 //   | xmlDoc
-//   |				di documenti XML                 |
+//   |				di documenti XML             |
 //   |                                           |
 //   |             by Ferr… Art & Tecnology 2001 |
 //   |             Giugno 2001
@@ -83,6 +83,7 @@ struct xmlDocument {
 	INT	*	arId;	// Indice degli ID
 	
 	INT		iCurrentLine;
+	BOOL	bNotHeaderXml;
 
 };
 typedef struct xmlDocument XMLD;
@@ -97,7 +98,10 @@ BOOL	xmlClose(XMLD *,BOOL bSave);
 PXML	xmlGet(XMLD * pxDoc, CHAR * pszFormat,...);
 DWORD	xmlLength(XMLD * pxDoc, CHAR * pszFormat);
 PXML	xmlAdd(XMLD * pxDoc, BOOL bAddEver, PXML pxParent, CHAR * pszNew,...);
+XMLPTR	xmlAppendChild(XMLD * pxDoc, XMLPTR pxParent, CHAR * pszNew,...);
+XMLPTR	xmlSet(XMLD * pxDoc, BOOL bAddEver, XMLPTR pxParent, CHAR * pszNew,...); // new 2014
 BOOL	xmlRemove(XMLD * pxDoc, PXML pxElement,BOOL bOnlyChildren);
+
 void	xmlPrint(XMLD * pxDoc,PXML pxElement);
 EH_LST	xmlToLst(XMLPTR pxStart,EH_LST lst);
 
